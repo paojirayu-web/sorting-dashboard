@@ -1,0 +1,3 @@
+{
+  "/api/export/daily-defects/excel/route": "app/api/export/daily-defects/excel/route.js"
+}

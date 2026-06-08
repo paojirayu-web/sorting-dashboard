@@ -21,7 +21,6 @@
 /build
 
 # misc
-/data/
 .DS_Store
 *.pem
 
@@ -31,24 +30,11 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
-
 # vercel
 .vercel
 
 # typescript
-*.tsbuildinfo
 next-env.d.ts
 
-# local debug / build artifacts
-production_package/
-build_log*.txt
-debug_*
-full-error.txt
-db-error.txt
-tsc-output.txt
-working-data.txt
-test-conn.py
-test_api.js
+# temp script output only
 scripts/tmp-*

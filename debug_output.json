@@ -1,0 +1,924 @@
+{
+  "computed_reasons": [
+    {
+      "computed_cp": "C",
+      "sub_typ": "เจียร์",
+      "rsn_desc": "J จุดดำ P",
+      "total_qty": 2483
+    },
+    {
+      "computed_cp": "C",
+      "sub_typ": "เจียร์",
+      "rsn_desc": "J เศษปะทุตัว P",
+      "total_qty": 2166
+    },
+    {
+      "computed_cp": "C",
+      "sub_typ": "P",
+      "rsn_desc": "เคลือบกระเทาะ P",
+      "total_qty": 1846
+    },
+    {
+      "computed_cp": "C",
+      "sub_typ": "P",
+      "rsn_desc": "รูตัว  P",
+      "total_qty": 1234
+    },
+    {
+      "computed_cp": "C",
+      "sub_typ": "P",
+      "rsn_desc": "ปั่นปาก ขอบสาก P",
+      "total_qty": 996
+    },
+    {
+      "computed_cp": "C",
+      "sub_typ": "P",
+      "rsn_desc": "น้ำยาไม่จับ P",
+      "total_qty": 682
+    },
+    {
+      "computed_cp": "C",
+      "sub_typ": "เจียร์",
+      "rsn_desc": "J เศษจากเตา P",
+      "total_qty": 460
+    },
+    {
+      "computed_cp": "C",
+      "sub_typ": "เจียร์",
+      "rsn_desc": "J เศษบอมกันเบี้ยวติด P",
+      "total_qty": 445
+    },
+    {
+      "computed_cp": "C",
+      "sub_typ": "เจียร์",
+      "rsn_desc": "J รอยโป๊ว P",
+      "total_qty": 213
+    },
+    {
+      "computed_cp": "C",
+      "sub_typ": "C",
+      "rsn_desc": "C เศษเดือดปะทุ",
+      "total_qty": 139
+    },
+    {
+      "computed_cp": "C",
+      "sub_typ": "C",
+      "rsn_desc": "C จุดดำ - จุดสี",
+      "total_qty": 124
+    },
+    {
+      "computed_cp": "C",
+      "sub_typ": "C",
+      "rsn_desc": "C บิ่นหลังเคลือบทุกกรณี",
+      "total_qty": 124
+    },
+    {
+      "computed_cp": "C",
+      "sub_typ": "C",
+      "rsn_desc": "C ขอบน้ำเคลือบ(ขอบชิ้นงา",
+      "total_qty": 105
+    },
+    {
+      "computed_cp": "C",
+      "sub_typ": "C",
+      "rsn_desc": "C เบี้ยว ,รูปทรงไม่ได้มา",
+      "total_qty": 86
+    },
+    {
+      "computed_cp": "C",
+      "sub_typ": "C",
+      "rsn_desc": "C บิ่นก่อนเคลือบ",
+      "total_qty": 76
+    },
+    {
+      "computed_cp": "C",
+      "sub_typ": "P",
+      "rsn_desc": "น้ำยาร้าว P",
+      "total_qty": 72
+    },
+    {
+      "computed_cp": "C",
+      "sub_typ": "C",
+      "rsn_desc": "C เคลือบผิวส้ม",
+      "total_qty": 59
+    },
+    {
+      "computed_cp": "C",
+      "sub_typ": "C",
+      "rsn_desc": "C เศษติด บิต,เศษขนาดใหญ่",
+      "total_qty": 56
+    },
+    {
+      "computed_cp": "C",
+      "sub_typ": "P",
+      "rsn_desc": "P โป้วไม่เต็ม(ยุบ)",
+      "total_qty": 39
+    },
+    {
+      "computed_cp": "C",
+      "sub_typ": "C",
+      "rsn_desc": "C แผลรอยเจียร์ลึกเกินไป",
+      "total_qty": 37
+    },
+    {
+      "computed_cp": "C",
+      "sub_typ": "C",
+      "rsn_desc": "C รอยน้ำยามาก",
+      "total_qty": 32
+    },
+    {
+      "computed_cp": "C",
+      "sub_typ": "C",
+      "rsn_desc": "C เรียงติดกันมาจากเตาเผา",
+      "total_qty": 31
+    },
+    {
+      "computed_cp": "C",
+      "sub_typ": "C",
+      "rsn_desc": "C ก้นร้าว",
+      "total_qty": 29
+    },
+    {
+      "computed_cp": "C",
+      "sub_typ": "C",
+      "rsn_desc": "C ปากร้าว",
+      "total_qty": 28
+    },
+    {
+      "computed_cp": "C",
+      "sub_typ": "เจียร์",
+      "rsn_desc": "J จุดสี P",
+      "total_qty": 28
+    },
+    {
+      "computed_cp": "C",
+      "sub_typ": "เจียร์",
+      "rsn_desc": "J เศษบิต P",
+      "total_qty": 15
+    },
+    {
+      "computed_cp": "C",
+      "sub_typ": "C",
+      "rsn_desc": "C โป่งบวม",
+      "total_qty": 13
+    },
+    {
+      "computed_cp": "C",
+      "sub_typ": "C",
+      "rsn_desc": "C ยุบ,บุ๋มบิ๊ม",
+      "total_qty": 8
+    },
+    {
+      "computed_cp": "C",
+      "sub_typ": "C",
+      "rsn_desc": "C น้ำยาร้าว(คอริ้ง)",
+      "total_qty": 6
+    },
+    {
+      "computed_cp": "C",
+      "sub_typ": "C",
+      "rsn_desc": "C เคลือบเดือด",
+      "total_qty": 5
+    },
+    {
+      "computed_cp": "C",
+      "sub_typ": "C",
+      "rsn_desc": "C รอยโป้ว",
+      "total_qty": 3
+    },
+    {
+      "computed_cp": "C",
+      "sub_typ": "C",
+      "rsn_desc": "C สีเลอะ",
+      "total_qty": 3
+    },
+    {
+      "computed_cp": "C",
+      "sub_typ": "C",
+      "rsn_desc": "C ป่อง,เว้า,เนื้อแหว่ง",
+      "total_qty": 2
+    },
+    {
+      "computed_cp": "C",
+      "sub_typ": "C",
+      "rsn_desc": "C ร้าวแคร๊ก",
+      "total_qty": 1
+    },
+    {
+      "computed_cp": "C",
+      "sub_typ": "C",
+      "rsn_desc": "C เคลือบกระเทาะ",
+      "total_qty": 1
+    },
+    {
+      "computed_cp": "C (Round 1)",
+      "sub_typ": "P",
+      "rsn_desc": "ซ่อมขอบปั่นปาก P",
+      "total_qty": 9780
+    },
+    {
+      "computed_cp": "C (Round 1)",
+      "sub_typ": "เจียร์",
+      "rsn_desc": "J จุดดำ P",
+      "total_qty": 4256
+    },
+    {
+      "computed_cp": "C (Round 1)",
+      "sub_typ": "P",
+      "rsn_desc": "รูตัว  P",
+      "total_qty": 4193
+    },
+    {
+      "computed_cp": "C (Round 1)",
+      "sub_typ": "เจียร์",
+      "rsn_desc": "J เศษปะทุตัว P",
+      "total_qty": 886
+    },
+    {
+      "computed_cp": "C (Round 1)",
+      "sub_typ": "C",
+      "rsn_desc": "C จุดดำ - จุดสี",
+      "total_qty": 722
+    },
+    {
+      "computed_cp": "C (Round 1)",
+      "sub_typ": "C",
+      "rsn_desc": "C บิ่นหลังเคลือบทุกกรณี",
+      "total_qty": 536
+    },
+    {
+      "computed_cp": "C (Round 1)",
+      "sub_typ": "เจียร์",
+      "rsn_desc": "J จุดสี P",
+      "total_qty": 433
+    },
+    {
+      "computed_cp": "C (Round 1)",
+      "sub_typ": "C",
+      "rsn_desc": "C ก้นร้าว",
+      "total_qty": 423
+    },
+    {
+      "computed_cp": "C (Round 1)",
+      "sub_typ": "P",
+      "rsn_desc": "น้ำยาร้าว P",
+      "total_qty": 403
+    },
+    {
+      "computed_cp": "c (Round 1)",
+      "sub_typ": "เจียร์",
+      "rsn_desc": "J เศษจากเตา P",
+      "total_qty": 399
+    },
+    {
+      "computed_cp": "C (Round 1)",
+      "sub_typ": "C",
+      "rsn_desc": "C ปากร้าว",
+      "total_qty": 328
+    },
+    {
+      "computed_cp": "C (Round 1)",
+      "sub_typ": "เจียร์",
+      "rsn_desc": "J เศษบอมกันเบี้ยวติด P",
+      "total_qty": 257
+    },
+    {
+      "computed_cp": "c (Round 1)",
+      "sub_typ": "p",
+      "rsn_desc": "เคลือบกระเทาะ P",
+      "total_qty": 185
+    },
+    {
+      "computed_cp": "C (Round 1)",
+      "sub_typ": "C",
+      "rsn_desc": "C เศษติด บิต,เศษขนาดใหญ่",
+      "total_qty": 150
+    },
+    {
+      "computed_cp": "C (Round 1)",
+      "sub_typ": "เจียร์",
+      "rsn_desc": "J เศษบิต P",
+      "total_qty": 141
+    },
+    {
+      "computed_cp": "C (Round 1)",
+      "sub_typ": "P",
+      "rsn_desc": "P โป้วไม่เต็ม(ยุบ)",
+      "total_qty": 122
+    },
+    {
+      "computed_cp": "C (Round 1)",
+      "sub_typ": "C",
+      "rsn_desc": "C บิ่นก่อนเคลือบ",
+      "total_qty": 120
+    },
+    {
+      "computed_cp": "C (Round 1)",
+      "sub_typ": "C",
+      "rsn_desc": "C เบี้ยว ,รูปทรงไม่ได้มา",
+      "total_qty": 97
+    },
+    {
+      "computed_cp": "C (Round 1)",
+      "sub_typ": "C",
+      "rsn_desc": "C น้ำยาร้าว(คอริ้ง)",
+      "total_qty": 63
+    },
+    {
+      "computed_cp": "C (Round 1)",
+      "sub_typ": "C",
+      "rsn_desc": "C รอยน้ำยามาก",
+      "total_qty": 32
+    },
+    {
+      "computed_cp": "C (Round 1)",
+      "sub_typ": "C",
+      "rsn_desc": "C เคลือบผิวส้ม",
+      "total_qty": 27
+    },
+    {
+      "computed_cp": "C (Round 1)",
+      "sub_typ": "C",
+      "rsn_desc": "C รอยขอบก้อนดิน",
+      "total_qty": 19
+    },
+    {
+      "computed_cp": "C (Round 1)",
+      "sub_typ": "C",
+      "rsn_desc": "C โป่งบวม",
+      "total_qty": 14
+    },
+    {
+      "computed_cp": "C (Round 1)",
+      "sub_typ": "C",
+      "rsn_desc": "C ร้าวแคร๊ก",
+      "total_qty": 7
+    },
+    {
+      "computed_cp": "C (Round 1)",
+      "sub_typ": "C",
+      "rsn_desc": "C เศษเดือดปะทุ",
+      "total_qty": 7
+    },
+    {
+      "computed_cp": "C (Round 1)",
+      "sub_typ": "C",
+      "rsn_desc": "C รูดิน",
+      "total_qty": 6
+    },
+    {
+      "computed_cp": "C (Round 1)",
+      "sub_typ": "C",
+      "rsn_desc": "C ยุบ,บุ๋มบิ๊ม",
+      "total_qty": 5
+    },
+    {
+      "computed_cp": "C (Round 1)",
+      "sub_typ": "C",
+      "rsn_desc": "C ริ้วดิน ,คลื่นดิน",
+      "total_qty": 4
+    },
+    {
+      "computed_cp": "C (Round 1)",
+      "sub_typ": "C",
+      "rsn_desc": "C สีเลอะ",
+      "total_qty": 4
+    },
+    {
+      "computed_cp": "C (Round 1)",
+      "sub_typ": "C",
+      "rsn_desc": "C เคลือบเดือด",
+      "total_qty": 3
+    },
+    {
+      "computed_cp": "C (Round 1)",
+      "sub_typ": "C",
+      "rsn_desc": "C ฟุตร้าว",
+      "total_qty": 2
+    },
+    {
+      "computed_cp": "P1",
+      "sub_typ": "เจียร์",
+      "rsn_desc": "J จุดดำ P",
+      "total_qty": 1502
+    },
+    {
+      "computed_cp": "P1",
+      "sub_typ": "เจียร์",
+      "rsn_desc": "J เศษปะทุตัว P",
+      "total_qty": 1378
+    },
+    {
+      "computed_cp": "P1",
+      "sub_typ": "P",
+      "rsn_desc": "ปั่นปาก ขอบสาก P",
+      "total_qty": 441
+    },
+    {
+      "computed_cp": "P1",
+      "sub_typ": "P",
+      "rsn_desc": "น้ำยาไม่จับ P",
+      "total_qty": 432
+    },
+    {
+      "computed_cp": "P1",
+      "sub_typ": "P",
+      "rsn_desc": "รูตัว  P",
+      "total_qty": 422
+    },
+    {
+      "computed_cp": "P1",
+      "sub_typ": "เจียร์",
+      "rsn_desc": "J รอยโป๊ว P",
+      "total_qty": 335
+    },
+    {
+      "computed_cp": "P1",
+      "sub_typ": "เจียร์",
+      "rsn_desc": "J เศษจากเตา P",
+      "total_qty": 252
+    },
+    {
+      "computed_cp": "P1",
+      "sub_typ": "P",
+      "rsn_desc": "เคลือบกระเทาะ P",
+      "total_qty": 160
+    },
+    {
+      "computed_cp": "P1",
+      "sub_typ": "C",
+      "rsn_desc": "C จุดดำ - จุดสี",
+      "total_qty": 126
+    },
+    {
+      "computed_cp": "P1",
+      "sub_typ": "C",
+      "rsn_desc": "C บิ่นหลังเคลือบทุกกรณี",
+      "total_qty": 106
+    },
+    {
+      "computed_cp": "P1",
+      "sub_typ": "C",
+      "rsn_desc": "C แผลรอยเจียร์ลึกเกินไป",
+      "total_qty": 56
+    },
+    {
+      "computed_cp": "P1",
+      "sub_typ": "c",
+      "rsn_desc": "C เคลือบเดือด",
+      "total_qty": 47
+    },
+    {
+      "computed_cp": "P1",
+      "sub_typ": "C",
+      "rsn_desc": "C เศษติด บิต,เศษขนาดใหญ่",
+      "total_qty": 43
+    },
+    {
+      "computed_cp": "P1",
+      "sub_typ": "C",
+      "rsn_desc": "C รอยโป้ว",
+      "total_qty": 34
+    },
+    {
+      "computed_cp": "P1",
+      "sub_typ": "C",
+      "rsn_desc": "C บิ่นก่อนเคลือบ",
+      "total_qty": 33
+    },
+    {
+      "computed_cp": "P1",
+      "sub_typ": "C",
+      "rsn_desc": "C ขอบน้ำเคลือบ(ขอบชิ้นงา",
+      "total_qty": 27
+    },
+    {
+      "computed_cp": "P1",
+      "sub_typ": "C",
+      "rsn_desc": "C เศษเดือดปะทุ",
+      "total_qty": 23
+    },
+    {
+      "computed_cp": "P1",
+      "sub_typ": "C",
+      "rsn_desc": "C เบี้ยว ,รูปทรงไม่ได้มา",
+      "total_qty": 22
+    },
+    {
+      "computed_cp": "P1",
+      "sub_typ": "เจียร์",
+      "rsn_desc": "J เศษบิต P",
+      "total_qty": 21
+    },
+    {
+      "computed_cp": "P1",
+      "sub_typ": "C",
+      "rsn_desc": "C รอยน้ำยามาก",
+      "total_qty": 15
+    },
+    {
+      "computed_cp": "P1",
+      "sub_typ": "C",
+      "rsn_desc": "C เคลือบผิวส้ม",
+      "total_qty": 12
+    },
+    {
+      "computed_cp": "P1",
+      "sub_typ": "P",
+      "rsn_desc": "น้ำยาร้าว P",
+      "total_qty": 10
+    },
+    {
+      "computed_cp": "P1",
+      "sub_typ": "C",
+      "rsn_desc": "C ผิวเคลือบตกผลึก",
+      "total_qty": 9
+    },
+    {
+      "computed_cp": "P1",
+      "sub_typ": "เจียร์",
+      "rsn_desc": "ซ่อมขอบปั่นปาก P",
+      "total_qty": 9
+    },
+    {
+      "computed_cp": "P1",
+      "sub_typ": "C",
+      "rsn_desc": "C เรียงติดกันมาจากเตาเผา",
+      "total_qty": 6
+    },
+    {
+      "computed_cp": "P1",
+      "sub_typ": "P",
+      "rsn_desc": "P โป้วไม่เต็ม(ยุบ)",
+      "total_qty": 6
+    },
+    {
+      "computed_cp": "P1",
+      "sub_typ": "C",
+      "rsn_desc": "C สีเลอะ",
+      "total_qty": 5
+    },
+    {
+      "computed_cp": "P1",
+      "sub_typ": "C",
+      "rsn_desc": "C ก้นร้าว",
+      "total_qty": 4
+    },
+    {
+      "computed_cp": "P1",
+      "sub_typ": "c",
+      "rsn_desc": "C ปากร้าว",
+      "total_qty": 4
+    },
+    {
+      "computed_cp": "P1",
+      "sub_typ": "C",
+      "rsn_desc": "C ยุบ,บุ๋มบิ๊ม",
+      "total_qty": 1
+    },
+    {
+      "computed_cp": "P2",
+      "sub_typ": "เจียร์",
+      "rsn_desc": "J เศษปะทุตัว P",
+      "total_qty": 1375
+    },
+    {
+      "computed_cp": "P2",
+      "sub_typ": "เจียร์",
+      "rsn_desc": "J จุดดำ P",
+      "total_qty": 1137
+    },
+    {
+      "computed_cp": "P2",
+      "sub_typ": "เจียร์",
+      "rsn_desc": "J รอยโป๊ว P",
+      "total_qty": 602
+    },
+    {
+      "computed_cp": "P2",
+      "sub_typ": "P",
+      "rsn_desc": "ปั่นปาก ขอบสาก P",
+      "total_qty": 429
+    },
+    {
+      "computed_cp": "P2",
+      "sub_typ": "P",
+      "rsn_desc": "น้ำยาไม่จับ P",
+      "total_qty": 294
+    },
+    {
+      "computed_cp": "P2",
+      "sub_typ": "เจียร์",
+      "rsn_desc": "J เศษจากเตา P",
+      "total_qty": 200
+    },
+    {
+      "computed_cp": "P2",
+      "sub_typ": "P",
+      "rsn_desc": "รูตัว  P",
+      "total_qty": 142
+    },
+    {
+      "computed_cp": "P2",
+      "sub_typ": "C",
+      "rsn_desc": "C แผลรอยเจียร์ลึกเกินไป",
+      "total_qty": 119
+    },
+    {
+      "computed_cp": "P2",
+      "sub_typ": "C",
+      "rsn_desc": "C จุดดำ - จุดสี",
+      "total_qty": 115
+    },
+    {
+      "computed_cp": "P2",
+      "sub_typ": "C",
+      "rsn_desc": "C เคลือบผิวส้ม",
+      "total_qty": 110
+    },
+    {
+      "computed_cp": "P2",
+      "sub_typ": "C",
+      "rsn_desc": "C บิ่นหลังเคลือบทุกกรณี",
+      "total_qty": 89
+    },
+    {
+      "computed_cp": "P2",
+      "sub_typ": "C",
+      "rsn_desc": "C เศษติด บิต,เศษขนาดใหญ่",
+      "total_qty": 52
+    },
+    {
+      "computed_cp": "P2",
+      "sub_typ": "C",
+      "rsn_desc": "C ขอบน้ำเคลือบ(ขอบชิ้นงา",
+      "total_qty": 46
+    },
+    {
+      "computed_cp": "P2",
+      "sub_typ": "C",
+      "rsn_desc": "C รอยโป้ว",
+      "total_qty": 39
+    },
+    {
+      "computed_cp": "P2",
+      "sub_typ": "C",
+      "rsn_desc": "C เศษเดือดปะทุ",
+      "total_qty": 32
+    },
+    {
+      "computed_cp": "P2",
+      "sub_typ": "C",
+      "rsn_desc": "C บิ่นก่อนเคลือบ",
+      "total_qty": 28
+    },
+    {
+      "computed_cp": "P2",
+      "sub_typ": "P",
+      "rsn_desc": "P โป้วไม่เต็ม(ยุบ)",
+      "total_qty": 21
+    },
+    {
+      "computed_cp": "P2",
+      "sub_typ": "C",
+      "rsn_desc": "C เคลือบเดือด",
+      "total_qty": 16
+    },
+    {
+      "computed_cp": "P2",
+      "sub_typ": "C",
+      "rsn_desc": "C เบี้ยว ,รูปทรงไม่ได้มา",
+      "total_qty": 14
+    },
+    {
+      "computed_cp": "P2",
+      "sub_typ": "P",
+      "rsn_desc": "พ่นทับรอยโป้ว P",
+      "total_qty": 10
+    },
+    {
+      "computed_cp": "P2",
+      "sub_typ": "C",
+      "rsn_desc": "C ก้นร้าว",
+      "total_qty": 7
+    },
+    {
+      "computed_cp": "P2",
+      "sub_typ": "C",
+      "rsn_desc": "C รอยน้ำยามาก",
+      "total_qty": 6
+    },
+    {
+      "computed_cp": "P2",
+      "sub_typ": "P",
+      "rsn_desc": "น้ำยาร้าว P",
+      "total_qty": 5
+    },
+    {
+      "computed_cp": "P2",
+      "sub_typ": "C",
+      "rsn_desc": "C ผิวเคลือบตกผลึก",
+      "total_qty": 5
+    },
+    {
+      "computed_cp": "P2",
+      "sub_typ": "C",
+      "rsn_desc": "C เรียงติดกันมาจากเตาเผา",
+      "total_qty": 3
+    },
+    {
+      "computed_cp": "P2",
+      "sub_typ": "C",
+      "rsn_desc": "C รูดิน",
+      "total_qty": 2
+    },
+    {
+      "computed_cp": "P2",
+      "sub_typ": "C",
+      "rsn_desc": "C ปากร้าว",
+      "total_qty": 2
+    },
+    {
+      "computed_cp": "P2",
+      "sub_typ": "C",
+      "rsn_desc": "C โป่งบวม",
+      "total_qty": 2
+    },
+    {
+      "computed_cp": "P2",
+      "sub_typ": "C",
+      "rsn_desc": "C ร้าวแคร๊ก",
+      "total_qty": 1
+    },
+    {
+      "computed_cp": "P3",
+      "sub_typ": "เจียร์",
+      "rsn_desc": "J เศษปะทุตัว P",
+      "total_qty": 78
+    },
+    {
+      "computed_cp": "P3",
+      "sub_typ": "เจียร์",
+      "rsn_desc": "J จุดดำ P",
+      "total_qty": 63
+    },
+    {
+      "computed_cp": "P3",
+      "sub_typ": "P",
+      "rsn_desc": "น้ำยาไม่จับ P",
+      "total_qty": 37
+    },
+    {
+      "computed_cp": "P3",
+      "sub_typ": "เจียร์",
+      "rsn_desc": "J เศษจากเตา P",
+      "total_qty": 31
+    },
+    {
+      "computed_cp": "P3",
+      "sub_typ": "เจียร์",
+      "rsn_desc": "J รอยโป๊ว P",
+      "total_qty": 19
+    },
+    {
+      "computed_cp": "P3",
+      "sub_typ": "C",
+      "rsn_desc": "C บิ่นหลังเคลือบทุกกรณี",
+      "total_qty": 13
+    },
+    {
+      "computed_cp": "P3",
+      "sub_typ": "C",
+      "rsn_desc": "C เคลือบผิวส้ม",
+      "total_qty": 12
+    },
+    {
+      "computed_cp": "P3",
+      "sub_typ": "C",
+      "rsn_desc": "C จุดดำ - จุดสี",
+      "total_qty": 2
+    },
+    {
+      "computed_cp": "P3",
+      "sub_typ": "C",
+      "rsn_desc": "C แผลรอยเจียร์ลึกเกินไป",
+      "total_qty": 2
+    },
+    {
+      "computed_cp": "P3",
+      "sub_typ": "C",
+      "rsn_desc": "C รอยโป้ว",
+      "total_qty": 2
+    },
+    {
+      "computed_cp": "P4",
+      "sub_typ": "เจียร์",
+      "rsn_desc": "J รอยโป๊ว P",
+      "total_qty": 107
+    },
+    {
+      "computed_cp": "P4",
+      "sub_typ": "เจียร์",
+      "rsn_desc": "J จุดดำ P",
+      "total_qty": 29
+    },
+    {
+      "computed_cp": "P4",
+      "sub_typ": "เจียร์",
+      "rsn_desc": "J เศษปะทุตัว P",
+      "total_qty": 19
+    },
+    {
+      "computed_cp": "P4",
+      "sub_typ": "P",
+      "rsn_desc": "น้ำยาไม่จับ P",
+      "total_qty": 12
+    },
+    {
+      "computed_cp": "P4",
+      "sub_typ": "C",
+      "rsn_desc": "C แผลรอยเจียร์ลึกเกินไป",
+      "total_qty": 7
+    },
+    {
+      "computed_cp": "P4",
+      "sub_typ": "C",
+      "rsn_desc": "C ผิวเคลือบตกผลึก",
+      "total_qty": 6
+    },
+    {
+      "computed_cp": "P4",
+      "sub_typ": "C",
+      "rsn_desc": "C เศษเดือดปะทุ",
+      "total_qty": 4
+    },
+    {
+      "computed_cp": "P4",
+      "sub_typ": "C",
+      "rsn_desc": "C บิ่นหลังเคลือบทุกกรณี",
+      "total_qty": 4
+    },
+    {
+      "computed_cp": "P4",
+      "sub_typ": "C",
+      "rsn_desc": "C รอยโป้ว",
+      "total_qty": 3
+    },
+    {
+      "computed_cp": "P4",
+      "sub_typ": "P",
+      "rsn_desc": "รูตัว  P",
+      "total_qty": 2
+    },
+    {
+      "computed_cp": "P4",
+      "sub_typ": "C",
+      "rsn_desc": "C เบี้ยว ,รูปทรงไม่ได้มา",
+      "total_qty": 1
+    }
+  ],
+  "computed_metrics": [
+    {
+      "m_cp": "C",
+      "totalQtyp": 20942,
+      "totalQtycomp": 9295,
+      "totalScrap": 968,
+      "totalReject": 10679
+    },
+    {
+      "m_cp": "c (Round 1)",
+      "totalQtyp": 23624,
+      "totalQtycomp": 0,
+      "totalScrap": 2569,
+      "totalReject": 21055
+    },
+    {
+      "m_cp": "P1",
+      "totalQtyp": 10569,
+      "totalQtycomp": 5028,
+      "totalScrap": 573,
+      "totalReject": 4968
+    },
+    {
+      "m_cp": "P2",
+      "totalQtyp": 9015,
+      "totalQtycomp": 4112,
+      "totalScrap": 688,
+      "totalReject": 4215
+    },
+    {
+      "m_cp": "P3",
+      "totalQtyp": 494,
+      "totalQtycomp": 235,
+      "totalScrap": 31,
+      "totalReject": 228
+    },
+    {
+      "m_cp": "P4",
+      "totalQtyp": 320,
+      "totalQtycomp": 126,
+      "totalScrap": 25,
+      "totalReject": 169
+    }
+  ]
+}

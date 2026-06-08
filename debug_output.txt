@@ -1,0 +1,60 @@
+Inspecting one row to see column names:
+Columns: m_trans, m_op, m_wrkc, m_mch, m_user, m_date, m_job, m_belt, m_shift, m_time1, m_time2, m_run, m_srun, m_man, m_doc, m_part, pt_desc1, pt_desc2, m_line, m_cp, m_kiln, qtyp, qtya, qtyaw, qtyb, qtyd, qtyc, qtyj, qtypr, qtycomp, qtyscrp, qtyrjct, sub_typ, sub_qty, sub_reason, rsn_desc, userlog, unit
+
+Searching for any column containing 'Jmmd72' (Case-insensitive):
+
+Searching in rsn_desc...
+
+Searching in pt_desc1...
+Found in pt_desc1 -> Date: 2018-04-19 00:00:00, Product: W/W JMMD72/G9950(VGA), Type: A รอ/แยก, Reason: None, Qty: 24
+Found in pt_desc1 -> Date: 2018-04-19 00:00:00, Product: W/W JMMD72/G9950(VGA), Type: C, Reason: C บิ่นก่อนเคลือบ, Qty: 2
+Found in pt_desc1 -> Date: 2018-04-19 00:00:00, Product: W/W JMMD72/G9950(VGA), Type: C, Reason: C บิ่นหลังเคลือบทุกกรณี, Qty: 1
+Found in pt_desc1 -> Date: 2018-04-19 00:00:00, Product: W/W JMMD72/G9950(VGA), Type: C, Reason: C ผิวเคลือบตกผลึก, Qty: 1
+Found in pt_desc1 -> Date: 2018-04-19 00:00:00, Product: W/W JMMD72/G9950(VGA), Type: เจียร์, Reason: J เศษติด อลูมิน่า P, Qty: 9
+Found in pt_desc1 -> Date: 2018-04-19 00:00:00, Product: W/W JMMD72/G9950(VGA), Type: เจียร์, Reason: J เศษปะทุตัว P, Qty: 10
+Found in pt_desc1 -> Date: 2018-06-08 00:00:00, Product: W/W JMMD72/G9950(VGA), Type: A รอ/แยก, Reason: None, Qty: 7
+Found in pt_desc1 -> Date: 2018-06-08 00:00:00, Product: W/W JMMD72/G9950(VGA), Type: C, Reason: C บิ่นก่อนเคลือบ, Qty: 2
+Found in pt_desc1 -> Date: 2018-06-08 00:00:00, Product: W/W JMMD72/G9950(VGA), Type: C, Reason: C ผิวเคลือบตกผลึก, Qty: 23
+Found in pt_desc1 -> Date: 2018-06-08 00:00:00, Product: W/W JMMD72/G9950(VGA), Type: C, Reason: C โป่งบวม, Qty: 1
+Found in pt_desc1 -> Date: 2018-06-08 00:00:00, Product: W/W JMMD72/G9950(VGA), Type: C, Reason: C เศษอลูมิน่า, Qty: 1
+Found in pt_desc1 -> Date: 2018-06-08 00:00:00, Product: W/W JMMD72/G9950(VGA), Type: C, Reason: C เศษติด บิต,เศษขนาดใหญ่, Qty: 1
+Found in pt_desc1 -> Date: 2018-06-08 00:00:00, Product: W/W JMMD72/G9950(VGA), Type: เจียร์, Reason: J เศษติด อลูมิน่า P, Qty: 8
+Found in pt_desc1 -> Date: 2018-06-08 00:00:00, Product: W/W JMMD72/G9950(VGA), Type: เจียร์, Reason: J เศษปะทุตัว P, Qty: 1
+Found in pt_desc1 -> Date: 2018-06-08 00:00:00, Product: W/W JMMD72/G9950(VGA), Type: P, Reason: เผาใหม่ รอยขีดข่วน P, Qty: 3
+Found in pt_desc1 -> Date: 2018-06-08 00:00:00, Product: W/W JMMD72/G9950(VGA), Type: P, Reason: น้ำยาไม่จับ P, Qty: 2
+Found in pt_desc1 -> Date: 2018-06-08 00:00:00, Product: W/W JMMD72/G9950(VGA), Type: P, Reason: ปั่นขอบปากขาว,หูขาว P, Qty: 33
+Found in pt_desc1 -> Date: 2020-05-18 00:00:00, Product: W/W JMMD72/G2965 SPRAY S003(VGA), Type: A รอ/แยก, Reason: None, Qty: 139
+Found in pt_desc1 -> Date: 2020-05-18 00:00:00, Product: W/W JMMD72/G2965 SPRAY S003(VGA), Type: C, Reason: C ฟุตกระดก, Qty: 8
+Found in pt_desc1 -> Date: 2020-05-18 00:00:00, Product: W/W JMMD72/G2965 SPRAY S003(VGA), Type: C, Reason: C บิ่นหลังเคลือบทุกกรณี, Qty: 3
+Found in pt_desc1 -> Date: 2020-05-18 00:00:00, Product: W/W JMMD72/G2965 SPRAY S003(VGA), Type: C, Reason: C เศษติด บิต,เศษขนาดใหญ่, Qty: 2
+Found in pt_desc1 -> Date: 2020-05-18 00:00:00, Product: W/W JMMD72/G2965 SPRAY S003(VGA), Type: เจียร์, Reason: J เศษจากเตา P, Qty: 20
+Found in pt_desc1 -> Date: 2020-05-18 00:00:00, Product: W/W JMMD72/G2965 SPRAY S003(VGA), Type: เจียร์, Reason: J เศษปะทุตัว P, Qty: 17
+Found in pt_desc1 -> Date: 2020-05-18 00:00:00, Product: W/W JMMD72/G2965 SPRAY S003(VGA), Type: P, Reason: น้ำยาไม่จับ P, Qty: 3
+Found in pt_desc1 -> Date: 2020-05-18 00:00:00, Product: W/W JMMD72/G2965 SPRAY S003(VGA), Type: P, Reason: รูหู   P, Qty: 3
+Found in pt_desc1 -> Date: 2020-05-18 00:00:00, Product: W/W JMMD72/G2965 SPRAY S003(VGA), Type: P, Reason: เผาใหม่ รอยขีดข่วน P, Qty: 10
+Found in pt_desc1 -> Date: 2020-05-18 00:00:00, Product: W/W JMMD72/T0040(VGA), Type: A, Reason: None, Qty: 68
+Found in pt_desc1 -> Date: 2020-05-18 00:00:00, Product: W/W JMMD72/T0040(VGA), Type: C, Reason: C เบี้ยว ,รูปทรงไม่ได้มา, Qty: 9
+Found in pt_desc1 -> Date: 2020-05-18 00:00:00, Product: W/W JMMD72/T0040(VGA), Type: C, Reason: C บิ่นหลังเคลือบทุกกรณี, Qty: 6
+Found in pt_desc1 -> Date: 2020-05-18 00:00:00, Product: W/W JMMD72/T0040(VGA), Type: เจียร์, Reason: J จุดดำ P, Qty: 2
+Found in pt_desc1 -> Date: 2020-05-18 00:00:00, Product: W/W JMMD72/T0040(VGA), Type: เจียร์, Reason: J เศษจากเตา P, Qty: 8
+Found in pt_desc1 -> Date: 2020-05-19 00:00:00, Product: W/W JMMD72/G2965 SPRAY S003(VGA), Type: A รอ/แยก, Reason: None, Qty: 2051
+Found in pt_desc1 -> Date: 2020-05-19 00:00:00, Product: W/W JMMD72/G2965 SPRAY S003(VGA), Type: C, Reason: C หูร้าว, Qty: 1
+Found in pt_desc1 -> Date: 2020-05-19 00:00:00, Product: W/W JMMD72/G2965 SPRAY S003(VGA), Type: C, Reason: C รอยน้ำยามาก, Qty: 4
+Found in pt_desc1 -> Date: 2020-05-19 00:00:00, Product: W/W JMMD72/G2965 SPRAY S003(VGA), Type: C, Reason: C โป่งบวม, Qty: 2
+Found in pt_desc1 -> Date: 2020-05-19 00:00:00, Product: W/W JMMD72/G2965 SPRAY S003(VGA), Type: C, Reason: C จุดดำ - จุดสี, Qty: 1
+Found in pt_desc1 -> Date: 2020-05-19 00:00:00, Product: W/W JMMD72/G2965 SPRAY S003(VGA), Type: C, Reason: C เศษติด บิต,เศษขนาดใหญ่, Qty: 1
+Found in pt_desc1 -> Date: 2020-05-19 00:00:00, Product: W/W JMMD72/G2965 SPRAY S003(VGA), Type: C, Reason: C เบี้ยว ,รูปทรงไม่ได้มา, Qty: 2
+Found in pt_desc1 -> Date: 2020-05-19 00:00:00, Product: W/W JMMD72/G2965 SPRAY S003(VGA), Type: C, Reason: C บิ่นก่อนเคลือบ, Qty: 1
+Found in pt_desc1 -> Date: 2020-05-19 00:00:00, Product: W/W JMMD72/G2965 SPRAY S003(VGA), Type: C, Reason: C บิ่นหลังเคลือบทุกกรณี, Qty: 26
+Found in pt_desc1 -> Date: 2020-05-19 00:00:00, Product: W/W JMMD72/G2965 SPRAY S003(VGA), Type: เจียร์, Reason: J รอยโป๊ว P, Qty: 4
+Found in pt_desc1 -> Date: 2020-05-19 00:00:00, Product: W/W JMMD72/G2965 SPRAY S003(VGA), Type: เจียร์, Reason: J เศษจากเตา P, Qty: 89
+Found in pt_desc1 -> Date: 2020-05-19 00:00:00, Product: W/W JMMD72/G2965 SPRAY S003(VGA), Type: เจียร์, Reason: J เศษปะทุตัว P, Qty: 48
+Found in pt_desc1 -> Date: 2020-05-19 00:00:00, Product: W/W JMMD72/G2965 SPRAY S003(VGA), Type: P, Reason: เคลือบกระเทาะ P, Qty: 25
+Found in pt_desc1 -> Date: 2020-05-19 00:00:00, Product: W/W JMMD72/G2965 SPRAY S003(VGA), Type: P, Reason: รูตัว  P, Qty: 9
+Found in pt_desc1 -> Date: 2020-05-19 00:00:00, Product: W/W JMMD72/G2965 SPRAY S003(VGA), Type: P, Reason: รูหู   P, Qty: 6
+Found in pt_desc1 -> Date: 2020-05-19 00:00:00, Product: W/W JMMD72/G2965 SPRAY S003(VGA), Type: P, Reason: เผาใหม่ รอยขีดข่วน P, Qty: 8
+Found in pt_desc1 -> Date: 2020-05-19 00:00:00, Product: W/W JMMD72/G2965 SPRAY S003(VGA), Type: 0, Reason: None, Qty: 0
+Found in pt_desc1 -> Date: 2020-05-19 00:00:00, Product: W/W JMMD72/G2965 SPRAY S003(VGA), Type: C, Reason: C หูร้าว, Qty: 5
+Found in pt_desc1 -> Date: 2020-05-19 00:00:00, Product: W/W JMMD72/G2965 SPRAY S003(VGA), Type: C, Reason: C ปากร้าว, Qty: 2
+
+Searching for 'JMMD72' (All caps) in rsn_desc:

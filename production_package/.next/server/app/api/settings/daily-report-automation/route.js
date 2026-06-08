@@ -1,0 +1,11 @@
+var R=require("../../../../chunks/[turbopack]_runtime.js")("server/app/api/settings/daily-report-automation/route.js")
+R.c("server/chunks/[root-of-the-server]__d407a52b._.js")
+R.c("server/chunks/[root-of-the-server]__6ac8ec31._.js")
+R.c("server/chunks/node_modules_9608d8e3._.js")
+R.c("server/chunks/_1e55387c._.js")
+R.c("server/chunks/node_modules_275fabdf._.js")
+R.c("server/chunks/node_modules_aadebe6d._.js")
+R.c("server/chunks/[root-of-the-server]__e0a33289._.js")
+R.c("server/chunks/ce889_server_app_api_settings_daily-report-automation_route_actions_bd775e79.js")
+R.m(231813)
+module.exports=R.m(231813).exports

@@ -1,0 +1,176 @@
+{
+  "version": 3,
+  "pages404": true,
+  "appType": "app",
+  "caseSensitive": false,
+  "basePath": "",
+  "redirects": [
+    {
+      "source": "/:path+/",
+      "destination": "/:path+",
+      "internal": true,
+      "priority": true,
+      "statusCode": 308,
+      "regex": "^(?:/((?:[^/]+?)(?:/(?:[^/]+?))*))/$"
+    }
+  ],
+  "headers": [],
+  "rewrites": {
+    "beforeFiles": [],
+    "afterFiles": [],
+    "fallback": []
+  },
+  "dynamicRoutes": [],
+  "staticRoutes": [
+    {
+      "page": "/",
+      "regex": "^/(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/(?:/)?$"
+    },
+    {
+      "page": "/api/automation/daily-report",
+      "regex": "^/api/automation/daily\\-report(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/automation/daily\\-report(?:/)?$"
+    },
+    {
+      "page": "/api/daily-defects",
+      "regex": "^/api/daily\\-defects(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/daily\\-defects(?:/)?$"
+    },
+    {
+      "page": "/api/data",
+      "regex": "^/api/data(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/data(?:/)?$"
+    },
+    {
+      "page": "/api/debug",
+      "regex": "^/api/debug(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/debug(?:/)?$"
+    },
+    {
+      "page": "/api/diagnostics/product-stats",
+      "regex": "^/api/diagnostics/product\\-stats(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/diagnostics/product\\-stats(?:/)?$"
+    },
+    {
+      "page": "/api/export/daily-defects/excel",
+      "regex": "^/api/export/daily\\-defects/excel(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/export/daily\\-defects/excel(?:/)?$"
+    },
+    {
+      "page": "/api/export/daily-defects/image",
+      "regex": "^/api/export/daily\\-defects/image(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/export/daily\\-defects/image(?:/)?$"
+    },
+    {
+      "page": "/api/export/product-sorting-log/excel",
+      "regex": "^/api/export/product\\-sorting\\-log/excel(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/export/product\\-sorting\\-log/excel(?:/)?$"
+    },
+    {
+      "page": "/api/monthly-stats",
+      "regex": "^/api/monthly\\-stats(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/monthly\\-stats(?:/)?$"
+    },
+    {
+      "page": "/api/product-date-range",
+      "regex": "^/api/product\\-date\\-range(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/product\\-date\\-range(?:/)?$"
+    },
+    {
+      "page": "/api/product-log",
+      "regex": "^/api/product\\-log(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/product\\-log(?:/)?$"
+    },
+    {
+      "page": "/api/product-reason-log",
+      "regex": "^/api/product\\-reason\\-log(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/product\\-reason\\-log(?:/)?$"
+    },
+    {
+      "page": "/api/products",
+      "regex": "^/api/products(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/products(?:/)?$"
+    },
+    {
+      "page": "/api/product-stats",
+      "regex": "^/api/product\\-stats(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/product\\-stats(?:/)?$"
+    },
+    {
+      "page": "/api/settings/daily-report-automation",
+      "regex": "^/api/settings/daily\\-report\\-automation(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/settings/daily\\-report\\-automation(?:/)?$"
+    },
+    {
+      "page": "/dashboard",
+      "regex": "^/dashboard(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard(?:/)?$"
+    },
+    {
+      "page": "/export/daily-defects/print",
+      "regex": "^/export/daily\\-defects/print(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/export/daily\\-defects/print(?:/)?$"
+    },
+    {
+      "page": "/favicon.ico",
+      "regex": "^/favicon\\.ico(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/favicon\\.ico(?:/)?$"
+    },
+    {
+      "page": "/_global-error",
+      "regex": "^/_global\\-error(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/_global\\-error(?:/)?$"
+    },
+    {
+      "page": "/_not-found",
+      "regex": "^/_not\\-found(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/_not\\-found(?:/)?$"
+    },
+    {
+      "page": "/reports/daily",
+      "regex": "^/reports/daily(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/reports/daily(?:/)?$"
+    }
+  ],
+  "dataRoutes": [],
+  "rsc": {
+    "header": "rsc",
+    "varyHeader": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch",
+    "prefetchHeader": "next-router-prefetch",
+    "didPostponeHeader": "x-nextjs-postponed",
+    "contentTypeHeader": "text/x-component",
+    "suffix": ".rsc",
+    "prefetchSegmentHeader": "next-router-segment-prefetch",
+    "prefetchSegmentSuffix": ".segment.rsc",
+    "prefetchSegmentDirSuffix": ".segments",
+    "clientParamParsing": false,
+    "dynamicRSCPrerender": false
+  },
+  "rewriteHeaders": {
+    "pathHeader": "x-nextjs-rewritten-path",
+    "queryHeader": "x-nextjs-rewritten-query"
+  }
+}
