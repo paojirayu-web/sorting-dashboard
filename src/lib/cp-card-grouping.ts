@@ -13,14 +13,6 @@ export function buildMergedPCardLabel(sourceMcps: string[]): string {
     return `Combine (${sourceMcps.join(', ')})`;
 }
 
-/** Wider grid span when more P cycles are merged (longer title). */
-export function getMergedCardGridClass(mergedFromCp: string[] | undefined): string {
-    const n = mergedFromCp?.length ?? 2;
-    if (n >= 4) return 'sm:col-span-2 lg:col-span-3 xl:col-span-4 2xl:col-span-4';
-    if (n === 3) return 'sm:col-span-2 lg:col-span-2 xl:col-span-3';
-    return 'sm:col-span-2';
-}
-
 export function collectPfiringCps(cps: CPData[]): string[] {
     return cps.filter((cp) => isPfiringCp(cp.m_cp)).map((cp) => cp.m_cp);
 }

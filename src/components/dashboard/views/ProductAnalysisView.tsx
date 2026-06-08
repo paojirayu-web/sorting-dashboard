@@ -14,12 +14,7 @@ import { DailyDetailModal } from '@/components/dashboard/DailyDetailModal';
 import { ExportProductSortingLogButton } from '@/components/dashboard/ExportProductSortingLogButton';
 import { QtyGradeSortingLog } from '@/components/dashboard/QtyGradeSortingLog';
 import { SectionHeader } from '@/components/dashboard/SectionHeader';
-import {
-    applyCpCardGrouping,
-    collectPfiringCps,
-    getMergedCardGridClass,
-    isMergedPCard,
-} from '@/lib/cp-card-grouping';
+import { applyCpCardGrouping, collectPfiringCps } from '@/lib/cp-card-grouping';
 import { PCardModeToggle, type PCardMode } from '@/components/dashboard/PCardModeToggle';
 import {
     buildFiringCycleQtyRows,
@@ -369,27 +364,20 @@ export function ProductAnalysisView({
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2">
-                                {displayCpBreakdown.map((cp, idx) => {
-                                    const merged = isMergedPCard(cp.m_cp);
-                                    return (
-                                        <div
-                                            key={`${cp.m_cp}-${idx}`}
-                                            className={`min-w-0 ${merged ? getMergedCardGridClass(cp.mergedFromCp) : ''}`}
-                                        >
-                                            <CompactCard
-                                                cp={cp}
-                                                theme={theme}
-                                                currentTheme={currentTheme}
-                                                showReject={showReject}
-                                                onCardClick={() => setSelectedCpCard(cp)}
-                                                onReasonClick={(r) => {
-                                                    setReasonChartMonth(null);
-                                                    setSelectedReason(r);
-                                                }}
-                                            />
-                                        </div>
-                                    );
-                                })}
+                                {displayCpBreakdown.map((cp, idx) => (
+                                    <CompactCard
+                                        key={`${cp.m_cp}-${idx}`}
+                                        cp={cp}
+                                        theme={theme}
+                                        currentTheme={currentTheme}
+                                        showReject={showReject}
+                                        onCardClick={() => setSelectedCpCard(cp)}
+                                        onReasonClick={(r) => {
+                                            setReasonChartMonth(null);
+                                            setSelectedReason(r);
+                                        }}
+                                    />
+                                ))}
                             </div>
                         )}
                     </section>

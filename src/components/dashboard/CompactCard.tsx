@@ -43,31 +43,23 @@ export function CompactCard({ cp, theme, showReject, onCardClick, onReasonClick 
                     onCardClick?.();
                 }
             }}
-            className={`${theme.cardBg} border ${theme.borderColor} rounded-xl p-2.5 shadow hover:shadow-md transition-all cursor-pointer h-full ${isMergedP ? 'min-w-0' : ''}`}
+            className={`${theme.cardBg} border ${theme.borderColor} rounded-xl p-2.5 shadow hover:shadow-md transition-all cursor-pointer`}
             title="Click to view all defects"
         >
             {/* Compact Header */}
             <div
-                className={
-                    isMergedP
-                        ? 'mb-2 space-y-1'
-                        : 'flex justify-between items-center gap-2 mb-2'
-                }
+                className={`flex justify-between gap-2 mb-2 ${isMergedP ? 'items-start' : 'items-center'}`}
             >
                 <h3
-                    className={`text-sm font-bold ${theme.textWhite} flex gap-1.5 min-w-0 ${isMergedP ? 'items-start leading-snug' : 'items-center truncate'}`}
+                    className={`text-sm font-bold ${theme.textWhite} flex items-center gap-1.5 min-w-0 flex-1 ${isMergedP ? '' : 'truncate'}`}
                     title={isMergedP ? undefined : cp.m_cp}
                 >
-                    <div
-                        className={`w-1 h-3.5 rounded-full shrink-0 mt-0.5 ${parseFloat(cp.metrics.scrapRate) > 5 ? 'bg-red-500' : 'bg-green-500'}`}
-                    />
-                    <span className={isMergedP ? 'whitespace-normal break-words' : 'truncate'}>
+                    <div className={`w-1 h-3.5 rounded-full shrink-0 ${parseFloat(cp.metrics.scrapRate) > 5 ? 'bg-red-500' : 'bg-green-500'}`} />
+                    <span className={isMergedP ? 'whitespace-normal break-words leading-snug' : 'truncate'}>
                         {cp.m_cp}
                     </span>
                 </h3>
-                <span
-                    className={`text-[15px] ${theme.textMuted} shrink-0 ${isMergedP ? 'block text-right' : ''}`}
-                >
+                <span className={`text-[15px] ${theme.textMuted} shrink-0`}>
                     Qty.Proc: <span className={theme.textPrimary}>{cp.metrics.totalQtyp.toLocaleString()}</span>
                 </span>
             </div>
