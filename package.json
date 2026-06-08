@@ -3,24 +3,37 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 8021",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 8021",
     "lint": "eslint"
   },
   "dependencies": {
+    "@napi-rs/canvas": "^1.0.0",
+    "@types/mssql": "^9.1.9",
+    "exceljs": "^4.4.0",
+    "form-data": "^4.0.5",
+    "lucide-react": "^0.563.0",
+    "mssql": "^12.2.0",
     "next": "16.1.6",
+    "node-cron": "^4.2.1",
+    "puppeteer": "^25.0.2",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "recharts": "^3.7.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/form-data": "^2.2.1",
     "@types/node": "^20",
+    "@types/node-cron": "^3.0.11",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^17.2.4",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
+    "tsx": "^4.21.0",
     "typescript": "^5"
   }
 }
