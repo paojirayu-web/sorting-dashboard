@@ -38,3 +38,13 @@ next-env.d.ts
 
 # temp script output only
 scripts/tmp-*
+
+# env (keep example only)
+.env
+.env.local
+.env.*.local
+
+# bundled deploy artifacts
+/production_package/node_modules/
+/production_package/.next/
+/production_package/.env
