@@ -7,6 +7,7 @@ import type { Theme, ThemeName } from '@/lib/themes';
 import type { CPData, DataItem, GroupedRow, ProductStats, SelectedReason, ReasonLogEntry, ReasonMonthlyEntry } from '@/types/dashboard';
 import { CompactCard } from '@/components/dashboard/CompactCard';
 import { FiringCycleQtyTable } from '@/components/dashboard/FiringCycleQtyTable';
+import { YieldPlanningCards } from '@/components/dashboard/YieldPlanningCards';
 import { ResponsiveReasonLog } from '@/components/dashboard/ResponsiveReasonLog';
 import { MultiCheckFilter } from '@/components/dashboard/MultiCheckFilter';
 import { CpDefectModal } from '@/components/dashboard/CpDefectModal';
@@ -27,6 +28,7 @@ import {
     collectKilnValues,
     getDefaultLogKilnFilters,
 } from '@/lib/product-sorting-log';
+import { buildYieldPlanningResult } from '@/lib/product-yield-planning';
 import { formatDateDisplay } from '@/lib/utils';
 
 type AnalysisLayoutMode = 'cards' | 'qty-table';
@@ -120,6 +122,14 @@ export function ProductAnalysisView({
             productStats?.cpBreakdown?.length
                 ? buildFiringCycleQtyRows(productStats.cpBreakdown)
                 : [],
+        [productStats?.cpBreakdown],
+    );
+
+    const yieldPlanning = useMemo(
+        () =>
+            productStats?.cpBreakdown?.length
+                ? buildYieldPlanningResult(productStats.cpBreakdown)
+                : { rows: [], divisorCp: null, divisorProcess: 0 },
         [productStats?.cpBreakdown],
     );
 
@@ -252,7 +262,9 @@ export function ProductAnalysisView({
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
                             <div className="flex items-center gap-2">
                                 <div className={`h-5 w-1 ${theme.accentBg} rounded-full`} />
-                                <h2 className={`text-base font-bold ${theme.textWhite}`}>Analysis Defects by Firing Cycle</h2>
+                                <h2 className={`text-base font-bold ${theme.textWhite}`}>
+                                    Analysis Defects by Firing Cycle
+                                </h2>
                             </div>
                             {layoutMode === 'cards' && (
                                 <div className="flex flex-wrap items-center gap-2">
@@ -286,6 +298,11 @@ export function ProductAnalysisView({
                             <div className="space-y-6">
                                 <FiringCycleQtyTable
                                     rows={firingCycleRows}
+                                    theme={theme}
+                                    currentTheme={currentTheme}
+                                />
+                                <YieldPlanningCards
+                                    data={yieldPlanning}
                                     theme={theme}
                                     currentTheme={currentTheme}
                                 />
@@ -347,7 +364,7 @@ export function ProductAnalysisView({
                                             </div>
                                         </div>
                                         <div
-                                            className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl overflow-hidden shadow-xl flex flex-col min-h-0 ${isSortingLogFullscreen ? 'flex-1' : ''}`}
+                                            className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl shadow-xl flex flex-col min-h-0 min-w-0 ${isSortingLogFullscreen ? 'flex-1 overflow-hidden' : ''}`}
                                         >
                                             <QtyGradeSortingLog
                                                 rows={sortingLogRows}

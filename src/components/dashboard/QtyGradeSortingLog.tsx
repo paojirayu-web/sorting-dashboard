@@ -124,15 +124,21 @@ export function QtyGradeSortingLog({
                                 </div>
                                 <div>
                                     <span className="text-green-600">Good</span>
-                                    <p className="font-bold text-green-500">{compRate.toFixed(0)}%</p>
+                                    <p className="font-bold text-green-500">
+                                        {item.qtycomp.toLocaleString()} ({compRate.toFixed(0)}%)
+                                    </p>
                                 </div>
                                 <div>
                                     <span className="text-red-600">Scrap</span>
-                                    <p className="font-bold text-red-500">{scrapRate.toFixed(0)}%</p>
+                                    <p className="font-bold text-red-500">
+                                        {item.totalScrap.toLocaleString()} ({scrapRate.toFixed(0)}%)
+                                    </p>
                                 </div>
                                 <div>
                                     <span className="text-orange-600">Rej</span>
-                                    <p className="font-bold text-orange-400">{rejectRate.toFixed(0)}%</p>
+                                    <p className="font-bold text-orange-400">
+                                        {item.totalReject.toLocaleString()} ({rejectRate.toFixed(0)}%)
+                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -140,8 +146,9 @@ export function QtyGradeSortingLog({
                 })}
             </div>
 
-            <div className={`hidden lg:flex lg:flex-col ${desktopScrollClass}`}>
-                <div className={`rounded-xl border ${gridBorder} overflow-hidden`}>
+            <div
+                className={`hidden lg:block table-scroll-x min-w-0 rounded-xl border ${gridBorder} ${desktopScrollClass}`}
+            >
                 <table className="w-full text-left border-collapse min-w-[920px]">
                     <thead className={`sticky top-0 z-30 ${isDark ? 'bg-zinc-800' : 'bg-gray-100'}`}>
                         <tr>
@@ -317,7 +324,6 @@ export function QtyGradeSortingLog({
                         })}
                     </tbody>
                 </table>
-                </div>
             </div>
         </div>
     );

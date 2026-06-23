@@ -142,5 +142,15 @@ export interface ProductItem {
     searchText: string;
 }
 
+export interface DefectReasonItem {
+    /** rsn_desc value */
+    value: string;
+    label: string;
+    searchText: string;
+    qty: number;
+}
+
+export type DefectListMode = 'scrap' | 'reject';
+
 // ─── View Types ──────────────────────────────────────────────
-export type ViewType = 'overview' | 'product-analysis' | 'monthly-analysis' | 'settings';
+export type ViewType = 'overview' | 'product-analysis' | 'monthly-analysis' | 'defect-analysis' | 'settings';

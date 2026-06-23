@@ -8,4 +8,5 @@ export { ResponsiveReasonLog } from './ResponsiveReasonLog';
 export { OverviewView } from './views/OverviewView';
 export { ProductAnalysisView } from './views/ProductAnalysisView';
 export { MonthlyAnalysisView } from './views/MonthlyAnalysisView';
+export { DefectAnalysisView } from './views/DefectAnalysisView';
 export { SettingsView } from './views/SettingsView';

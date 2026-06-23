@@ -69,6 +69,82 @@ export function SettingsView({ theme, currentTheme, setCurrentTheme }: SettingsV
                     theme={theme}
                 >
                 <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.4 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-06-22</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Defect Analysis — layout &amp; trend chart</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Side-by-side layout:</strong> Trend chart and monthly breakdown on one row (70% / 30%); filters (From / To / C/P) moved to the same row as the defect title.</li>
+                                <li><strong>Dual-axis trend:</strong> Left axis = %Total Scrap or Reject; right axis = Defect % (of output), scaled independently so defect up/down is easier to read.</li>
+                                <li><strong>Tooltip:</strong> Shows total %, defect %, and <strong>share of total scrap/reject</strong> with qty detail.</li>
+                                <li><strong>Removed</strong> the secondary defect zoom chart below the main trend.</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Defect Analysis — monthly breakdown</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Always expanded:</strong> Removed month collapse/expand; Top 3 ware or kiln per month shown directly.</li>
+                                <li><strong>Colors by mode:</strong> Scrap mode uses red; Reject mode uses orange (ware and kiln).</li>
+                                <li><strong>DW codeware:</strong> Ware rows show <code className={`${theme.inputBg} px-1 rounded`}>pt_desc1</code> on top and <code className={`${theme.inputBg} px-1 rounded`}>pt_desc2</code> below (143 series).</li>
+                                <li><strong>Scroll:</strong> Breakdown matches trend panel height; scroll when months exceed visible area.</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Defect Analysis — C/P C1 fix</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>C1 filter:</strong> Trend and breakdown queries now group by <code className={`${theme.inputBg} px-1 rounded`}>m_user</code> (not <code className={`${theme.inputBg} px-1 rounded`}>MAX(m_user)</code>) so somboon + CP=C rows classify as C1 correctly and <code className={`${theme.inputBg} px-1 rounded`}>sub_qty</code> is not lost when filtering C1.</li>
+                                <li><strong>Reject trend:</strong> Total line uses %Total Reject (<code className={`${theme.inputBg} px-1 rounded`}>qtyrjct</code> / <code className={`${theme.inputBg} px-1 rounded`}>qtyp</code>) in Reject mode.</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Product Analysis — Data Sorting Log (mobile)</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Qty + %:</strong> Mobile cards now show Good / Scrap / Reject as <strong>quantity (percent)</strong>, not percent only.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.3 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-06-22</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Defect Analysis (new page)</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Scrap / Reject toggle (header):</strong> Choose defect type before search — list and trend load only matching <code className={`${theme.inputBg} px-1 rounded`}>rsn_desc</code> rows.</li>
+                                <li><strong>Defect search:</strong> Search box lists <code className={`${theme.inputBg} px-1 rounded`}>rsn_desc</code> filtered by WW/DW/ALL and selected Scrap or Reject mode.</li>
+                                <li><strong>Monthly trend:</strong> Line chart and table for the selected defect, with C/P filter.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.2 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-06-22</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Product Analysis — Yield Planning</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Yield KPI cards (Table view):</strong> Shown between <strong>Analysis Defects by Firing Cycle</strong> and <strong>Data Sorting Log</strong> — no separate Defect/Yield toggle.</li>
+                                <li><strong>KPIs:</strong> <strong>Baseline Process</strong> (C or C1), <strong>Actual Yield (Total)</strong>, <strong>Reject Total</strong>, and <strong>Scrap Total</strong> — cumulative Good / Reject / Scrap vs baseline Process for production planning.</li>
+                                <li><strong>Through round:</strong> Dropdown to include firing cycles from the base round through the selected C/P (e.g. through P2); defaults to the last round with Process qty.</li>
+                                <li><strong>Planning note:</strong> P1/P2 totals may include carry-over from prior rounds; yield is a reference KPI, not strict lot-to-lot yield.</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Product Analysis — Data Sorting Log</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Table scroll:</strong> Fixed desktop layout so all columns (Good / Scrap / Reject) remain reachable via horizontal scroll; removed inner <code className={`${theme.inputBg} px-1 rounded`}>overflow-hidden</code> clipping.</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>UI fixes</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Dark theme:</strong> <strong>Through round</strong> filter text is readable (explicit select/option colors).</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
                     <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.1 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-06-06</span></h3>
                     <div className="space-y-4">
                         <div>
