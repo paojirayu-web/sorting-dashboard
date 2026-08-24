@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, LayoutGrid, Maximize2, Minimize2, Table2, XCircle, X } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import type { Theme, ThemeName } from '@/lib/themes';
@@ -27,9 +27,12 @@ import {
     collectCpValues,
     collectKilnValues,
     getDefaultLogKilnFilters,
+    matchesSelectedProduct,
 } from '@/lib/product-sorting-log';
+import { buildCpBreakdownFromRaw } from '@/lib/build-cp-from-raw';
 import { buildYieldPlanningResult } from '@/lib/product-yield-planning';
-import { formatDateDisplay } from '@/lib/utils';
+import { formatDateDisplay, normalizeMDate } from '@/lib/utils';
+import { TimelineDateFilter } from '@/components/dashboard/TimelineDateFilter';
 
 type AnalysisLayoutMode = 'cards' | 'qty-table';
 
@@ -39,6 +42,7 @@ interface ProductAnalysisViewProps {
     selectedProduct: string;
     selectedProductLabel: string;
     productStats: ProductStats | null;
+    statsLoading?: boolean;
     paRawData: DataItem[];
     paRawLoading: boolean;
     showReject: boolean;
@@ -47,6 +51,7 @@ interface ProductAnalysisViewProps {
     setSelectedReason: (r: SelectedReason | null) => void;
     reasonLogData: ReasonLogEntry[];
     reasonLogLoading: boolean;
+    reasonLogError?: string | null;
     reasonMonthly: ReasonMonthlyEntry[];
     reasonChartMonth: string | null;
     setReasonChartMonth: (m: string | null) => void;
@@ -62,6 +67,7 @@ export function ProductAnalysisView({
     selectedProduct,
     selectedProductLabel,
     productStats,
+    statsLoading = false,
     paRawData,
     paRawLoading,
     showReject,
@@ -70,6 +76,7 @@ export function ProductAnalysisView({
     setSelectedReason,
     reasonLogData,
     reasonLogLoading,
+    reasonLogError = null,
     reasonMonthly,
     reasonChartMonth,
     setReasonChartMonth,
@@ -86,20 +93,105 @@ export function ProductAnalysisView({
     const [logKilnFilters, setLogKilnFilters] = useState<string[]>(['ALL']);
     const [selectedSortingLogRow, setSelectedSortingLogRow] = useState<GroupedRow | null>(null);
     const [isSortingLogFullscreen, setIsSortingLogFullscreen] = useState(false);
+    const [planningYieldPct, setPlanningYieldPct] = useState<number | null>(null);
+    const [planningMeta, setPlanningMeta] = useState<{
+        loading?: boolean;
+        source?: string | null;
+        match?: string | null;
+        sampleRows?: number;
+        error?: string | null;
+    }>({ loading: false });
+    /** Separate date ranges per layout tab so switching does not overwrite the other. */
+    const [cardsStartDate, setCardsStartDate] = useState(analysisStartDate);
+    const [cardsEndDate, setCardsEndDate] = useState(analysisEndDate);
+    const [tableStartDate, setTableStartDate] = useState(analysisStartDate);
+    const [tableEndDate, setTableEndDate] = useState(analysisEndDate);
+    /** Table-mode timeline outer bounds (do not shrink when narrowing range). */
+    const [timelineBoundStart, setTimelineBoundStart] = useState(analysisStartDate);
+    const [timelineBoundEnd, setTimelineBoundEnd] = useState(analysisEndDate);
+    /** Capsule dates selected within timeline (empty = all dates in range). */
+    const [selectedCapsuleDates, setSelectedCapsuleDates] = useState<string[]>([]);
+    /** Skip re-seeding local ranges when we ourselves pushed dates to parent. */
+    const selfPushGenRef = useRef(0);
+
+    const activeStartDate = layoutMode === 'qty-table' ? tableStartDate : cardsStartDate;
+    const activeEndDate = layoutMode === 'qty-table' ? tableEndDate : cardsEndDate;
+
+    // Debounce push to parent — sliding timeline must not fire SQL on every tick
+    useEffect(() => {
+        if (activeStartDate === analysisStartDate && activeEndDate === analysisEndDate) return;
+        const timer = window.setTimeout(() => {
+            selfPushGenRef.current += 1;
+            setAnalysisStartDate(activeStartDate);
+            setAnalysisEndDate(activeEndDate);
+        }, 500);
+        return () => window.clearTimeout(timer);
+    }, [
+        activeStartDate,
+        activeEndDate,
+        analysisStartDate,
+        analysisEndDate,
+        setAnalysisStartDate,
+        setAnalysisEndDate,
+    ]);
+
+    // Parent auto-range / external date change → seed both tabs (keep filters independent after that)
+    useEffect(() => {
+        if (selfPushGenRef.current > 0) {
+            selfPushGenRef.current -= 1;
+            return;
+        }
+        setCardsStartDate(analysisStartDate);
+        setCardsEndDate(analysisEndDate);
+        setTableStartDate(analysisStartDate);
+        setTableEndDate(analysisEndDate);
+        setTimelineBoundStart(analysisStartDate);
+        setTimelineBoundEnd(analysisEndDate);
+        setSelectedCapsuleDates([]);
+    }, [analysisStartDate, analysisEndDate]);
+
+    useEffect(() => {
+        setSelectedCapsuleDates([]);
+    }, [selectedProduct]);
+
+    /** Table tab CP metrics: capsule selection rebuilds from raw; else use API stats for table range. */
+    const tableCpBreakdown = useMemo(() => {
+        if (selectedCapsuleDates.length > 0) {
+            return buildCpBreakdownFromRaw(
+                paRawData,
+                selectedProduct,
+                tableStartDate,
+                tableEndDate,
+                selectedCapsuleDates,
+            );
+        }
+        return productStats?.cpBreakdown ?? [];
+    }, [
+        selectedCapsuleDates,
+        paRawData,
+        selectedProduct,
+        tableStartDate,
+        tableEndDate,
+        productStats?.cpBreakdown,
+    ]);
+
+    const cardsCpBreakdown = productStats?.cpBreakdown ?? [];
+    const activeCpBreakdown =
+        layoutMode === 'qty-table' ? tableCpBreakdown : cardsCpBreakdown;
 
     const isSpecialFiring = useMemo(
-        () => isSpecialFiringProduct(productStats?.cpBreakdown ?? []),
-        [productStats?.cpBreakdown],
+        () => isSpecialFiringProduct(activeCpBreakdown),
+        [activeCpBreakdown],
     );
 
     const sortedCpBreakdown = useMemo(() => {
-        if (!productStats?.cpBreakdown?.length) return [];
-        const sorted = sortCpBreakdownForDisplay(productStats.cpBreakdown);
+        if (!activeCpBreakdown.length) return [];
+        const sorted = sortCpBreakdownForDisplay(activeCpBreakdown);
         if (!isSpecialFiring) {
             return sorted.filter((cp) => cp.m_cp !== 'C1');
         }
         return sorted;
-    }, [productStats?.cpBreakdown, isSpecialFiring]);
+    }, [activeCpBreakdown, isSpecialFiring]);
 
     const pCpOptions = useMemo(
         () => collectPfiringCps(sortedCpBreakdown),
@@ -119,23 +211,79 @@ export function ProductAnalysisView({
 
     const firingCycleRows = useMemo(
         () =>
-            productStats?.cpBreakdown?.length
-                ? buildFiringCycleQtyRows(productStats.cpBreakdown)
+            tableCpBreakdown.length
+                ? buildFiringCycleQtyRows(tableCpBreakdown)
                 : [],
-        [productStats?.cpBreakdown],
+        [tableCpBreakdown],
     );
 
     const yieldPlanning = useMemo(
         () =>
-            productStats?.cpBreakdown?.length
-                ? buildYieldPlanningResult(productStats.cpBreakdown)
+            tableCpBreakdown.length
+                ? buildYieldPlanningResult(tableCpBreakdown)
                 : { rows: [], divisorCp: null, divisorProcess: 0 },
-        [productStats?.cpBreakdown],
+        [tableCpBreakdown],
     );
 
+    const planningLookup = useMemo(() => {
+        const info = productStats?.totalStats?.info;
+        const desc1 = (info?.pt_desc1 || selectedProductLabel || '').trim();
+        const part = (info?.m_part || '').trim();
+        // DW product key is "DW:desc2:desc1" — prefer info.pt_desc1 when present
+        let resolvedDesc1 = desc1;
+        if (!info?.pt_desc1 && selectedProduct.startsWith('DW:')) {
+            const rest = selectedProduct.slice(3);
+            const idx = rest.indexOf(':');
+            resolvedDesc1 = idx >= 0 ? rest.slice(idx + 1).trim() : rest.trim();
+        } else if (!info?.pt_desc1 && selectedProduct && !selectedProduct.startsWith('DW:')) {
+            resolvedDesc1 = selectedProduct.trim();
+        }
+        return { desc1: resolvedDesc1, part };
+    }, [productStats?.totalStats?.info, selectedProduct, selectedProductLabel]);
+
+    useEffect(() => {
+        if (!planningLookup.desc1 && !planningLookup.part) {
+            setPlanningYieldPct(null);
+            setPlanningMeta({ loading: false, match: 'none' });
+            return;
+        }
+        let cancelled = false;
+        setPlanningMeta((m) => ({ ...m, loading: true, error: null }));
+        const qs = new URLSearchParams();
+        if (planningLookup.desc1) qs.set('desc1', planningLookup.desc1);
+        if (planningLookup.part) qs.set('part', planningLookup.part);
+        fetch(`/api/product-planning-yield?${qs.toString()}`)
+            .then(async (res) => {
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed to load planning yield');
+                if (cancelled) return;
+                setPlanningYieldPct(
+                    typeof data.planningYieldPct === 'number' ? data.planningYieldPct : null,
+                );
+                setPlanningMeta({
+                    loading: false,
+                    source: data.source ?? null,
+                    match: data.match ?? null,
+                    sampleRows: data.sampleRows ?? 0,
+                    error: null,
+                });
+            })
+            .catch((err) => {
+                if (cancelled) return;
+                setPlanningYieldPct(null);
+                setPlanningMeta({
+                    loading: false,
+                    error: err instanceof Error ? err.message : String(err),
+                });
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [planningLookup.desc1, planningLookup.part]);
+
     const kilnOptions = useMemo(
-        () => collectKilnValues(paRawData, selectedProduct, analysisStartDate, analysisEndDate),
-        [paRawData, selectedProduct, analysisStartDate, analysisEndDate],
+        () => collectKilnValues(paRawData, selectedProduct, tableStartDate, tableEndDate),
+        [paRawData, selectedProduct, tableStartDate, tableEndDate],
     );
 
     const cpOptions = useMemo(
@@ -143,38 +291,65 @@ export function ProductAnalysisView({
             collectCpValues(
                 paRawData,
                 selectedProduct,
-                analysisStartDate,
-                analysisEndDate,
+                tableStartDate,
+                tableEndDate,
                 sortedCpBreakdown.map((cp) => cp.m_cp),
             ),
-        [paRawData, selectedProduct, analysisStartDate, analysisEndDate, sortedCpBreakdown],
+        [paRawData, selectedProduct, tableStartDate, tableEndDate, sortedCpBreakdown],
     );
 
-    const sortingLogRows = useMemo(
-        () =>
-            buildProductSortingLogRows(
-                paRawData,
-                selectedProduct,
-                logCpFilters,
-                logKilnFilters,
-                analysisStartDate,
-                analysisEndDate,
-            ),
-        [paRawData, selectedProduct, logCpFilters, logKilnFilters, analysisStartDate, analysisEndDate],
-    );
+    const sortingLogRows = useMemo(() => {
+        const rows = buildProductSortingLogRows(
+            paRawData,
+            selectedProduct,
+            logCpFilters,
+            logKilnFilters,
+            tableStartDate,
+            tableEndDate,
+        );
+        if (selectedCapsuleDates.length === 0) return rows;
+        const allow = new Set(selectedCapsuleDates);
+        return rows.filter((r) => allow.has(normalizeMDate(r.m_date)));
+    }, [
+        paRawData,
+        selectedProduct,
+        logCpFilters,
+        logKilnFilters,
+        tableStartDate,
+        tableEndDate,
+        selectedCapsuleDates,
+    ]);
 
     const kilnOptionsKey = kilnOptions.join('|');
 
     useEffect(() => {
         setLogCpFilters(['ALL']);
         setLogKilnFilters(getDefaultLogKilnFilters(kilnOptions));
-    }, [selectedProduct, analysisStartDate, analysisEndDate, kilnOptionsKey]);
+    }, [selectedProduct, tableStartDate, tableEndDate, kilnOptionsKey]);
 
     useEffect(() => {
         setPCardMode('separate');
         setCombinePSelection([...pCpOptions]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset when P CP list changes
     }, [selectedProduct, pCpOptionsKey]);
+
+    const availableCapsuleDates = useMemo(() => {
+        if (!paRawData.length || !selectedProduct) return [];
+        const set = new Set<string>();
+        for (const item of paRawData) {
+            if (!matchesSelectedProduct(item, selectedProduct)) continue;
+            const d = normalizeMDate(item.m_date);
+            if (!d) continue;
+            if (d < tableStartDate || d > tableEndDate) continue;
+            set.add(d);
+        }
+        return [...set].sort();
+    }, [paRawData, selectedProduct, tableStartDate, tableEndDate]);
+
+    useEffect(() => {
+        setSelectedCapsuleDates((prev) =>
+            prev.filter((d) => d >= tableStartDate && d <= tableEndDate),
+        );
+    }, [tableStartDate, tableEndDate]);
 
     useEffect(() => {
         if (!isSortingLogFullscreen && !selectedCpCard) return;
@@ -202,7 +377,7 @@ export function ProductAnalysisView({
                                 <h1 className={`text-xl sm:text-2xl md:text-3xl font-black ${theme.textWhite} break-words`}>{selectedProductLabel}</h1>
                             )}
                         </div>
-                        {productStats && productStats.cpBreakdown.length > 0 && (
+                        {selectedProduct && (
                             <div className={`flex rounded-lg border ${theme.borderColor} overflow-hidden shrink-0 self-start sm:self-auto`}>
                                 <button
                                     type="button"
@@ -230,34 +405,55 @@ export function ProductAnalysisView({
                         )}
                     </div>
                     <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 sm:gap-3 w-full">
-                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4 w-full sm:w-auto">
-                            {/* Date Range Picker */}
-                            <div className={`flex items-center gap-2 px-3 py-2 ${theme.inputBg} rounded-xl border ${theme.borderColor}`}>
-                                <span className={`text-xs font-bold ${theme.textMuted}`}>From:</span>
-                                <input
-                                    type="date"
-                                    value={analysisStartDate}
-                                    onChange={(e) => setAnalysisStartDate(e.target.value)}
-                                    style={{ colorScheme: currentTheme }}
-                                    className={`bg-transparent outline-none text-xs font-bold ${theme.textWhite} cursor-pointer`}
-                                />
+                        {layoutMode === 'qty-table' ? (
+                            <TimelineDateFilter
+                                theme={theme}
+                                currentTheme={currentTheme}
+                                boundStart={timelineBoundStart || tableStartDate}
+                                boundEnd={timelineBoundEnd || tableEndDate}
+                                onChangeBounds={(start, end) => {
+                                    setTimelineBoundStart(start);
+                                    setTimelineBoundEnd(end);
+                                }}
+                                startDate={tableStartDate}
+                                endDate={tableEndDate}
+                                onChangeRange={(start, end) => {
+                                    setTableStartDate(start);
+                                    setTableEndDate(end);
+                                }}
+                                availableDates={availableCapsuleDates}
+                                selectedDates={selectedCapsuleDates}
+                                onSelectedDatesChange={setSelectedCapsuleDates}
+                            />
+                        ) : (
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4 w-full sm:w-auto">
+                                <div className={`flex items-center gap-2 px-3 py-2 ${theme.inputBg} rounded-xl border ${theme.borderColor}`}>
+                                    <span className={`text-xs font-bold ${theme.textMuted}`}>From:</span>
+                                    <input
+                                        type="date"
+                                        value={cardsStartDate}
+                                        onChange={(e) => setCardsStartDate(e.target.value)}
+                                        style={{ colorScheme: currentTheme }}
+                                        className={`bg-transparent outline-none text-xs font-bold ${theme.textWhite} cursor-pointer`}
+                                    />
+                                </div>
+                                <div className={`flex items-center gap-2 px-3 py-2 ${theme.inputBg} rounded-xl border ${theme.borderColor}`}>
+                                    <span className={`text-xs font-bold ${theme.textMuted}`}>To:</span>
+                                    <input
+                                        type="date"
+                                        value={cardsEndDate}
+                                        onChange={(e) => setCardsEndDate(e.target.value)}
+                                        style={{ colorScheme: currentTheme }}
+                                        className={`bg-transparent outline-none text-xs font-bold ${theme.textWhite} cursor-pointer`}
+                                    />
+                                </div>
                             </div>
-                            <div className={`flex items-center gap-2 px-3 py-2 ${theme.inputBg} rounded-xl border ${theme.borderColor}`}>
-                                <span className={`text-xs font-bold ${theme.textMuted}`}>To:</span>
-                                <input
-                                    type="date"
-                                    value={analysisEndDate}
-                                    onChange={(e) => setAnalysisEndDate(e.target.value)}
-                                    style={{ colorScheme: currentTheme }}
-                                    className={`bg-transparent outline-none text-xs font-bold ${theme.textWhite} cursor-pointer`}
-                                />
-                            </div>
-                        </div>
+                        )}
                     </div>
                 </div>
 
                 {/* Section: Merged Analysis Table */}
-                {productStats && productStats.cpBreakdown.length > 0 && (
+                {selectedProduct && (statsLoading || (productStats && productStats.cpBreakdown.length > 0)) && (
                     <section>
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
                             <div className="flex items-center gap-2">
@@ -265,8 +461,13 @@ export function ProductAnalysisView({
                                 <h2 className={`text-base font-bold ${theme.textWhite}`}>
                                     Analysis Defects by Firing Cycle
                                 </h2>
+                                {statsLoading && (
+                                    <span className={`text-[10px] font-bold ${theme.textMuted} animate-pulse`}>
+                                        Updating…
+                                    </span>
+                                )}
                             </div>
-                            {layoutMode === 'cards' && (
+                            {layoutMode === 'cards' && !statsLoading && (
                                 <div className="flex flex-wrap items-center gap-2">
                                     {pCpOptions.length >= 2 && (
                                         <PCardModeToggle
@@ -296,16 +497,31 @@ export function ProductAnalysisView({
 
                         {layoutMode === 'qty-table' ? (
                             <div className="space-y-6">
-                                <FiringCycleQtyTable
-                                    rows={firingCycleRows}
-                                    theme={theme}
-                                    currentTheme={currentTheme}
-                                />
-                                <YieldPlanningCards
-                                    data={yieldPlanning}
-                                    theme={theme}
-                                    currentTheme={currentTheme}
-                                />
+                                {statsLoading ? (
+                                    <div className="space-y-4 animate-pulse" aria-busy="true">
+                                        <div className={`h-40 w-full rounded-2xl border ${theme.borderColor} ${theme.inputBg}`} />
+                                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                                            {[1, 2, 3, 4].map((i) => (
+                                                <div key={i} className={`h-28 rounded-2xl border ${theme.borderColor} ${theme.inputBg}`} />
+                                            ))}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <FiringCycleQtyTable
+                                            rows={firingCycleRows}
+                                            theme={theme}
+                                            currentTheme={currentTheme}
+                                        />
+                                        <YieldPlanningCards
+                                            data={yieldPlanning}
+                                            theme={theme}
+                                            currentTheme={currentTheme}
+                                            planningYieldPct={planningYieldPct}
+                                            planningMeta={planningMeta}
+                                        />
+                                    </>
+                                )}
                                 <div className={isSortingLogFullscreen ? 'relative' : undefined}>
                                     {isSortingLogFullscreen && (
                                         <div
@@ -330,13 +546,24 @@ export function ProductAnalysisView({
                                                 <ExportProductSortingLogButton
                                                     rows={sortingLogRows}
                                                     productLabel={selectedProductLabel}
-                                                    startDate={analysisStartDate}
-                                                    endDate={analysisEndDate}
+                                                    startDate={
+                                                        selectedCapsuleDates.length === 1
+                                                            ? selectedCapsuleDates[0]
+                                                            : tableStartDate
+                                                    }
+                                                    endDate={
+                                                        selectedCapsuleDates.length === 1
+                                                            ? selectedCapsuleDates[0]
+                                                            : selectedCapsuleDates.length > 1
+                                                              ? [...selectedCapsuleDates].sort().at(-1)!
+                                                              : tableEndDate
+                                                    }
                                                     cpFilters={logCpFilters}
                                                     kilnFilters={logKilnFilters}
                                                     theme={theme}
                                                     disabled={paRawLoading}
                                                 />
+
                                                 <MultiCheckFilter
                                                     label="CP"
                                                     options={cpOptions}
@@ -378,6 +605,12 @@ export function ProductAnalysisView({
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+                        ) : statsLoading ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2 animate-pulse" aria-busy="true">
+                                {[1, 2, 3, 4, 5].map((i) => (
+                                    <div key={i} className={`h-48 rounded-2xl border ${theme.borderColor} ${theme.inputBg}`} />
+                                ))}
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2">
@@ -505,6 +738,11 @@ export function ProductAnalysisView({
                                     </div>
                                 ))}
                             </div>
+                        </div>
+                    ) : reasonLogError ? (
+                        <div className={`py-10 text-center text-sm`}>
+                            <p className="text-red-400 font-semibold mb-1">Failed to load reason log</p>
+                            <p className={`${theme.textMuted}`}>{reasonLogError}</p>
                         </div>
                     ) : reasonLogData.length === 0 ? (
                         <div className={`py-10 text-center ${theme.textMuted} text-sm`}>No records found for this reason</div>

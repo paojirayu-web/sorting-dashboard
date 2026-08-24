@@ -2,6 +2,16 @@
 
 All notable changes to the **Sorting Dashboard** project will be documented in this file.
 
+## [1.6.8] - 2026-08-06
+
+### Added
+- **Overview — Data Sorting Logs Export Excel:** Button next to CP/Unit filters; POST `/api/export/overview-sorting-log/excel`; same compact Qty/% layout as Product Analysis, plus **Item number**, separate **Description1** / **Description2** columns, and a Total row.
+
+### Fixed
+- **Overview Excel date range:** Export now includes the full filtered 7-day set (UI table still shows only the latest 100 rows for performance).
+
+---
+
 ## [1.6.1] - 2026-06-06
 
 ### Added

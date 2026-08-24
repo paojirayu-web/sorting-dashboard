@@ -6,7 +6,8 @@ import type { Theme, ThemeName } from '@/lib/themes';
 import type { GroupedRow } from '@/types/dashboard';
 import { SectionHeader } from '@/components/dashboard/SectionHeader';
 import { ResponsiveSortingLog } from '@/components/dashboard/ResponsiveSortingLog';
-import { formatProductDescription, formatDateDisplay } from '@/lib/utils';
+import { ExportOverviewSortingLogButton } from '@/components/dashboard/ExportOverviewSortingLogButton';
+import { formatDateDisplay } from '@/lib/utils';
 
 interface OverviewMetrics {
     totalQtyp: number;
@@ -34,6 +35,8 @@ interface OverviewViewProps {
     trendData: TrendDataPoint[];
     dailyActivityTable: GroupedRow[];
     activityTable: GroupedRow[];
+    /** Full filtered rows for Excel (not capped at 100 like the on-screen table). */
+    activityTableExportRows: GroupedRow[];
     // Daily Monitor
     isDailyMonitorFullscreen: boolean;
     setIsDailyMonitorFullscreen: (v: boolean) => void;
@@ -64,6 +67,7 @@ export function OverviewView({
     trendData,
     dailyActivityTable,
     activityTable,
+    activityTableExportRows,
     isDailyMonitorFullscreen,
     setIsDailyMonitorFullscreen,
     setSelectedDailyRow,
@@ -322,6 +326,13 @@ export function OverviewView({
                 <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
                     <SectionHeader title="Data Sorting Logs" subtitle="Real-time production logs" theme={theme} />
                     <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                        <ExportOverviewSortingLogButton
+                            rows={activityTableExportRows}
+                            selectedDate={selectedDate}
+                            cpFilter={cpFilter}
+                            unitFilter={unitFilter}
+                            theme={theme}
+                        />
                         <div className={`flex items-center gap-2 px-3 py-2 ${theme.inputBg} rounded-xl border ${theme.borderColor}`}>
                             <span className={`text-xs font-bold ${theme.textMuted}`}>CP:</span>
                             <select

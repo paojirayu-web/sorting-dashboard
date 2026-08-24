@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { themes, type ThemeName } from "@/lib/themes";
 import { formatDateShort, formatProductDescription } from "@/lib/utils";
 import type { DataItem, ProductStats, MonthlyStats, SelectedReason, ViewType, GroupedRow, ReasonLogEntry, ReasonMonthlyEntry, ProductItem, DefectReasonItem, DefectListMode } from "@/types/dashboard";
-import type { DefectTrendPayload } from "@/lib/defect-reason-query";
+import type { DefectTrendPayload, DefectJobMetricRow } from "@/lib/defect-reason-query";
 import {
     Sidebar,
     Header,
@@ -19,12 +19,52 @@ import { buildDailyActivityTable } from "@/lib/daily-defects";
 import { isC1SpecialReasonForRecord, isSomboonCpC } from "@/lib/c1-special-reason";
 import { isRejectSubTyp, isScrapSubTyp } from "@/lib/sub-typ";
 import type { UnitFilter } from "@/lib/unit-filter";
+import { getEffectiveUnitFilter } from "@/lib/unit-filter";
+
+type DefectTrendCacheEntry = {
+    trend?: DefectTrendPayload["trend"];
+};
+
+type DefectChartReady = {
+    trend: DefectTrendPayload["trend"];
+    jobMetrics: DefectTrendPayload["jobMetrics"];
+};
+
+/** AbortSignal.any is Chromium 116+ / Safari 17.4+ — polyfill for older clients. */
+function mergeAbortSignals(signals: AbortSignal[]): AbortSignal {
+    if (typeof AbortSignal.any === "function") {
+        return AbortSignal.any(signals);
+    }
+    const controller = new AbortController();
+    const onAbort = () => {
+        controller.abort();
+        for (const signal of signals) {
+            signal.removeEventListener("abort", onAbort);
+        }
+    };
+    for (const signal of signals) {
+        if (signal.aborted) {
+            controller.abort();
+            return controller.signal;
+        }
+        signal.addEventListener("abort", onAbort);
+    }
+    return controller.signal;
+}
+
+function isAbortError(error: unknown): boolean {
+    return (
+        (error instanceof DOMException && error.name === "AbortError") ||
+        (error instanceof Error && error.name === "AbortError")
+    );
+}
 
 export default function Dashboard() {
     const PRODUCT_STATS_TIMEOUT_MS = 120000;
-    const REASON_LOG_TIMEOUT_MS = 60000;
+    const REASON_LOG_TIMEOUT_MS = 120000;
     const MONTHLY_STATS_TIMEOUT_MS = 120000;
     const MONTHLY_RAW_TIMEOUT_MS = 120000;
+    const DEFECT_CHART_TIMEOUT_MS = 120000;
     // ─── UI State ────────────────────────────────────────────
     const [isSidebarOpen, setSidebarOpen] = useState(false);
     const [currentTheme, setCurrentTheme] = useState<ThemeName>("dark");
@@ -56,12 +96,15 @@ export default function Dashboard() {
     const [selectedReason, setSelectedReason] = useState<SelectedReason | null>(null);
     const [reasonLogData, setReasonLogData] = useState<ReasonLogEntry[]>([]);
     const [reasonLogLoading, setReasonLogLoading] = useState(false);
+    const [reasonLogError, setReasonLogError] = useState<string | null>(null);
     const [reasonMonthly, setReasonMonthly] = useState<ReasonMonthlyEntry[]>([]);
     const [reasonChartMonth, setReasonChartMonth] = useState<string | null>(null);
     // Shared date range for Product Analysis + Monthly Analysis
     const [analysisStartDate, setAnalysisStartDate] = useState(() => {
         const now = new Date();
-        return `${now.getFullYear() - 1}-01-01`;
+        const year = now.getFullYear() - 1;
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        return `${year}-${month}-01`;
     });
     const [analysisEndDate, setAnalysisEndDate] = useState(() => {
         const now = new Date();
@@ -89,16 +132,24 @@ export default function Dashboard() {
         wareKilns: [],
     });
     const [defectListMode, setDefectListMode] = useState<DefectListMode>("scrap");
+    const [defectUnitFilter, setDefectUnitFilter] = useState<UnitFilter>("WW_WHITE");
     const [defectListLoading, setDefectListLoading] = useState(false);
     const [defectTrendLoading, setDefectTrendLoading] = useState(false);
     const defectListAbortRef = useRef<AbortController | null>(null);
-    const defectTrendAbortRef = useRef<AbortController | null>(null);
+    const defectChartAbortRef = useRef<AbortController | null>(null);
+    const defectListCacheRef = useRef<Map<string, DefectReasonItem[]>>(new Map());
+    const defectTrendCacheRef = useRef<Map<string, DefectTrendCacheEntry>>(new Map());
+    const defectJobMetricsCacheRef = useRef<Map<string, DefectJobMetricRow[]>>(new Map());
+    const defectDisplayedTrendKeyRef = useRef<string>("");
 
     const productStatsAbortRef = useRef<AbortController | null>(null);
     const paRawAbortRef = useRef<AbortController | null>(null);
     const reasonLogAbortRef = useRef<AbortController | null>(null);
     const monthlyStatsAbortRef = useRef<AbortController | null>(null);
-    const autoDateRangeProductRef = useRef<string | null>(null);
+    /** Product whose auto date range was last applied (skip repeat API on PA↔MA switch). */
+    const appliedAutoDateRangeProductRef = useRef<string | null>(null);
+    /** When set to selectedProduct, PA/MA data fetches may run with current analysis dates. */
+    const [analysisDateRangeReadyFor, setAnalysisDateRangeReadyFor] = useState<string | null>(null);
 
     const isValidDateRange = useCallback((startDate: string, endDate: string) => {
         return Boolean(startDate && endDate && startDate <= endDate);
@@ -106,33 +157,41 @@ export default function Dashboard() {
 
     const fetchJsonWithTimeout = useCallback(async (url: string, timeoutMs: number, externalSignal?: AbortSignal) => {
         const timeoutController = new AbortController();
-        const timeoutId = setTimeout(() => timeoutController.abort(), timeoutMs);
+        let timedOut = false;
+        const timeoutId = setTimeout(() => {
+            timedOut = true;
+            timeoutController.abort();
+        }, timeoutMs);
         const mergedSignal = externalSignal
-            ? AbortSignal.any([externalSignal, timeoutController.signal])
+            ? mergeAbortSignals([externalSignal, timeoutController.signal])
             : timeoutController.signal;
 
         try {
             const res = await fetch(url, { signal: mergedSignal });
             return await res.json();
+        } catch (error) {
+            if (timedOut) {
+                const timeoutError = new Error(`Request timed out after ${timeoutMs}ms`);
+                timeoutError.name = "TimeoutError";
+                throw timeoutError;
+            }
+            throw error;
         } finally {
             clearTimeout(timeoutId);
         }
     }, []);
 
     // ─── Data Fetching ───────────────────────────────────────
-    const applyAutoDateRangeForProduct = useCallback(async (product: string) => {
-        try {
-            const res = await fetch(
-                `/api/product-date-range?product=${encodeURIComponent(product)}`,
-            );
-            const range = await res.json();
-            if (range?.minDate && range?.maxDate) {
-                setAnalysisStartDate(range.minDate);
-                setAnalysisEndDate(range.maxDate);
-            }
-        } catch (e) {
-            console.error(e);
+    const fetchProductAutoDateRange = useCallback(async (product: string) => {
+        const res = await fetch(
+            `/api/product-date-range?product=${encodeURIComponent(product)}`,
+        );
+        const range = await res.json();
+        if (range?.error) return null;
+        if (range?.minDate && range?.maxDate) {
+            return { minDate: range.minDate as string, maxDate: range.maxDate as string };
         }
+        return null;
     }, []);
 
     const fetchProductList = useCallback(async (forceRefresh = false) => {
@@ -144,6 +203,8 @@ export default function Dashboard() {
         } catch (e) { console.error(e); }
     }, []);
 
+    const lastProductStatsKeyRef = useRef<string | null>(null);
+
     const fetchProductStats = useCallback(async (product: string) => {
         if (!isValidDateRange(analysisStartDate, analysisEndDate)) {
             setProductStats(null);
@@ -153,8 +214,12 @@ export default function Dashboard() {
         productStatsAbortRef.current?.abort();
         const controller = new AbortController();
         productStatsAbortRef.current = controller;
-        // Clear stale stats immediately so users can see that a new range is loading.
-        setProductStats(null);
+        const requestKey = `${product}|${analysisStartDate}|${analysisEndDate}`;
+        // Clear only when product changes — keep stale stats on date refresh so the view stays mounted (tab preserved).
+        if (lastProductStatsKeyRef.current?.split('|')[0] !== product) {
+            setProductStats(null);
+        }
+        lastProductStatsKeyRef.current = requestKey;
         setStatsLoading(true);
         try {
             const dateParams = `&startDate=${analysisStartDate}&endDate=${analysisEndDate}`;
@@ -163,14 +228,17 @@ export default function Dashboard() {
                 PRODUCT_STATS_TIMEOUT_MS,
                 controller.signal
             );
+            if (lastProductStatsKeyRef.current !== requestKey) return;
             setProductStats(result.error ? null : result);
         } catch (e) {
-            if ((e as Error).name !== "AbortError") {
+            if (!isAbortError(e)) {
                 console.error(e);
-                setProductStats(null);
+                if (lastProductStatsKeyRef.current === requestKey) setProductStats(null);
             }
         }
-        finally { setStatsLoading(false); }
+        finally {
+            if (lastProductStatsKeyRef.current === requestKey) setStatsLoading(false);
+        }
     }, [analysisStartDate, analysisEndDate, isValidDateRange, fetchJsonWithTimeout]);
 
     const fetchProductRawData = useCallback(async (product: string) => {
@@ -189,22 +257,147 @@ export default function Dashboard() {
                 MONTHLY_RAW_TIMEOUT_MS,
                 controller.signal,
             );
+            if (paRawAbortRef.current !== controller) return;
             setPaRawData(Array.isArray(result) ? result : []);
         } catch (e) {
-            if ((e as Error).name !== "AbortError") {
+            if (!isAbortError(e)) {
                 console.error(e);
-                setPaRawData([]);
+                if (paRawAbortRef.current === controller) setPaRawData([]);
             }
         } finally {
-            setPaRawLoading(false);
+            if (paRawAbortRef.current === controller) {
+                setPaRawLoading(false);
+            }
         }
     }, [analysisStartDate, analysisEndDate, isValidDateRange, fetchJsonWithTimeout]);
 
-    const fetchDefectReasonList = useCallback(async () => {
+    const buildDefectScopeKey = useCallback(() => {
+        return `${analysisStartDate}|${analysisEndDate}|${category}|${defectListMode}`;
+    }, [analysisStartDate, analysisEndDate, category, defectListMode]);
+
+    const buildDefectTrendKey = useCallback(
+        (rsnDesc: string, unit: UnitFilter = getEffectiveUnitFilter(defectUnitFilter, category)) =>
+            `${buildDefectScopeKey()}|${rsnDesc}|${unit}`,
+        [buildDefectScopeKey, defectUnitFilter, category],
+    );
+
+    const getDefectChartUnit = useCallback(
+        () => getEffectiveUnitFilter(defectUnitFilter, category),
+        [defectUnitFilter, category],
+    );
+
+    const buildDefectJobMetricsKey = useCallback(
+        (unit: UnitFilter = getEffectiveUnitFilter(defectUnitFilter, category)) =>
+            `${analysisStartDate}|${analysisEndDate}|${category}|${unit}`,
+        [analysisStartDate, analysisEndDate, category, defectUnitFilter],
+    );
+
+    const getDefectChartFromCache = useCallback(
+        (trendKey: string, unit: UnitFilter): DefectChartReady | null => {
+            const trendEntry = defectTrendCacheRef.current.get(trendKey);
+            const jobMetrics = defectJobMetricsCacheRef.current.get(buildDefectJobMetricsKey(unit));
+            if (!trendEntry?.trend || jobMetrics === undefined) return null;
+            return { trend: trendEntry.trend, jobMetrics };
+        },
+        [buildDefectJobMetricsKey],
+    );
+
+    const mergeDefectTrendCache = useCallback((trendKey: string, trend: DefectTrendPayload["trend"]) => {
+        const prev = defectTrendCacheRef.current.get(trendKey);
+        const next: DefectTrendCacheEntry = { ...prev, trend };
+        defectTrendCacheRef.current.set(trendKey, next);
+        return next;
+    }, []);
+
+    const applyDefectTrendPayload = useCallback((entry: DefectChartReady, trendKey: string) => {
+        setDefectTrendPayload({
+            trend: entry.trend,
+            jobMetrics: entry.jobMetrics,
+            products: [],
+            wareKilns: [],
+        });
+        defectDisplayedTrendKeyRef.current = trendKey;
+    }, []);
+
+    const defectChartPending = useMemo(() => {
+        if (view !== "defect-analysis" || !selectedDefect) return false;
+        const expectedKey = buildDefectTrendKey(selectedDefect);
+        return defectTrendLoading || expectedKey !== defectDisplayedTrendKeyRef.current;
+    }, [view, selectedDefect, defectTrendLoading, buildDefectTrendKey, defectTrendPayload]);
+
+    const tryApplyDefectTrend = useCallback(
+        (trendKey: string, currentTrendKey: string, unit: UnitFilter, options?: { allowPartialChart?: boolean }) => {
+            if (trendKey !== currentTrendKey) return false;
+            const chart = getDefectChartFromCache(trendKey, unit);
+            if (!chart) return false;
+
+            if (options?.allowPartialChart) {
+                const sameScopeAsDisplayed = defectDisplayedTrendKeyRef.current === trendKey;
+                const noDisplayYet = defectDisplayedTrendKeyRef.current === "";
+                if (!sameScopeAsDisplayed && !noDisplayYet) return false;
+            }
+
+            applyDefectTrendPayload(chart, trendKey);
+            return true;
+        },
+        [applyDefectTrendPayload, getDefectChartFromCache],
+    );
+
+    const fetchDefectJobMetrics = useCallback(async (
+        unit: UnitFilter,
+        signal?: AbortSignal,
+        forceRefresh = false,
+    ): Promise<DefectJobMetricRow[] | null> => {
+        if (!isValidDateRange(analysisStartDate, analysisEndDate)) return null;
+
+        const metricsKey = buildDefectJobMetricsKey(unit);
+        if (!forceRefresh) {
+            const cached = defectJobMetricsCacheRef.current.get(metricsKey);
+            if (cached) return cached;
+        } else {
+            defectJobMetricsCacheRef.current.delete(metricsKey);
+        }
+
+        try {
+            const params = new URLSearchParams({
+                startDate: analysisStartDate,
+                endDate: analysisEndDate,
+                category,
+                unit,
+                part: 'job-metrics',
+            });
+            if (forceRefresh) params.set('refresh', '1');
+            const result = await fetchJsonWithTimeout(
+                `/api/defect-trend?${params}`,
+                DEFECT_CHART_TIMEOUT_MS,
+                signal,
+            );
+            if (signal?.aborted) return null;
+            const jobMetrics = Array.isArray(result?.jobMetrics) ? result.jobMetrics as DefectJobMetricRow[] : [];
+            defectJobMetricsCacheRef.current.set(metricsKey, jobMetrics);
+            return jobMetrics;
+        } catch (e) {
+            if (!isAbortError(e)) {
+                console.error(e);
+            }
+            return null;
+        }
+    }, [analysisStartDate, analysisEndDate, category, buildDefectJobMetricsKey, isValidDateRange, fetchJsonWithTimeout]);
+
+    const fetchDefectReasonList = useCallback(async (forceRefresh = false) => {
         if (!isValidDateRange(analysisStartDate, analysisEndDate)) {
             setDefectReasonList([]);
             setDefectListLoading(false);
             return;
+        }
+        const cacheKey = buildDefectScopeKey();
+        if (!forceRefresh) {
+            const cached = defectListCacheRef.current.get(cacheKey);
+            if (cached) {
+                setDefectReasonList(cached);
+                setDefectListLoading(false);
+                return;
+            }
         }
         defectListAbortRef.current?.abort();
         const controller = new AbortController();
@@ -216,76 +409,165 @@ export default function Dashboard() {
                 endDate: analysisEndDate,
                 category,
                 mode: defectListMode,
+                unit: getEffectiveUnitFilter('ALL', category),
             });
+            if (forceRefresh) params.set('refresh', '1');
             const result = await fetchJsonWithTimeout(
                 `/api/defect-reasons?${params}`,
                 MONTHLY_RAW_TIMEOUT_MS,
                 controller.signal,
             );
             if (controller.signal.aborted) return;
-            setDefectReasonList(Array.isArray(result) ? result : []);
+            const list = Array.isArray(result) ? result : [];
+            defectListCacheRef.current.set(cacheKey, list);
+            setDefectReasonList(list);
         } catch (e) {
-            if ((e as Error).name !== "AbortError") {
+            if (!isAbortError(e)) {
                 console.error(e);
-                setDefectReasonList([]);
             }
         } finally {
             if (defectListAbortRef.current === controller) {
                 setDefectListLoading(false);
             }
         }
-    }, [analysisStartDate, analysisEndDate, category, defectListMode, isValidDateRange, fetchJsonWithTimeout]);
+    }, [analysisStartDate, analysisEndDate, category, defectListMode, buildDefectScopeKey, isValidDateRange, fetchJsonWithTimeout]);
 
-    const fetchDefectTrend = useCallback(async (rsnDesc: string) => {
+    const fetchDefectChart = useCallback(async (
+        rsnDesc: string,
+        forceRefresh = false,
+        options?: { unit?: UnitFilter; prefetch?: boolean },
+    ) => {
         if (!isValidDateRange(analysisStartDate, analysisEndDate) || !rsnDesc) {
-            setDefectTrendPayload({ trend: [], jobMetrics: [], products: [], wareKilns: [] });
-            setDefectTrendLoading(false);
+            if (!options?.prefetch) setDefectTrendLoading(false);
             return;
         }
-        defectTrendAbortRef.current?.abort();
+        const unit = options?.unit ?? getDefectChartUnit();
+        const trendKey = buildDefectTrendKey(rsnDesc, unit);
+        const displayedTrendKey = buildDefectTrendKey(rsnDesc);
+
+        if (!forceRefresh) {
+            if (getDefectChartFromCache(trendKey, unit)) {
+                if (
+                    !options?.prefetch &&
+                    tryApplyDefectTrend(trendKey, displayedTrendKey, unit, { allowPartialChart: true })
+                ) {
+                    setDefectTrendLoading(false);
+                    return;
+                }
+                if (options?.prefetch) return;
+            }
+        } else if (!options?.prefetch) {
+            defectTrendCacheRef.current.delete(trendKey);
+        }
+
         const controller = new AbortController();
-        defectTrendAbortRef.current = controller;
-        setDefectTrendLoading(true);
+        if (!options?.prefetch) {
+            defectChartAbortRef.current?.abort();
+            defectChartAbortRef.current = controller;
+            setDefectTrendLoading(true);
+        }
+
         try {
+            const jobMetrics = await fetchDefectJobMetrics(unit, controller.signal, forceRefresh);
+            if (controller.signal.aborted) return;
+            if (!jobMetrics) return;
+
             const params = new URLSearchParams({
                 startDate: analysisStartDate,
                 endDate: analysisEndDate,
                 category,
                 rsn_desc: rsnDesc,
                 mode: defectListMode,
+                unit,
+                part: 'trend',
             });
+            if (forceRefresh) params.set('refresh', '1');
             const result = await fetchJsonWithTimeout(
                 `/api/defect-trend?${params}`,
-                MONTHLY_RAW_TIMEOUT_MS,
+                DEFECT_CHART_TIMEOUT_MS,
                 controller.signal,
             );
             if (controller.signal.aborted) return;
-            if (result && Array.isArray(result.trend)) {
-                setDefectTrendPayload({
-                    trend: result.trend,
-                    jobMetrics: Array.isArray(result.jobMetrics) ? result.jobMetrics : [],
-                    products: Array.isArray(result.products) ? result.products : [],
-                    wareKilns: Array.isArray(result.wareKilns) ? result.wareKilns : [],
-                });
-            } else if (Array.isArray(result)) {
-                setDefectTrendPayload({ trend: result, jobMetrics: [], products: [], wareKilns: [] });
-            } else {
-                setDefectTrendPayload({ trend: [], jobMetrics: [], products: [], wareKilns: [] });
+            const trend = Array.isArray(result?.trend) ? result.trend : [];
+            mergeDefectTrendCache(trendKey, trend);
+            if (!options?.prefetch && trendKey === displayedTrendKey) {
+                applyDefectTrendPayload({ trend, jobMetrics }, trendKey);
+            }
+
+            if (!options?.prefetch && category !== 'DW') {
+                const siblingUnit: UnitFilter | undefined =
+                    unit === 'WW_WHITE' ? 'WW_BLACK' : unit === 'WW_BLACK' ? 'WW_WHITE' : undefined;
+                if (siblingUnit) {
+                    const siblingKey = buildDefectTrendKey(rsnDesc, siblingUnit);
+                    if (!getDefectChartFromCache(siblingKey, siblingUnit)) {
+                        void fetchDefectChart(rsnDesc, false, { unit: siblingUnit, prefetch: true });
+                    }
+                }
             }
         } catch (e) {
-            if ((e as Error).name !== "AbortError") {
+            if (!isAbortError(e)) {
                 console.error(e);
-                setDefectTrendPayload({ trend: [], jobMetrics: [], products: [], wareKilns: [] });
             }
         } finally {
-            setDefectTrendLoading(false);
+            if (!options?.prefetch && defectChartAbortRef.current === controller) {
+                setDefectTrendLoading(false);
+            }
         }
-    }, [analysisStartDate, analysisEndDate, category, defectListMode, isValidDateRange, fetchJsonWithTimeout]);
+    }, [
+        analysisStartDate,
+        analysisEndDate,
+        category,
+        defectListMode,
+        getDefectChartUnit,
+        buildDefectTrendKey,
+        isValidDateRange,
+        fetchJsonWithTimeout,
+        mergeDefectTrendCache,
+        applyDefectTrendPayload,
+        tryApplyDefectTrend,
+        getDefectChartFromCache,
+        fetchDefectJobMetrics,
+    ]);
+
+    const ensureDefectTrendLoaded = useCallback(
+        async (rsnDesc: string, forceRefresh = false) => {
+            if (!isValidDateRange(analysisStartDate, analysisEndDate) || !rsnDesc) return;
+
+            const unit = getDefectChartUnit();
+            const trendKey = buildDefectTrendKey(rsnDesc);
+            if (!forceRefresh) {
+                const chart = getDefectChartFromCache(trendKey, unit);
+                if (chart) {
+                    applyDefectTrendPayload(chart, trendKey);
+                    setDefectTrendLoading(false);
+                    return;
+                }
+            } else {
+                defectTrendCacheRef.current.delete(trendKey);
+                defectJobMetricsCacheRef.current.delete(buildDefectJobMetricsKey(unit));
+                defectDisplayedTrendKeyRef.current = "";
+            }
+
+            await fetchDefectChart(rsnDesc, forceRefresh);
+        },
+        [
+            analysisStartDate,
+            analysisEndDate,
+            buildDefectTrendKey,
+            buildDefectJobMetricsKey,
+            getDefectChartUnit,
+            isValidDateRange,
+            applyDefectTrendPayload,
+            fetchDefectChart,
+            getDefectChartFromCache,
+        ],
+    );
 
     const fetchReasonLog = useCallback(async (product: string, reason: SelectedReason) => {
         if (!isValidDateRange(analysisStartDate, analysisEndDate)) {
             setReasonLogData([]);
             setReasonMonthly([]);
+            setReasonLogError(null);
             setReasonLogLoading(false);
             return;
         }
@@ -294,6 +576,7 @@ export default function Dashboard() {
         reasonLogAbortRef.current = controller;
         setReasonLogData([]);
         setReasonMonthly([]);
+        setReasonLogError(null);
         setReasonLogLoading(true);
         try {
             const params = new URLSearchParams({
@@ -314,16 +597,35 @@ export default function Dashboard() {
                 params.set('is_round1', reason.is_round1 ? '1' : '0');
             }
             const result = await fetchJsonWithTimeout(`/api/product-reason-log?${params}`, REASON_LOG_TIMEOUT_MS, controller.signal);
-            if (result.error) { setReasonLogData([]); setReasonMonthly([]); }
-            else { setReasonLogData(result.log || []); setReasonMonthly(result.monthly || []); }
-        } catch (e) {
-            if ((e as Error).name !== "AbortError") {
-                console.error(e);
+            if (reasonLogAbortRef.current !== controller) return;
+            if (result.error) {
                 setReasonLogData([]);
                 setReasonMonthly([]);
+                setReasonLogError(String(result.error));
+            } else {
+                setReasonLogData(result.log || []);
+                setReasonMonthly(result.monthly || []);
+                setReasonLogError(null);
+            }
+        } catch (e) {
+            if (isAbortError(e)) return;
+            console.error(e);
+            if (reasonLogAbortRef.current === controller) {
+                setReasonLogData([]);
+                setReasonMonthly([]);
+                setReasonLogError(
+                    e instanceof Error && e.name === "TimeoutError"
+                        ? "Timed out loading reason log. Try a narrower date range, then click the reason again."
+                        : e instanceof Error
+                          ? e.message
+                          : "Failed to load reason log",
+                );
+            }
+        } finally {
+            if (reasonLogAbortRef.current === controller) {
+                setReasonLogLoading(false);
             }
         }
-        finally { setReasonLogLoading(false); }
     }, [analysisStartDate, analysisEndDate, isValidDateRange, fetchJsonWithTimeout]);
 
     const fetchMonthlyStats = useCallback(async (product: string) => {
@@ -347,6 +649,7 @@ export default function Dashboard() {
                 MONTHLY_STATS_TIMEOUT_MS,
                 controller.signal
             );
+            if (monthlyStatsAbortRef.current !== controller) return;
             setMonthlyStats(statsResult?.error ? null : statsResult);
             setMonthlyLoading(false);
 
@@ -355,21 +658,26 @@ export default function Dashboard() {
                 MONTHLY_RAW_TIMEOUT_MS,
                 controller.signal
             ).then((rawResult) => {
+                if (monthlyStatsAbortRef.current !== controller) return;
                 if (Array.isArray(rawResult)) setMonthlyRawData(rawResult);
             }).catch((error) => {
-                if ((error as Error).name !== "AbortError") {
+                if (!isAbortError(error)) {
                     console.error(error);
-                    setMonthlyRawData([]);
+                    if (monthlyStatsAbortRef.current === controller) setMonthlyRawData([]);
                 }
             });
         } catch (e) {
-            if ((e as Error).name !== "AbortError") {
+            if (!isAbortError(e)) {
                 console.error(e);
-                setMonthlyStats(null);
-                setMonthlyRawData([]);
+                if (monthlyStatsAbortRef.current === controller) {
+                    setMonthlyStats(null);
+                    setMonthlyRawData([]);
+                }
             }
         } finally {
-            setMonthlyLoading(false);
+            if (monthlyStatsAbortRef.current === controller) {
+                setMonthlyLoading(false);
+            }
         }
     }, [analysisStartDate, analysisEndDate, monthlyCpFilter, isValidDateRange, fetchJsonWithTimeout]);
 
@@ -417,9 +725,13 @@ export default function Dashboard() {
         if (view === "defect-analysis") {
             setRefreshing(true);
             try {
-                await fetchDefectReasonList();
+                defectListCacheRef.current.clear();
+                defectTrendCacheRef.current.clear();
+                defectJobMetricsCacheRef.current.clear();
+                defectDisplayedTrendKeyRef.current = "";
+                await fetchDefectReasonList(true);
                 if (selectedDefect) {
-                    await fetchDefectTrend(selectedDefect);
+                    await ensureDefectTrendLoaded(selectedDefect, true);
                 }
             } finally {
                 setRefreshing(false);
@@ -435,7 +747,7 @@ export default function Dashboard() {
         fetchProductRawData,
         fetchMonthlyStats,
         fetchDefectReasonList,
-        fetchDefectTrend,
+        ensureDefectTrendLoaded,
         selectedDefect,
     ]);
 
@@ -458,54 +770,109 @@ export default function Dashboard() {
 
     useEffect(() => {
         if (!selectedProduct) {
-            autoDateRangeProductRef.current = null;
+            appliedAutoDateRangeProductRef.current = null;
+            setAnalysisDateRangeReadyFor(null);
+            setSelectedReason(null);
+            setReasonLogData([]);
+            setReasonMonthly([]);
+            setReasonLogError(null);
             return;
         }
         if (view !== "product-analysis" && view !== "monthly-analysis") return;
-        if (autoDateRangeProductRef.current === selectedProduct) return;
+
+        // Same product already ranged (e.g. switch PA ↔ MA) — allow fetches immediately.
+        if (appliedAutoDateRangeProductRef.current === selectedProduct) {
+            setAnalysisDateRangeReadyFor(selectedProduct);
+            return;
+        }
 
         let cancelled = false;
+        setAnalysisDateRangeReadyFor(null);
+        reasonLogAbortRef.current?.abort();
+        setSelectedReason(null);
+        setReasonLogData([]);
+        setReasonMonthly([]);
+        setReasonLogError(null);
+        setReasonLogLoading(false);
+        if (view === "monthly-analysis") setMonthlyLoading(true);
+        if (view === "product-analysis") {
+            setStatsLoading(true);
+            setPaRawLoading(true);
+        }
+
         void (async () => {
-            await applyAutoDateRangeForProduct(selectedProduct);
-            if (!cancelled) {
-                autoDateRangeProductRef.current = selectedProduct;
+            try {
+                const range = await fetchProductAutoDateRange(selectedProduct);
+                if (cancelled) return;
+                if (range) {
+                    setAnalysisStartDate(range.minDate);
+                    setAnalysisEndDate(range.maxDate);
+                }
+            } catch (e) {
+                console.error(e);
+                if (cancelled) return;
             }
+            if (cancelled) return;
+            appliedAutoDateRangeProductRef.current = selectedProduct;
+            setAnalysisDateRangeReadyFor(selectedProduct);
         })();
 
         return () => {
             cancelled = true;
         };
-    }, [selectedProduct, view, applyAutoDateRangeForProduct]);
+    }, [selectedProduct, view, fetchProductAutoDateRange]);
 
     useEffect(() => {
         if (!selectedProduct || view !== "product-analysis") return;
+        if (analysisDateRangeReadyFor !== selectedProduct) return;
         fetchProductStats(selectedProduct);
         fetchProductRawData(selectedProduct);
-    }, [selectedProduct, view, analysisStartDate, analysisEndDate, fetchProductStats, fetchProductRawData]);
-
-    useEffect(() => {
-        if (view !== "defect-analysis") return;
-        setSelectedDefect((current) => {
-            if (!current) return current;
-            return defectReasonList.some((item) => item.value === current) ? current : "";
-        });
-    }, [view, defectReasonList]);
+    }, [selectedProduct, view, analysisDateRangeReadyFor, analysisStartDate, analysisEndDate, fetchProductStats, fetchProductRawData]);
 
     useEffect(() => {
         if (view !== "defect-analysis" || !selectedDefect) {
             setDefectTrendPayload({ trend: [], jobMetrics: [], products: [], wareKilns: [] });
+            defectDisplayedTrendKeyRef.current = "";
+            setDefectTrendLoading(false);
             return;
         }
-        fetchDefectTrend(selectedDefect);
-    }, [view, selectedDefect, fetchDefectTrend]);
+
+        const trendKey = buildDefectTrendKey(selectedDefect);
+        if (defectDisplayedTrendKeyRef.current !== trendKey) {
+            setDefectTrendPayload({ trend: [], jobMetrics: [], products: [], wareKilns: [] });
+            defectDisplayedTrendKeyRef.current = "";
+        }
+        setDefectTrendLoading(true);
+        void ensureDefectTrendLoaded(selectedDefect);
+    }, [
+        view,
+        selectedDefect,
+        defectUnitFilter,
+        category,
+        analysisStartDate,
+        analysisEndDate,
+        ensureDefectTrendLoaded,
+        buildDefectTrendKey,
+    ]);
 
     useEffect(() => {
         if (view !== "defect-analysis") return;
         setSelectedDefect("");
+        setDefectUnitFilter("WW_WHITE");
         setDefectTrendPayload({ trend: [], jobMetrics: [], products: [], wareKilns: [] });
+        defectDisplayedTrendKeyRef.current = "";
     }, [view, category, defectListMode]);
-    useEffect(() => { if (selectedReason && selectedProduct && view === "product-analysis") fetchReasonLog(selectedProduct, selectedReason); }, [selectedReason, selectedProduct, view, fetchReasonLog]);
-    useEffect(() => { if (selectedProduct && view === "monthly-analysis") fetchMonthlyStats(selectedProduct); }, [selectedProduct, view, fetchMonthlyStats]);
+    useEffect(() => {
+        if (!(selectedReason && selectedProduct && view === "product-analysis" && analysisDateRangeReadyFor === selectedProduct)) {
+            return;
+        }
+        fetchReasonLog(selectedProduct, selectedReason);
+    }, [selectedReason, selectedProduct, view, analysisDateRangeReadyFor, fetchReasonLog]);
+    useEffect(() => {
+        if (selectedProduct && view === "monthly-analysis" && analysisDateRangeReadyFor === selectedProduct) {
+            fetchMonthlyStats(selectedProduct);
+        }
+    }, [selectedProduct, view, analysisDateRangeReadyFor, fetchMonthlyStats]);
     useEffect(() => {
         return () => {
             productStatsAbortRef.current?.abort();
@@ -513,7 +880,7 @@ export default function Dashboard() {
             reasonLogAbortRef.current?.abort();
             monthlyStatsAbortRef.current?.abort();
             defectListAbortRef.current?.abort();
-            defectTrendAbortRef.current?.abort();
+            defectChartAbortRef.current?.abort();
         };
     }, []);
 
@@ -525,8 +892,9 @@ export default function Dashboard() {
             if (cp === 'C(FRIT&BOM)' || cp === 'Cs') cp = 'C1';
             return { ...item, m_cp: cp };
         }).filter(item => {
-            if (category === "WW") return item.m_part.startsWith("142");
-            if (category === "DW") return item.m_part.startsWith("143");
+            const part = item.m_part || '';
+            if (category === "WW") return part.startsWith("142");
+            if (category === "DW") return part.startsWith("143");
             return true;
         });
     }, [data, category]);
@@ -563,14 +931,23 @@ export default function Dashboard() {
         return isSomboonCpC(item) ? 'C1' : item.m_cp;
     };
 
+    useEffect(() => {
+        if (view !== "defect-analysis") return;
+        setSelectedDefect((current) => {
+            if (!current) return current;
+            return defectReasonList.some((item) => item.value === current) ? current : "";
+        });
+    }, [view, defectReasonList]);
+
     const filteredProducts = useMemo(() => {
-        return productList.filter(p => p.searchText.toLowerCase().includes(productSearch.toLowerCase()));
+        const q = productSearch.toLowerCase();
+        return productList.filter(p => (p.searchText || '').toLowerCase().includes(q));
     }, [productList, productSearch]);
 
     const filteredDefects = useMemo(() => {
         const query = defectSearch.toLowerCase().trim();
         if (!query) return defectReasonList;
-        return defectReasonList.filter((item) => item.searchText.toLowerCase().includes(query));
+        return defectReasonList.filter((item) => (item.searchText || '').toLowerCase().includes(query));
     }, [defectReasonList, defectSearch]);
 
     const selectedProductLabel = useMemo(() => {
@@ -660,7 +1037,8 @@ export default function Dashboard() {
         });
     }, [filteredData, selectedDate, overallCpFilter, overallUnitFilter, category]);
 
-    const activityTable = useMemo(() => {
+    /** Full filtered Sorting Logs (7-day window). UI shows top 100; Excel exports all. */
+    const activityTableAll = useMemo(() => {
         const grouped = new Map<string, GroupedRow>();
 
         filteredData
@@ -700,10 +1078,15 @@ export default function Dashboard() {
         return Array.from(grouped.values())
             .filter(item => {
                 const q = searchQuery.toLowerCase();
-                const matchesSearch = item.m_job.toLowerCase().includes(q) ||
-                    item.m_part.toLowerCase().includes(q) ||
-                    item.pt_desc1.toLowerCase().includes(q) ||
-                    (item.m_part.startsWith('143') && (item.pt_desc2 || '').toLowerCase().includes(q));
+                const job = (item.m_job || '').toLowerCase();
+                const part = (item.m_part || '').toLowerCase();
+                const desc1 = (item.pt_desc1 || '').toLowerCase();
+                const desc2 = (item.pt_desc2 || '').toLowerCase();
+                const matchesSearch = !q ||
+                    job.includes(q) ||
+                    part.includes(q) ||
+                    desc1.includes(q) ||
+                    (part.startsWith('143') && desc2.includes(q));
                 const matchesCP = cpFilter === "ALL" || item.m_cp === cpFilter || (cpFilter === 'C' && item.m_cp === 'C1');
                 return matchesSearch && matchesCP;
             })
@@ -718,9 +1101,10 @@ export default function Dashboard() {
                     return 1000;
                 };
                 return getOrder(a.m_cp) - getOrder(b.m_cp);
-            })
-            .slice(0, 100);
+            });
     }, [filteredData, searchQuery, cpFilter, unitFilter, category]);
+
+    const activityTable = useMemo(() => activityTableAll.slice(0, 100), [activityTableAll]);
 
     // ─── Render ──────────────────────────────────────────────
     return (
@@ -787,13 +1171,13 @@ export default function Dashboard() {
                 />
 
                 <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-8 space-y-6 sm:space-y-8 md:space-y-10 min-h-0">
-                    {(loading || (view === "product-analysis" && statsLoading && !productStats) || (view === "monthly-analysis" && monthlyLoading && !monthlyStats)) ? (
+                    {((loading && view === "overview") || (view === "monthly-analysis" && monthlyLoading && !monthlyStats)) ? (
                         <div className="flex flex-col items-center justify-center h-64 space-y-4">
                             <div className={`w-12 h-12 border-4 ${theme.badgeBorder} border-t-blue-500 rounded-full animate-spin`} />
                             <p className={`${theme.textMuted} font-medium animate-pulse`}>
                                 {view === "overview" ? "Fetching latest sorting data..." :
                                     view === "monthly-analysis" ? "Aggregating monthly statistics..." :
-                                        "Analyzing product data (2-year scope)..."}
+                                        "Loading..."}
                             </p>
                         </div>
                     ) : view === "overview" ? (
@@ -806,6 +1190,7 @@ export default function Dashboard() {
                             trendData={trendData}
                             dailyActivityTable={dailyActivityTable}
                             activityTable={activityTable}
+                            activityTableExportRows={activityTableAll}
                             isDailyMonitorFullscreen={isDailyMonitorFullscreen}
                             setIsDailyMonitorFullscreen={setIsDailyMonitorFullscreen}
                             setSelectedDailyRow={setSelectedDailyRow}
@@ -830,6 +1215,7 @@ export default function Dashboard() {
                             selectedProduct={selectedProduct}
                             selectedProductLabel={selectedProductLabel}
                             productStats={productStats}
+                            statsLoading={statsLoading}
                             paRawData={paRawData}
                             paRawLoading={paRawLoading}
                             showReject={showReject}
@@ -838,6 +1224,7 @@ export default function Dashboard() {
                             setSelectedReason={setSelectedReason}
                             reasonLogData={reasonLogData}
                             reasonLogLoading={reasonLogLoading}
+                            reasonLogError={reasonLogError}
                             reasonMonthly={reasonMonthly}
                             reasonChartMonth={reasonChartMonth}
                             setReasonChartMonth={setReasonChartMonth}
@@ -867,7 +1254,9 @@ export default function Dashboard() {
                             selectedDefect={selectedDefect}
                             selectedDefectLabel={selectedDefectLabel}
                             trendPayload={defectTrendPayload}
-                            loading={defectListLoading || defectTrendLoading}
+                            chartPending={defectChartPending}
+                            breakdownUnitFilter={defectUnitFilter}
+                            setBreakdownUnitFilter={setDefectUnitFilter}
                             analysisStartDate={analysisStartDate}
                             setAnalysisStartDate={setAnalysisStartDate}
                             analysisEndDate={analysisEndDate}

@@ -9,11 +9,30 @@ export const UNIT_LABELS: Record<UnitFilter, string> = {
     WW_BLACK: 'WW(black)',
 };
 
+export function buildUnitFilterSql(unitFilter: UnitFilter, category: string): string {
+    const effective = getEffectiveUnitFilter(unitFilter, category);
+    if (effective === 'WW_WHITE') return "RTRIM(LTRIM(ISNULL(unit, ''))) LIKE 'W5240%'";
+    if (effective === 'WW_BLACK') return "RTRIM(LTRIM(ISNULL(unit, ''))) LIKE 'W5241%'";
+    return '1=1';
+}
+
+export function getEffectiveUnitFilter(unitFilter: UnitFilter, category: string): UnitFilter {
+    return category === 'DW' ? 'ALL' : unitFilter;
+}
+
 export function matchesUnitFilter(item: DataItem, unitFilter: UnitFilter, category: string): boolean {
-    const effective = category === 'DW' ? 'ALL' : unitFilter;
+    const effective = getEffectiveUnitFilter(unitFilter, category);
     if (effective === 'ALL') return true;
     if (effective === 'WW_WHITE') return (item.unit || '').startsWith('W5240');
     if (effective === 'WW_BLACK') return (item.unit || '').startsWith('W5241');
+    return true;
+}
+
+export function matchesDefectUnit(unit: string, unitFilter: UnitFilter, category: string): boolean {
+    const effective = getEffectiveUnitFilter(unitFilter, category);
+    if (effective === 'ALL') return true;
+    if (effective === 'WW_WHITE') return (unit || '').startsWith('W5240');
+    if (effective === 'WW_BLACK') return (unit || '').startsWith('W5241');
     return true;
 }
 

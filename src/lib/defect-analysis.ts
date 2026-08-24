@@ -9,7 +9,10 @@ import { isRejectSubTyp, isScrapSubTyp } from '@/lib/sub-typ';
 
 export type DefectTrendMode = 'scrap' | 'reject';
 
-const BREAKDOWN_TOP_N = 3;
+export const BREAKDOWN_PANEL_TOP_N = 10;
+export const BREAKDOWN_MONTH_TOP_N = 10;
+/** Minimum ware process qty to include in breakdown ranking */
+export const BREAKDOWN_MIN_QTYPROC = 500;
 
 export type DefectChartRow = {
     month: string;
@@ -28,7 +31,11 @@ export type DefectMonthlyBreakdownRow = {
     label: string;
     /** DW (143): pt_desc2 shown below label (pt_desc1) */
     labelSub?: string;
+    /** Set when C/P filter is ALL — display CP beside codeware */
+    mCp?: string;
     qty: number;
+    qtyproc: number;
+    /** defect qty / ware process qty (jobs with this defect) */
     pct: number;
     rank: number;
 };
@@ -39,13 +46,14 @@ export type DefectKilnShareRow = {
     pct: number;
 };
 
-export type SelectedWareBreakdown = {
-    month: string;
-    label: string;
-    labelSub?: string;
-    wareQty: number;
-    warePct: number;
-};
+export function buildWareBreakdownKey(
+    month: string,
+    label: string,
+    labelSub?: string,
+    mCp?: string,
+): string {
+    return `${month}\0${label}\0${labelSub ?? ''}\0${mCp ?? ''}`;
+}
 
 export type SingleDefectTrendResult = {
     chartData: DefectChartRow[];
@@ -127,37 +135,68 @@ function isDwCodeware(mPart: string): boolean {
     return (mPart || '').startsWith('143');
 }
 
-function buildTopMonthlyBreakdown(
-    entries: { month: string; label: string; labelSub?: string; qty: number }[],
+export function buildWareBreakdown(
+    products: DefectProductMonthRow[],
+    mCpFilter: string,
 ): DefectMonthlyBreakdownRow[] {
-    const byMonth = new Map<string, Map<string, { label: string; labelSub?: string; qty: number }>>();
+    const splitByCp = mCpFilter === 'ALL';
+    const byMonth = new Map<
+        string,
+        Map<string, { label: string; labelSub?: string; mCp?: string; qty: number; qtyproc: number }>
+    >();
 
-    entries.forEach(({ month, label, labelSub, qty }) => {
-        if (!byMonth.has(month)) byMonth.set(month, new Map());
-        const bucket = byMonth.get(month)!;
-        const groupKey = labelSub ? `${label}\0${labelSub}` : label;
+    products.forEach((row) => {
+        if (!matchesCpFilter(row, mCpFilter)) return;
+        const desc1 = (row.pt_desc1 || '').trim();
+        const desc2 = (row.pt_desc2 || '').trim();
+        const isDw = isDwCodeware(row.m_part);
+        const label = desc1 || '-';
+        const labelSub = isDw && desc2 ? desc2 : undefined;
+        const displayCp = splitByCp ? getDisplayCpFromRecord(row) : undefined;
+        const groupKey = splitByCp
+            ? `${label}\0${labelSub ?? ''}\0${displayCp}`
+            : labelSub
+              ? `${label}\0${labelSub}`
+              : label;
+
+        if (!byMonth.has(row.month)) byMonth.set(row.month, new Map());
+        const bucket = byMonth.get(row.month)!;
         const existing = bucket.get(groupKey);
         if (existing) {
-            existing.qty += qty;
+            existing.qty += row.qty || 0;
+            existing.qtyproc += row.qtyproc || 0;
         } else {
-            bucket.set(groupKey, { label, labelSub, qty });
+            bucket.set(groupKey, {
+                label,
+                labelSub,
+                mCp: displayCp,
+                qty: row.qty || 0,
+                qtyproc: row.qtyproc || 0,
+            });
         }
     });
 
     const rows: DefectMonthlyBreakdownRow[] = [];
     byMonth.forEach((labels, month) => {
-        const monthTotal = Array.from(labels.values()).reduce((sum, entry) => sum + entry.qty, 0);
         const sorted = Array.from(labels.values())
-            .sort((a, b) => b.qty - a.qty)
-            .slice(0, BREAKDOWN_TOP_N);
-
+            .filter((entry) => entry.qtyproc >= BREAKDOWN_MIN_QTYPROC)
+            .map((entry) => ({
+                ...entry,
+                pct: entry.qtyproc > 0 ? Math.round((entry.qty / entry.qtyproc) * 1000) / 10 : 0,
+            }))
+            .sort((a, b) => {
+                if (b.pct !== a.pct) return b.pct - a.pct;
+                return b.qty - a.qty;
+            });
         sorted.forEach((entry, index) => {
             rows.push({
                 month,
                 label: entry.label,
                 labelSub: entry.labelSub,
+                mCp: entry.mCp,
                 qty: entry.qty,
-                pct: monthTotal > 0 ? Math.round((entry.qty / monthTotal) * 1000) / 10 : 0,
+                qtyproc: entry.qtyproc,
+                pct: entry.pct,
                 rank: index + 1,
             });
         });
@@ -170,27 +209,26 @@ function buildTopMonthlyBreakdown(
     });
 }
 
-function buildWareBreakdown(
-    products: DefectProductMonthRow[],
+export function buildKilnSharesFromWareRows(
+    rows: DefectWareKilnMonthRow[],
     mCpFilter: string,
-): DefectMonthlyBreakdownRow[] {
-    const entries: { month: string; label: string; labelSub?: string; qty: number }[] = [];
+): DefectKilnShareRow[] {
+    const byKiln = new Map<string, number>();
 
-    products.forEach((row) => {
+    rows.forEach((row) => {
         if (!matchesCpFilter(row, mCpFilter)) return;
-        const desc1 = (row.pt_desc1 || '').trim();
-        const desc2 = (row.pt_desc2 || '').trim();
-        const isDw = isDwCodeware(row.m_part);
-
-        entries.push({
-            month: row.month,
-            label: desc1 || '-',
-            labelSub: isDw && desc2 ? desc2 : undefined,
-            qty: row.qty || 0,
-        });
+        const kiln = (row.kiln || '').trim() || '-';
+        byKiln.set(kiln, (byKiln.get(kiln) || 0) + (row.qty || 0));
     });
 
-    return buildTopMonthlyBreakdown(entries);
+    const total = Array.from(byKiln.values()).reduce((sum, qty) => sum + qty, 0);
+    return Array.from(byKiln.entries())
+        .sort((a, b) => b[1] - a[1])
+        .map(([kiln, qty]) => ({
+            kiln,
+            qty,
+            pct: total > 0 ? Math.round((qty / total) * 1000) / 10 : 0,
+        }));
 }
 
 export function getKilnSharesForWare(

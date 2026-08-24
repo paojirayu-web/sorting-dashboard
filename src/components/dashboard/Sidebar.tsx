@@ -31,7 +31,6 @@ export function Sidebar({ theme, view, isSidebarOpen, onSetView, onClose }: Side
                         </span>
                     )}
                 </div>
-                {/* Close button for mobile */}
                 {isSidebarOpen && (
                     <button onClick={onClose} className="p-2 md:hidden" title="Close Sidebar">
                         <X size={20} className={theme.textSecondary} />
@@ -84,7 +83,6 @@ export function Sidebar({ theme, view, isSidebarOpen, onSetView, onClose }: Side
                     {isSidebarOpen && <span className={view === "settings" ? "font-semibold" : "font-medium"}>Settings</span>}
                 </button>
 
-                {/* Collapse button - visible on desktop when sidebar is open */}
                 {isSidebarOpen && (
                     <button
                         onClick={onClose}

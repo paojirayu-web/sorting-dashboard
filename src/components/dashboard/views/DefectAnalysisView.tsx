@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { Package, Flame, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronDown, Package } from 'lucide-react';
 import {
     Area,
     CartesianGrid,
@@ -14,17 +14,23 @@ import {
     YAxis,
 } from 'recharts';
 import type { Theme, ThemeName } from '@/lib/themes';
-import type { DefectTrendPayload } from '@/lib/defect-reason-query';
-import { SectionHeader } from '@/components/dashboard/SectionHeader';
 import {
+    BREAKDOWN_PANEL_TOP_N,
+    BREAKDOWN_MIN_QTYPROC,
     buildSingleDefectTrend,
-    getKilnSharesForWare,
+    buildKilnSharesFromWareRows,
+    buildWareBreakdown,
+    buildWareBreakdownKey,
+    collectDefectCpOptionsFromRecords,
     type DefectChartRow,
     type DefectKilnShareRow,
     type DefectMonthlyBreakdownRow,
-    type SelectedWareBreakdown,
 } from '@/lib/defect-analysis';
+import { SectionHeader } from '@/components/dashboard/SectionHeader';
+import type { DefectTrendPayload, DefectProductMonthRow, DefectWareKilnMonthRow } from '@/lib/defect-reason-query';
 import type { DefectListMode } from '@/types/dashboard';
+import type { UnitFilter } from '@/lib/unit-filter';
+import { UNIT_LABELS } from '@/lib/unit-filter';
 
 interface DefectAnalysisViewProps {
     theme: Theme;
@@ -34,7 +40,10 @@ interface DefectAnalysisViewProps {
     selectedDefect: string;
     selectedDefectLabel: string;
     trendPayload: DefectTrendPayload;
-    loading: boolean;
+    /** True while chart data does not match the selected defect / filters */
+    chartPending: boolean;
+    breakdownUnitFilter: UnitFilter;
+    setBreakdownUnitFilter: (unit: UnitFilter) => void;
     analysisStartDate: string;
     setAnalysisStartDate: (d: string) => void;
     analysisEndDate: string;
@@ -114,8 +123,43 @@ function TrendTooltip({
                         {row.defectQty.toLocaleString()} / {totalQty.toLocaleString()} pcs
                     </p>
                 </div>
+                <p className={`pt-1 text-[10px] ${isDark ? 'text-zinc-500' : 'text-gray-400'}`}>
+                    คลิกจุดบนเส้น Defect % เพื่อดู Top ware
+                </p>
             </div>
         </div>
+    );
+}
+
+function DefectTrendDot({
+    cx,
+    cy,
+    payload,
+    onMonthSelect,
+    radius = 5,
+}: {
+    cx?: number;
+    cy?: number;
+    payload?: DefectChartRow;
+    onMonthSelect: (month: string) => void;
+    radius?: number;
+}) {
+    if (cx == null || cy == null || !payload?.month) return null;
+
+    return (
+        <circle
+            cx={cx}
+            cy={cy}
+            r={radius}
+            fill="#2563eb"
+            stroke="#ffffff"
+            strokeWidth={1.5}
+            style={{ cursor: 'pointer' }}
+            onClick={(event) => {
+                event.stopPropagation();
+                onMonthSelect(payload.month);
+            }}
+        />
     );
 }
 
@@ -143,179 +187,121 @@ function BreakdownBar({
 function BreakdownWareLabel({
     label,
     labelSub,
+    mCp,
     theme,
     isDark,
 }: {
     label: string;
     labelSub?: string;
+    mCp?: string;
     theme: Theme;
     isDark: boolean;
 }) {
     const subColor = isDark ? 'text-orange-400' : 'text-orange-600';
+    const cpBadge = mCp ? (
+        <span
+            className={`shrink-0 text-[9px] font-bold px-1 py-px rounded border ${theme.badgeBg} ${theme.badgeBorder} ${theme.textMuted}`}
+            title={`C/P: ${mCp}`}
+        >
+            {mCp}
+        </span>
+    ) : null;
 
     if (!labelSub) {
         return (
-            <p className={`text-[11px] font-medium truncate ${theme.textWhite}`} title={label}>
-                {label}
-            </p>
+            <div className="flex items-center gap-1 min-w-0" title={mCp ? `${label} (${mCp})` : label}>
+                <p className={`text-[11px] font-medium truncate ${theme.textWhite}`}>{label}</p>
+                {cpBadge}
+            </div>
         );
     }
 
     return (
-        <div className="min-w-0" title={`${label}\n${labelSub}`}>
-            <p className={`text-[11px] font-medium truncate leading-tight ${theme.textWhite}`}>
-                {label}
-            </p>
-            <p className={`text-[10px] font-medium truncate leading-tight ${subColor}`}>
-                {labelSub}
-            </p>
-        </div>
-    );
-}
-
-function KilnShareBar({ pct, isDark }: { pct: number; isDark: boolean }) {
-    const fill = isDark ? 'bg-amber-500' : 'bg-amber-600';
-    const track = isDark ? 'bg-zinc-800' : 'bg-gray-100';
-
-    return (
-        <div className={`h-1.5 rounded-full overflow-hidden ${track}`}>
-            <div className={`h-full rounded-full ${fill} transition-all`} style={{ width: `${Math.min(pct, 100)}%` }} />
-        </div>
-    );
-}
-
-function WareKilnModal({
-    theme,
-    isDark,
-    selected,
-    kilnShares,
-    defectMode,
-    defectLabel,
-    onClose,
-}: {
-    theme: Theme;
-    isDark: boolean;
-    selected: SelectedWareBreakdown;
-    kilnShares: DefectKilnShareRow[];
-    defectMode: DefectListMode;
-    defectLabel: string;
-    onClose: () => void;
-}) {
-    const accentText = defectMode === 'scrap' ? 'text-red-500' : 'text-orange-500';
-    const totalQty = kilnShares.reduce((sum, row) => sum + row.qty, 0);
-
-    return (
-        <>
-            <div className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-sm" onClick={onClose} />
-            <div
-                className={`fixed inset-0 sm:inset-x-4 sm:top-6 sm:bottom-6 z-[201] ${theme.cardBg} border-0 sm:border ${theme.borderColor} sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden md:inset-x-auto md:left-1/2 md:-translate-x-1/2 md:w-[min(520px,92vw)] md:max-h-[85vh]`}
-            >
-                <div className={`flex items-start justify-between px-4 sm:px-5 py-4 border-b ${theme.borderColor} shrink-0 gap-3`}>
-                    <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                            <Flame size={16} className="text-amber-500 shrink-0" />
-                            <p className={`text-[10px] font-bold uppercase tracking-wide ${theme.textMuted}`}>
-                                Kiln share · {selected.month}
-                            </p>
-                        </div>
-                        <BreakdownWareLabel
-                            label={selected.label}
-                            labelSub={selected.labelSub}
-                            theme={theme}
-                            isDark={isDark}
-                        />
-                        <p className={`text-[10px] ${theme.textMuted} mt-2`}>
-                            {selected.wareQty.toLocaleString()} pcs ({selected.warePct.toFixed(1)}% of monthly {defectLabel.toLowerCase()})
-                        </p>
-                    </div>
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className={`p-2 shrink-0 rounded-xl ${theme.inputBg} border ${theme.borderColor} ${theme.textSecondary} hover:opacity-80 transition-all touch-manipulation`}
-                        aria-label="Close"
-                    >
-                        <X size={18} />
-                    </button>
-                </div>
-
-                <div className="flex-1 overflow-auto p-4 sm:p-5 min-h-0">
-                    {kilnShares.length === 0 ? (
-                        <p className={`text-center text-sm py-8 ${theme.textMuted}`}>No kiln data for this ware.</p>
-                    ) : (
-                        <div className="space-y-3">
-                            {kilnShares.map((row, index) => (
-                                <div
-                                    key={`${row.kiln}-${index}`}
-                                    className={`rounded-xl border ${theme.borderColor} px-3 py-2.5 ${isDark ? 'bg-zinc-900/40' : 'bg-gray-50/80'}`}
-                                >
-                                    <div className="flex items-center justify-between gap-2 mb-1.5">
-                                        <span className={`text-sm font-bold truncate ${theme.textWhite}`} title={row.kiln}>
-                                            {row.kiln}
-                                        </span>
-                                        <div className="flex items-center gap-2 shrink-0 text-[11px]">
-                                            <span className={`font-bold ${theme.textSecondary}`}>
-                                                {row.qty.toLocaleString()} pcs
-                                            </span>
-                                            <span className={`font-black ${accentText}`}>
-                                                {row.pct.toFixed(1)}%
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <KilnShareBar pct={row.pct} isDark={isDark} />
-                                </div>
-                            ))}
-                            <p className={`text-[10px] ${theme.textMuted} text-center pt-1`}>
-                                {kilnShares.length} kiln{kilnShares.length !== 1 ? 's' : ''} · {totalQty.toLocaleString()} pcs total
-                            </p>
-                        </div>
-                    )}
-                </div>
+        <div className="min-w-0" title={mCp ? `${label}\n${labelSub}\nC/P: ${mCp}` : `${label}\n${labelSub}`}>
+            <div className="flex items-center gap-1 min-w-0">
+                <p className={`text-[11px] font-medium truncate leading-tight ${theme.textWhite}`}>{label}</p>
+                {cpBadge}
             </div>
-        </>
+            <p className={`text-[10px] font-medium truncate leading-tight ${subColor}`}>{labelSub}</p>
+        </div>
     );
 }
 
-function MonthBreakdownCard({
+function KilnCapsules({
+    kilnShares,
+    wareQty,
+    theme,
+    accentText,
+}: {
+    kilnShares: DefectKilnShareRow[];
+    wareQty: number;
+    theme: Theme;
+    accentText: string;
+}) {
+    if (kilnShares.length === 0) return null;
+
+    return (
+        <div className="pl-3 pr-1 pb-1 pt-0.5">
+            <div className={`text-[9px] font-bold ${theme.textMuted} mb-0.5`}>Kiln breakdown</div>
+            <div className="flex flex-wrap gap-0.5">
+                {kilnShares.map((row) => {
+                    const kilnPct = wareQty > 0 ? (row.qty / wareQty) * 100 : 0;
+                    return (
+                        <span
+                            key={row.kiln}
+                            className={`inline-flex items-center gap-0.5 text-[9px] font-mono px-1 py-0.5 rounded ${theme.badgeBg} border ${theme.badgeBorder}`}
+                        >
+                            <span className={`font-bold ${theme.accentText}`}>{row.kiln}</span>
+                            <span className={theme.textMuted}>{row.qty.toLocaleString()}</span>
+                            <span className={`${accentText} opacity-80`}>({kilnPct.toFixed(0)}%)</span>
+                        </span>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
+function WareBreakdownList({
+    rows,
     theme,
     isDark,
-    month,
-    monthRows,
     defectMode,
+    expandedWareKey,
+    getKilnShares,
+    kilnLoadingKeys,
     onWareClick,
 }: {
+    rows: DefectMonthlyBreakdownRow[];
     theme: Theme;
     isDark: boolean;
-    month: string;
-    monthRows: DefectMonthlyBreakdownRow[];
     defectMode: DefectListMode;
+    expandedWareKey: string | null;
+    getKilnShares: (row: DefectMonthlyBreakdownRow) => DefectKilnShareRow[] | null;
+    kilnLoadingKeys: ReadonlySet<string>;
     onWareClick: (row: DefectMonthlyBreakdownRow) => void;
 }) {
-    const monthTotal = monthRows.reduce((sum, row) => sum + row.qty, 0);
-    const topPctSum = monthRows.reduce((sum, row) => sum + row.pct, 0);
     const accentText = defectMode === 'scrap' ? 'text-red-500' : 'text-orange-500';
 
     return (
-        <div className={`rounded-xl border ${theme.borderColor} overflow-hidden ${isDark ? 'bg-zinc-900/40' : 'bg-gray-50/80'}`}>
-            <div className="px-3 py-3">
-                <div className="flex items-center justify-between gap-2 mb-2">
-                    <span className={`text-sm font-black ${theme.textWhite}`}>{month}</span>
-                    <div className="flex items-center gap-2 shrink-0 text-[10px]">
-                        <span className={`px-2 py-0.5 rounded-md font-bold ${theme.inputBg} ${theme.textMuted}`}>
-                            Top {monthRows.length}
-                        </span>
-                        <span className={`font-bold ${theme.textSecondary}`}>
-                            {monthTotal.toLocaleString()} pcs
-                        </span>
-                    </div>
-                </div>
+        <div className="space-y-1">
+            {rows.map((row) => {
+                const rowKey = buildWareBreakdownKey(row.month, row.label, row.labelSub, row.mCp);
+                const isExpanded = expandedWareKey === rowKey;
+                const kilnShares = isExpanded ? getKilnShares(row) : null;
+                const kilnLoading = isExpanded && kilnShares === null && kilnLoadingKeys.has(rowKey);
 
-                <div className="space-y-2">
-                    {monthRows.map((row) => (
+                return (
+                    <div
+                        key={rowKey}
+                        className={`rounded-lg border ${theme.borderColor} overflow-hidden transition-colors ${
+                            isExpanded ? (isDark ? 'bg-white/[0.04]' : 'bg-black/[0.03]') : ''
+                        }`}
+                    >
                         <button
-                            key={`${month}-${row.rank}-${row.label}-${row.labelSub ?? ''}`}
                             type="button"
                             onClick={() => onWareClick(row)}
-                            className={`w-full grid grid-cols-[1.25rem_1fr_3rem] items-start gap-2 rounded-lg px-1 py-1 -mx-1 text-left transition-colors hover:bg-white/5 active:bg-white/10 cursor-pointer touch-manipulation`}
+                            className={`w-full grid grid-cols-[1.25rem_1fr_auto_1rem] items-start gap-2 px-2 py-1.5 text-left transition-colors hover:bg-white/5 active:bg-white/10 cursor-pointer touch-manipulation`}
                         >
                             <span
                                 className={`inline-flex items-center justify-center w-5 h-5 rounded-md text-[9px] font-black border mt-0.5 ${RANK_STYLES[row.rank - 1] ?? RANK_STYLES[2]}`}
@@ -326,89 +312,185 @@ function MonthBreakdownCard({
                                 <BreakdownWareLabel
                                     label={row.label}
                                     labelSub={row.labelSub}
+                                    mCp={row.mCp}
                                     theme={theme}
                                     isDark={isDark}
                                 />
                                 <BreakdownBar pct={row.pct} isDark={isDark} mode={defectMode} />
                             </div>
-                            <span className={`text-[11px] font-black text-right pt-0.5 ${accentText}`}>
-                                {row.pct.toFixed(1)}%
-                            </span>
+                            <div className="flex flex-col items-end shrink-0 pt-0.5 text-[10px] font-mono font-bold">
+                                <span className={accentText}>{row.qty.toLocaleString()}</span>
+                                <span className={`${accentText} opacity-80 text-[9px]`}>
+                                    ({row.pct.toFixed(1)}%)
+                                </span>
+                            </div>
+                            <ChevronDown
+                                size={14}
+                                className={`mt-1 shrink-0 ${theme.textMuted} transition-transform duration-200 ${
+                                    isExpanded ? 'rotate-180' : ''
+                                }`}
+                            />
                         </button>
-                    ))}
-                </div>
-
-                {monthRows.length > 0 && (
-                    <p className={`text-[10px] ${theme.textMuted} mt-2`}>
-                        Top {monthRows.length} cover {topPctSum.toFixed(1)}% of monthly defect · tap ware for kiln split
-                    </p>
-                )}
-            </div>
+                        {isExpanded && kilnLoading && (
+                            <p className={`px-3 pb-2 text-[9px] ${theme.textMuted} animate-pulse`}>Loading kilns…</p>
+                        )}
+                        {isExpanded && !kilnLoading && kilnShares && kilnShares.length > 0 && (
+                            <KilnCapsules
+                                kilnShares={kilnShares}
+                                wareQty={row.qty}
+                                theme={theme}
+                                accentText={accentText}
+                            />
+                        )}
+                        {isExpanded && !kilnLoading && kilnShares?.length === 0 && (
+                            <p className={`px-3 pb-2 text-[9px] ${theme.textMuted}`}>No kiln data for this filter.</p>
+                        )}
+                    </div>
+                );
+            })}
         </div>
     );
 }
 
-function MonthlyBreakdown({
+const BREAKDOWN_UNIT_TABS: { id: UnitFilter; label: string }[] = [
+    { id: 'WW_WHITE', label: 'White' },
+    { id: 'WW_BLACK', label: 'Black' },
+];
+
+const BREAKDOWN_SIBLING_UNIT: Partial<Record<UnitFilter, UnitFilter>> = {
+    WW_WHITE: 'WW_BLACK',
+    WW_BLACK: 'WW_WHITE',
+};
+
+function BreakdownUnitTabs({
     theme,
     isDark,
-    rows,
-    emptyMessage,
-    defectMode,
-    onWareClick,
-    compact = false,
+    value,
+    onChange,
 }: {
     theme: Theme;
     isDark: boolean;
-    rows: DefectMonthlyBreakdownRow[];
-    emptyMessage: string;
-    defectMode: DefectListMode;
-    onWareClick: (row: DefectMonthlyBreakdownRow) => void;
-    compact?: boolean;
+    value: UnitFilter;
+    onChange: (unit: UnitFilter) => void;
 }) {
-    const months = useMemo(
-        () => [...new Set(rows.map((row) => row.month))].sort((a, b) => b.localeCompare(a)),
-        [rows],
+    return (
+        <div className={`flex p-0.5 rounded-lg border ${theme.borderColor} ${isDark ? 'bg-zinc-900/60' : 'bg-gray-100'}`}>
+            {BREAKDOWN_UNIT_TABS.map((tab) => {
+                const active = value === tab.id;
+                return (
+                    <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => onChange(tab.id)}
+                        className={`flex-1 px-2 py-1.5 text-[10px] font-bold rounded-md transition-colors touch-manipulation ${
+                            active
+                                ? `${isDark ? 'bg-zinc-700 text-white' : 'bg-white text-gray-900 shadow-sm'}`
+                                : `${theme.textMuted} hover:opacity-80`
+                        }`}
+                    >
+                        {tab.label}
+                    </button>
+                );
+            })}
+        </div>
     );
+}
+
+function BreakdownPanel({
+    theme,
+    isDark,
+    category,
+    defectMode,
+    defectLabel,
+    breakdownUnitFilter,
+    setBreakdownUnitFilter,
+    selectedMonth,
+    monthDefectQty,
+    panelRows,
+    loading,
+    expandedWareKey,
+    getKilnShares,
+    kilnLoadingKeys,
+    onWareClick,
+}: {
+    theme: Theme;
+    isDark: boolean;
+    category: string;
+    defectMode: DefectListMode;
+    defectLabel: string;
+    breakdownUnitFilter: UnitFilter;
+    setBreakdownUnitFilter: (unit: UnitFilter) => void;
+    selectedMonth: string | null;
+    monthDefectQty: number | null;
+    panelRows: DefectMonthlyBreakdownRow[];
+    loading: boolean;
+    expandedWareKey: string | null;
+    getKilnShares: (row: DefectMonthlyBreakdownRow) => DefectKilnShareRow[] | null;
+    kilnLoadingKeys: ReadonlySet<string>;
+    onWareClick: (row: DefectMonthlyBreakdownRow) => void;
+}) {
+    const showUnitTabs = category !== 'DW';
 
     return (
         <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl overflow-hidden shadow-lg h-full flex flex-col min-h-0`}>
-            <div className={`${compact ? 'px-3 py-2' : 'px-4 py-3'} border-b ${theme.borderColor} ${theme.inputBg} shrink-0`}>
+            <div className="px-3 py-2 border-b border-inherit shrink-0 space-y-2">
                 <div className="flex items-center gap-2">
-                    <Package size={compact ? 14 : 16} className={defectMode === 'scrap' ? 'text-red-500' : 'text-orange-500'} />
-                    <div>
-                        <p className={`${compact ? 'text-xs' : 'text-sm'} font-bold ${theme.textWhite}`}>Monthly breakdown</p>
-                        {!compact && (
-                            <p className={`text-[10px] ${theme.textMuted} mt-0.5`}>
-                                Top 3 ware share per month · tap for kiln split
-                            </p>
-                        )}
+                    <Package size={14} className={defectMode === 'scrap' ? 'text-red-500' : 'text-orange-500'} />
+                    <div className="min-w-0">
+                        <p className={`text-xs font-bold ${theme.textWhite}`}>Ware breakdown</p>
+                        <p className={`text-[10px] ${theme.textMuted}`}>
+                            Top {BREAKDOWN_PANEL_TOP_N} · qtyproc ≥ {BREAKDOWN_MIN_QTYPROC.toLocaleString()} · คลิก ware เพื่อดู kiln
+                        </p>
                     </div>
                 </div>
+                {showUnitTabs && (
+                    <BreakdownUnitTabs
+                        theme={theme}
+                        isDark={isDark}
+                        value={breakdownUnitFilter}
+                        onChange={setBreakdownUnitFilter}
+                    />
+                )}
             </div>
 
-            {rows.length === 0 ? (
-                <div className={`px-3 py-8 text-center text-xs ${theme.textMuted}`}>{emptyMessage}</div>
-            ) : (
-                <div className={`${compact ? 'p-2' : 'p-3 sm:p-4'} space-y-2 flex-1 min-h-0 overflow-y-auto overscroll-contain`}>
-                    {months.map((month) => {
-                        const monthRows = rows
-                            .filter((row) => row.month === month)
-                            .sort((a, b) => a.rank - b.rank);
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3">
+                {!selectedMonth ? (
+                    <p className={`text-center text-xs py-8 ${theme.textMuted}`}>เลือก defect เพื่อดู breakdown</p>
+                ) : (
+                    <>
+                        <div className="mb-2">
+                            <p className={`text-sm font-black ${theme.textWhite}`}>{selectedMonth}</p>
+                            <p className={`text-[10px] ${theme.textMuted}`}>
+                                {monthDefectQty != null
+                                    ? `${monthDefectQty.toLocaleString()} pcs · ${defectLabel}`
+                                    : `— · ${defectLabel}`}
+                                {showUnitTabs ? ` · ${UNIT_LABELS[breakdownUnitFilter]}` : ''}
+                            </p>
+                        </div>
 
-                        return (
-                            <MonthBreakdownCard
-                                key={month}
+                        {loading ? (
+                            <p className={`text-center text-xs py-8 ${theme.textMuted} animate-pulse`}>
+                                Loading breakdown…
+                            </p>
+                        ) : panelRows.length === 0 ? (
+                            <p className={`text-center text-xs py-8 ${theme.textMuted}`}>
+                                No ware data for this month and unit.
+                            </p>
+                        ) : (
+                            <WareBreakdownList
+                                rows={panelRows}
                                 theme={theme}
                                 isDark={isDark}
-                                month={month}
-                                monthRows={monthRows}
                                 defectMode={defectMode}
+                                expandedWareKey={expandedWareKey}
+                                getKilnShares={getKilnShares}
+                                kilnLoadingKeys={kilnLoadingKeys}
                                 onWareClick={onWareClick}
                             />
-                        );
-                    })}
-                </div>
-            )}
+                        )}
+                    </>
+                )}
+            </div>
         </div>
     );
 }
@@ -421,18 +503,216 @@ export function DefectAnalysisView({
     selectedDefect,
     selectedDefectLabel,
     trendPayload,
-    loading,
+    chartPending,
+    breakdownUnitFilter,
+    setBreakdownUnitFilter,
     analysisStartDate,
     setAnalysisStartDate,
     analysisEndDate,
     setAnalysisEndDate,
 }: DefectAnalysisViewProps) {
     const [mCpFilter, setMCpFilter] = useState('ALL');
-    const [selectedWare, setSelectedWare] = useState<SelectedWareBreakdown | null>(null);
+    const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+    const [expandedWareKey, setExpandedWareKey] = useState<string | null>(null);
+    const monthProductsCacheRef = useRef<Map<string, DefectProductMonthRow[]>>(new Map());
+    const monthBreakdownAbortRef = useRef<AbortController | null>(null);
+    const [monthCacheVersion, setMonthCacheVersion] = useState(0);
+    const [monthBreakdownLoading, setMonthBreakdownLoading] = useState<string | null>(null);
+    const kilnRowsCacheRef = useRef<Map<string, DefectWareKilnMonthRow[]>>(new Map());
+    const kilnFetchAbortRef = useRef<Map<string, AbortController>>(new Map());
+    const [kilnCacheVersion, setKilnCacheVersion] = useState(0);
+    const [kilnLoadingKeys, setKilnLoadingKeys] = useState<Set<string>>(() => new Set());
+
+    const breakdownDataScopeKey = `${analysisStartDate}|${analysisEndDate}|${category}|${defectMode}|${selectedDefect}`;
+
+    const getMonthCacheKey = useCallback(
+        (month: string, unit: UnitFilter = breakdownUnitFilter) =>
+            `${breakdownDataScopeKey}|${unit}|${month}`,
+        [breakdownDataScopeKey, breakdownUnitFilter],
+    );
+
+    useEffect(() => {
+        monthProductsCacheRef.current.clear();
+        setMonthCacheVersion((v) => v + 1);
+        monthBreakdownAbortRef.current?.abort();
+        setMonthBreakdownLoading(null);
+        kilnRowsCacheRef.current.clear();
+        setKilnCacheVersion((v) => v + 1);
+        kilnFetchAbortRef.current.forEach((controller) => controller.abort());
+        kilnFetchAbortRef.current.clear();
+        setKilnLoadingKeys(new Set());
+        setExpandedWareKey(null);
+    }, [breakdownDataScopeKey]);
+
+    const getKilnCacheKey = useCallback(
+        (row: DefectMonthlyBreakdownRow) =>
+            `${breakdownDataScopeKey}|${breakdownUnitFilter}|${buildWareBreakdownKey(row.month, row.label, row.labelSub, row.mCp)}`,
+        [breakdownDataScopeKey, breakdownUnitFilter],
+    );
+
+    const prefetchMonthBreakdown = useCallback(
+        async (month: string, unit: UnitFilter) => {
+            if (!selectedDefect || category === 'DW') return;
+            const cacheKey = getMonthCacheKey(month, unit);
+            if (monthProductsCacheRef.current.has(cacheKey)) return;
+
+            try {
+                const params = new URLSearchParams({
+                    startDate: analysisStartDate,
+                    endDate: analysisEndDate,
+                    category,
+                    rsn_desc: selectedDefect,
+                    mode: defectMode,
+                    unit,
+                    part: 'breakdown',
+                    month,
+                });
+                const res = await fetch(`/api/defect-trend?${params}`);
+                if (!res.ok) return;
+                const result = await res.json();
+                const products = Array.isArray(result?.products) ? result.products as DefectProductMonthRow[] : [];
+                monthProductsCacheRef.current.set(cacheKey, products);
+                setMonthCacheVersion((v) => v + 1);
+            } catch {
+                // background prefetch — ignore errors
+            }
+        },
+        [
+            analysisStartDate,
+            analysisEndDate,
+            category,
+            defectMode,
+            selectedDefect,
+            getMonthCacheKey,
+        ],
+    );
+
+    const loadMonthBreakdown = useCallback(
+        async (month: string) => {
+            if (!selectedDefect) return;
+
+            const cacheKey = getMonthCacheKey(month);
+            if (monthProductsCacheRef.current.has(cacheKey)) return;
+
+            monthBreakdownAbortRef.current?.abort();
+            const controller = new AbortController();
+            monthBreakdownAbortRef.current = controller;
+            setMonthBreakdownLoading(month);
+
+            try {
+                const params = new URLSearchParams({
+                    startDate: analysisStartDate,
+                    endDate: analysisEndDate,
+                    category,
+                    rsn_desc: selectedDefect,
+                    mode: defectMode,
+                    unit: breakdownUnitFilter,
+                    part: 'breakdown',
+                    month,
+                });
+                const res = await fetch(`/api/defect-trend?${params}`, { signal: controller.signal });
+                if (!res.ok) {
+                    const body = await res.json().catch(() => ({}));
+                    const detail = typeof body?.error === 'string' ? body.error : `HTTP ${res.status}`;
+                    throw new Error(`Failed to load month breakdown: ${detail}`);
+                }
+                const result = await res.json();
+                const products = Array.isArray(result?.products) ? result.products as DefectProductMonthRow[] : [];
+                monthProductsCacheRef.current.set(cacheKey, products);
+                setMonthCacheVersion((v) => v + 1);
+
+                const siblingUnit = BREAKDOWN_SIBLING_UNIT[breakdownUnitFilter];
+                if (siblingUnit) void prefetchMonthBreakdown(month, siblingUnit);
+            } catch (e) {
+                if ((e as Error).name !== 'AbortError') {
+                    console.error(e);
+                    monthProductsCacheRef.current.set(cacheKey, []);
+                    setMonthCacheVersion((v) => v + 1);
+                }
+            } finally {
+                if (monthBreakdownAbortRef.current === controller) {
+                    setMonthBreakdownLoading(null);
+                }
+            }
+        },
+        [
+            analysisStartDate,
+            analysisEndDate,
+            category,
+            defectMode,
+            breakdownUnitFilter,
+            selectedDefect,
+            getMonthCacheKey,
+            prefetchMonthBreakdown,
+        ],
+    );
+
+    const loadWareKilns = useCallback(async (row: DefectMonthlyBreakdownRow) => {
+        const cacheKey = getKilnCacheKey(row);
+        if (kilnRowsCacheRef.current.has(cacheKey)) return;
+
+        const rowKey = buildWareBreakdownKey(row.month, row.label, row.labelSub, row.mCp);
+        kilnFetchAbortRef.current.get(rowKey)?.abort();
+
+        const controller = new AbortController();
+        kilnFetchAbortRef.current.set(rowKey, controller);
+        setKilnLoadingKeys((prev) => new Set(prev).add(rowKey));
+
+        try {
+            const params = new URLSearchParams({
+                startDate: analysisStartDate,
+                endDate: analysisEndDate,
+                category,
+                rsn_desc: selectedDefect,
+                mode: defectMode,
+                unit: breakdownUnitFilter,
+                part: 'kilns',
+                month: row.month,
+                pt_desc1: row.label,
+                pt_desc2: row.labelSub ?? '',
+            });
+            const res = await fetch(`/api/defect-trend?${params}`, { signal: controller.signal });
+            if (!res.ok) throw new Error('Failed to load kiln breakdown');
+            const rows = (await res.json()) as DefectWareKilnMonthRow[];
+            kilnRowsCacheRef.current.set(cacheKey, Array.isArray(rows) ? rows : []);
+            setKilnCacheVersion((v) => v + 1);
+        } catch (e) {
+            if ((e as Error).name !== 'AbortError') {
+                console.error(e);
+                kilnRowsCacheRef.current.set(cacheKey, []);
+                setKilnCacheVersion((v) => v + 1);
+            }
+        } finally {
+            kilnFetchAbortRef.current.delete(rowKey);
+            setKilnLoadingKeys((prev) => {
+                const next = new Set(prev);
+                next.delete(rowKey);
+                return next;
+            });
+        }
+    }, [
+        analysisStartDate,
+        analysisEndDate,
+        category,
+        defectMode,
+        breakdownUnitFilter,
+        selectedDefect,
+        getKilnCacheKey,
+    ]);
+
+    const getKilnShares = useCallback(
+        (row: DefectMonthlyBreakdownRow): DefectKilnShareRow[] | null => {
+            void kilnCacheVersion;
+            const cached = kilnRowsCacheRef.current.get(getKilnCacheKey(row));
+            if (cached === undefined) return null;
+            return buildKilnSharesFromWareRows(cached, row.mCp ?? mCpFilter);
+        },
+        [kilnCacheVersion, getKilnCacheKey, mCpFilter],
+    );
 
     const cpOptions = useMemo(
-        () => buildSingleDefectTrend(trendPayload.trend, trendPayload.jobMetrics, trendPayload.products, 'ALL', defectMode).cpOptions,
-        [trendPayload, defectMode],
+        () => collectDefectCpOptionsFromRecords(trendPayload.trend),
+        [trendPayload.trend],
     );
 
     const cpOptionsKey = cpOptions.join('|');
@@ -441,10 +721,6 @@ export function DefectAnalysisView({
         if (mCpFilter === 'ALL') return;
         if (!cpOptions.includes(mCpFilter)) setMCpFilter('ALL');
     }, [mCpFilter, cpOptionsKey, cpOptions]);
-
-    useEffect(() => {
-        setSelectedWare(null);
-    }, [selectedDefect, mCpFilter, defectMode, analysisStartDate, analysisEndDate]);
 
     const trend = useMemo(
         () =>
@@ -460,25 +736,71 @@ export function DefectAnalysisView({
         [trendPayload, selectedDefect, mCpFilter, defectMode],
     );
 
-    const kilnShares = useMemo(() => {
-        if (!selectedWare) return [];
-        return getKilnSharesForWare(
-            trendPayload.wareKilns,
-            selectedWare.month,
-            selectedWare.label,
-            selectedWare.labelSub,
-            mCpFilter,
-        );
-    }, [selectedWare, trendPayload.wareKilns, mCpFilter]);
+    const latestMonth = useMemo(() => {
+        if (trend.chartData.length === 0) return null;
+        return [...trend.chartData].sort((a, b) => b.month.localeCompare(a.month))[0].month;
+    }, [trend.chartData]);
+
+    useEffect(() => {
+        if (!latestMonth) {
+            setSelectedMonth(null);
+            return;
+        }
+        setSelectedMonth((prev) => {
+            if (!prev || !trend.chartData.some((row) => row.month === prev)) return latestMonth;
+            return prev;
+        });
+    }, [latestMonth, trend.chartData, selectedDefect]);
+
+    useEffect(() => {
+        if (!selectedMonth || chartPending) return;
+        void loadMonthBreakdown(selectedMonth);
+    }, [selectedMonth, breakdownUnitFilter, loadMonthBreakdown, chartPending]);
+
+    useEffect(() => {
+        if (chartPending || !selectedDefect || category === 'DW') return;
+        const months = trend.chartData.map((row) => row.month).sort((a, b) => b.localeCompare(a));
+        if (months.length === 0) return;
+
+        const toPrefetch = new Set<string>();
+        const latest = months[0];
+        toPrefetch.add(latest);
+        if (months.length > 1) toPrefetch.add(months[1]);
+        if (selectedMonth) toPrefetch.add(selectedMonth);
+
+        toPrefetch.forEach((month) => {
+            void prefetchMonthBreakdown(month, breakdownUnitFilter);
+            const siblingUnit = BREAKDOWN_SIBLING_UNIT[breakdownUnitFilter];
+            if (siblingUnit) void prefetchMonthBreakdown(month, siblingUnit);
+        });
+    }, [
+        chartPending,
+        selectedDefect,
+        category,
+        trend.chartData,
+        selectedMonth,
+        breakdownUnitFilter,
+        prefetchMonthBreakdown,
+    ]);
+
+    const monthDefectQtyMap = useMemo(() => {
+        const map = new Map<string, number>();
+        trend.chartData.forEach((row) => {
+            map.set(row.month, row.defectQty);
+        });
+        return map;
+    }, [trend.chartData]);
+
+    const handleChartMonthClick = (month: string) => {
+        setExpandedWareKey(null);
+        setSelectedMonth(month);
+    };
 
     const handleWareClick = (row: DefectMonthlyBreakdownRow) => {
-        setSelectedWare({
-            month: row.month,
-            label: row.label,
-            labelSub: row.labelSub,
-            wareQty: row.qty,
-            warePct: row.pct,
-        });
+        const key = buildWareBreakdownKey(row.month, row.label, row.labelSub, row.mCp);
+        const next = expandedWareKey === key ? null : key;
+        setExpandedWareKey(next);
+        if (next) void loadWareKilns(row);
     };
 
     const isDark = currentTheme === 'dark';
@@ -486,7 +808,26 @@ export function DefectAnalysisView({
     const defectLabel = defectMode === 'scrap' ? 'Scrap' : 'Reject';
     const categoryLabel = category === 'ALL' ? 'ALL' : category;
 
-    const breakdownRows = trend.wareBreakdown;
+    const panelRows = useMemo(() => {
+        if (!selectedMonth) return [];
+        void monthCacheVersion;
+        const products = monthProductsCacheRef.current.get(getMonthCacheKey(selectedMonth)) ?? [];
+        return buildWareBreakdown(products, mCpFilter)
+            .filter((row) => row.month === selectedMonth)
+            .sort((a, b) => {
+                if (b.pct !== a.pct) return b.pct - a.pct;
+                return b.qty - a.qty;
+            })
+            .slice(0, BREAKDOWN_PANEL_TOP_N)
+            .map((row, index) => ({ ...row, rank: index + 1 }));
+    }, [selectedMonth, monthCacheVersion, getMonthCacheKey, mCpFilter]);
+
+    const panelLoading =
+        selectedMonth != null &&
+        (chartPending ||
+            monthBreakdownLoading === selectedMonth ||
+            !monthProductsCacheRef.current.has(getMonthCacheKey(selectedMonth)));
+
     const totalTrendColor = TOTAL_TREND_COLOR[defectMode];
 
     const defectAxisMax = useMemo(() => {
@@ -560,11 +901,7 @@ export function DefectAnalysisView({
             </div>
 
             <section>
-                {loading ? (
-                    <div className={`py-16 text-center ${theme.textMuted} text-sm animate-pulse`}>
-                        Loading defect trend...
-                    </div>
-                ) : trend.chartData.length === 0 ? (
+                {!chartPending && trend.chartData.length === 0 ? (
                     <div className={`py-16 text-center ${theme.cardBg} border ${theme.borderColor} rounded-2xl ${theme.textMuted} text-sm`}>
                         No {defectLabel.toLowerCase()} records for this defect, date range, and C/P filter.
                     </div>
@@ -573,22 +910,34 @@ export function DefectAnalysisView({
                         <SectionHeader
                             title={`${defectLabel} trend`}
                             subtitle={
-                                mCpFilter === 'ALL'
-                                    ? `Left = total ${defectLabel.toLowerCase()} % · right = defect % (zoomed) · share in tooltip · ${categoryLabel}`
-                                    : `C/P ${mCpFilter} · dual axis · share in tooltip`
+                                chartPending
+                                    ? 'Loading chart…'
+                                    : [
+                                          mCpFilter === 'ALL' ? null : `C/P ${mCpFilter}`,
+                                          category !== 'DW' ? UNIT_LABELS[breakdownUnitFilter] : null,
+                                          'คลิกจุดบนเส้น Defect % เพื่อเลือกเดือน',
+                                      ]
+                                          .filter(Boolean)
+                                          .join(' · ')
                             }
                             theme={theme}
                         />
                         <div className="grid grid-cols-1 lg:grid-cols-[7fr_3fr] gap-4 items-stretch min-h-0">
                             <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-3 sm:p-4 shadow-lg flex flex-col min-w-0 min-h-0 h-full`}>
+                                {chartPending ? (
+                                    <div className="flex flex-1 min-h-[340px] items-center justify-center">
+                                        <p className={`${theme.textMuted} text-sm animate-pulse`}>Loading defect trend…</p>
+                                    </div>
+                                ) : (
+                                    <>
                                 <div className="flex items-center justify-between px-1 pb-2 shrink-0">
                                     <p className={`text-xs font-bold ${theme.textMuted}`}>Period total ({defectLabel})</p>
                                     <p className={`text-sm font-black ${defectMode === 'scrap' ? 'text-red-500' : 'text-orange-500'}`}>
                                         {trend.total.toLocaleString()} pcs
                                     </p>
                                 </div>
-                                <div className="flex-1 min-h-[300px] sm:min-h-[340px] w-full">
-                                    <ResponsiveContainer width="100%" height="100%">
+                                <div className="w-full">
+                                    <ResponsiveContainer width="100%" height={340}>
                                         <ComposedChart
                                             data={trend.chartData}
                                             margin={TREND_CHART_MARGIN}
@@ -681,42 +1030,59 @@ export function DefectAnalysisView({
                                                 stroke="#2563eb"
                                                 strokeWidth={2}
                                                 strokeDasharray="5 5"
-                                                dot={{ r: 3, fill: '#2563eb', strokeWidth: 0 }}
-                                                activeDot={{ r: 5 }}
+                                                dot={(props: { cx?: number; cy?: number; payload?: DefectChartRow }) => (
+                                                    <DefectTrendDot
+                                                        cx={props.cx}
+                                                        cy={props.cy}
+                                                        payload={props.payload}
+                                                        onMonthSelect={handleChartMonthClick}
+                                                    />
+                                                )}
+                                                activeDot={(props: { cx?: number; cy?: number; payload?: DefectChartRow }) => (
+                                                    <DefectTrendDot
+                                                        cx={props.cx}
+                                                        cy={props.cy}
+                                                        payload={props.payload}
+                                                        onMonthSelect={handleChartMonthClick}
+                                                        radius={7}
+                                                    />
+                                                )}
                                                 connectNulls
                                             />
                                         </ComposedChart>
                                     </ResponsiveContainer>
                                 </div>
+                                    </>
+                                )}
                             </div>
 
-                            <div className="min-w-0 flex flex-col min-h-0 max-h-[420px] sm:max-h-[460px] lg:max-h-none h-full lg:h-0 lg:min-h-full overflow-hidden">
-                                <MonthlyBreakdown
-                                theme={theme}
-                                isDark={isDark}
-                                rows={breakdownRows}
-                                defectMode={defectMode}
-                                onWareClick={handleWareClick}
-                                compact
-                                emptyMessage="No ware breakdown for this filter."
-                            />
+                            <div className="min-w-0 flex flex-col min-h-0 max-h-[min(72vh,720px)] lg:max-h-none h-full lg:h-0 lg:min-h-full overflow-hidden">
+                                <BreakdownPanel
+                                    theme={theme}
+                                    isDark={isDark}
+                                    category={category}
+                                    defectMode={defectMode}
+                                    defectLabel={defectLabel}
+                                    breakdownUnitFilter={breakdownUnitFilter}
+                                    setBreakdownUnitFilter={setBreakdownUnitFilter}
+                                    selectedMonth={selectedMonth}
+                                    monthDefectQty={
+                                        selectedMonth && !chartPending
+                                            ? monthDefectQtyMap.get(selectedMonth) ?? 0
+                                            : null
+                                    }
+                                    panelRows={panelRows}
+                                    loading={panelLoading}
+                                    expandedWareKey={expandedWareKey}
+                                    getKilnShares={getKilnShares}
+                                    kilnLoadingKeys={kilnLoadingKeys}
+                                    onWareClick={handleWareClick}
+                                />
                             </div>
                         </div>
                     </div>
                 )}
             </section>
-
-            {selectedWare && (
-                <WareKilnModal
-                    theme={theme}
-                    isDark={isDark}
-                    selected={selectedWare}
-                    kilnShares={kilnShares}
-                    defectMode={defectMode}
-                    defectLabel={defectLabel}
-                    onClose={() => setSelectedWare(null)}
-                />
-            )}
         </div>
     );
 }

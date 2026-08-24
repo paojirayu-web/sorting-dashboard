@@ -14,30 +14,110 @@ interface YieldPlanningCardsProps {
     data: YieldPlanningResult;
     theme: Theme;
     currentTheme: ThemeName;
+    /** Planning yield % from shipment (0–100). null = not found / loading handled by parent. */
+    planningYieldPct?: number | null;
+    planningMeta?: {
+        loading?: boolean;
+        source?: string | null;
+        match?: string | null;
+        sampleRows?: number;
+        error?: string | null;
+    };
 }
 
-function formatPct(value: number): string {
+function formatPctRatio(value: number): string {
     return `${(value * 100).toFixed(1)}%`;
 }
 
-function KpiCard({
+function formatPctPoints(value: number): string {
+    return `${value.toFixed(1)}%`;
+}
+
+/**
+ * One line: actual% (↑/↓diff%) / plan%
+ * Diff sits after actual, smaller type. Numbers use theme text color.
+ * invertDiff: for scrap — lower actual is better (↓ green, ↑ amber).
+ */
+function PctCompareLine({
+    actualPct,
+    planPct,
+    loading,
+    theme,
+    invertDiff = false,
+}: {
+    actualPct: number;
+    planPct: number | null;
+    loading?: boolean;
+    theme: Theme;
+    invertDiff?: boolean;
+}) {
+    const actualStr = formatPctPoints(actualPct);
+    const planStr =
+        loading ? '…' : planPct != null && Number.isFinite(planPct) ? formatPctPoints(planPct) : '—';
+
+    let diffNode: React.ReactNode = null;
+    if (!loading && planPct != null && Number.isFinite(planPct)) {
+        const diff = actualPct - planPct;
+        const abs = Math.abs(diff).toFixed(1);
+        if (Math.abs(diff) < 0.05) {
+            diffNode = (
+                <span className={`text-xs sm:text-sm font-bold tabular-nums shrink-0 ${theme.textMuted}`}>
+                    (→0.0%)
+                </span>
+            );
+        } else {
+            const better = invertDiff ? diff < 0 : diff > 0;
+            const arrow = diff > 0 ? '↑' : '↓';
+            diffNode = (
+                <span
+                    className={`text-xs sm:text-sm font-bold tabular-nums shrink-0 ${
+                        better ? 'text-emerald-400' : 'text-amber-400'
+                    }`}
+                >
+                    ({arrow}{abs}%)
+                </span>
+            );
+        }
+    }
+
+    return (
+        <p
+            className={`flex flex-nowrap items-baseline gap-x-1 text-xl sm:text-2xl font-black tabular-nums leading-none ${theme.textWhite}`}
+        >
+            <span className="shrink-0">{actualStr}</span>
+            {diffNode}
+            <span className={`font-bold shrink-0 ${theme.textMuted}`}>/</span>
+            <span className="shrink-0">{planStr}</span>
+        </p>
+    );
+}
+
+function CompareKpiCard({
     label,
-    value,
+    actualPct,
+    planPct,
+    loading,
     subtitle,
     icon: Icon,
     accentClass,
     theme,
+    invertDiff,
+    className = '',
 }: {
     label: string;
-    value: string;
+    actualPct: number;
+    planPct: number | null;
+    loading?: boolean;
     subtitle?: string;
     icon: typeof TrendingUp;
     accentClass: string;
     theme: Theme;
+    invertDiff?: boolean;
+    className?: string;
 }) {
     return (
         <div
-            className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-5 shadow-lg flex flex-col gap-2 min-h-[108px]`}
+            className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-3 sm:p-4 shadow-lg flex flex-col gap-2 min-h-[108px] min-w-0 ${className}`}
         >
             <div className="flex items-start justify-between gap-2">
                 <p className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider ${theme.textMuted}`}>
@@ -47,7 +127,58 @@ function KpiCard({
                     <Icon size={16} />
                 </div>
             </div>
-            <p className={`text-2xl sm:text-3xl font-black tabular-nums leading-none ${theme.textWhite}`}>
+            <PctCompareLine
+                actualPct={actualPct}
+                planPct={planPct}
+                loading={loading}
+                theme={theme}
+                invertDiff={invertDiff}
+            />
+            {subtitle && (
+                <p className={`text-[10px] sm:text-xs leading-snug ${theme.textMuted}`}>{subtitle}</p>
+            )}
+        </div>
+    );
+}
+
+function KpiCard({
+    label,
+    value,
+    subtitle,
+    icon: Icon,
+    accentClass,
+    theme,
+    className = '',
+    compact = false,
+}: {
+    label: string;
+    value: string;
+    subtitle?: string;
+    icon: typeof TrendingUp;
+    accentClass: string;
+    theme: Theme;
+    className?: string;
+    compact?: boolean;
+}) {
+    return (
+        <div
+            className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl ${
+                compact ? 'p-2.5 sm:p-3' : 'p-3 sm:p-4'
+            } shadow-lg flex flex-col gap-2 min-h-[108px] min-w-0 ${className}`}
+        >
+            <div className="flex items-start justify-between gap-2">
+                <p className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider ${theme.textMuted}`}>
+                    {label}
+                </p>
+                <div className={`p-1.5 rounded-lg shrink-0 ${accentClass}`}>
+                    <Icon size={compact ? 14 : 16} />
+                </div>
+            </div>
+            <p
+                className={`font-black tabular-nums leading-none ${theme.textWhite} ${
+                    compact ? 'text-lg sm:text-xl' : 'text-xl sm:text-2xl'
+                }`}
+            >
                 {value}
             </p>
             {subtitle && (
@@ -57,7 +188,13 @@ function KpiCard({
     );
 }
 
-export function YieldPlanningCards({ data, theme, currentTheme }: YieldPlanningCardsProps) {
+export function YieldPlanningCards({
+    data,
+    theme,
+    currentTheme,
+    planningYieldPct = null,
+    planningMeta,
+}: YieldPlanningCardsProps) {
     const { rows, divisorCp, divisorProcess } = data;
     const roundOptions = useMemo(() => getYieldRoundOptions(rows), [rows]);
     const [throughIndex, setThroughIndex] = useState(() => getDefaultThroughRoundIndex(roundOptions));
@@ -90,11 +227,16 @@ export function YieldPlanningCards({ data, theme, currentTheme }: YieldPlanningC
         ? 'bg-[#1f1f1f] text-white'
         : 'bg-white text-gray-900';
 
+    const actualYieldPct = metrics.pctA * 100;
+    const actualScrapPct = metrics.pctC * 100;
+    const hasPlan = planningYieldPct != null && Number.isFinite(planningYieldPct);
+    const planningScrapPct = hasPlan ? 100 - planningYieldPct : null;
+
     return (
         <div className="space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <p className={`text-[10px] font-bold uppercase tracking-wider ${theme.textMuted}`}>
-                    Actual Yield
+                    Actual vs Planning Yield
                 </p>
                 <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border ${theme.borderColor} ${theme.inputBg}`}>
                     <label
@@ -123,7 +265,7 @@ export function YieldPlanningCards({ data, theme, currentTheme }: YieldPlanningC
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[1.15fr_1.45fr_1.45fr_0.75fr] gap-3">
                 <KpiCard
                     label={`Baseline Process (${divisorCp})`}
                     value={divisorProcess.toLocaleString()}
@@ -132,33 +274,39 @@ export function YieldPlanningCards({ data, theme, currentTheme }: YieldPlanningC
                     accentClass="bg-violet-500/15 text-violet-400"
                     theme={theme}
                 />
-                <KpiCard
-                    label="Actual Yield (Total)"
-                    value={formatPct(metrics.pctA)}
+                <CompareKpiCard
+                    label="Actual / Planning Yield"
+                    actualPct={actualYieldPct}
+                    planPct={hasPlan ? planningYieldPct : null}
+                    loading={planningMeta?.loading}
                     subtitle={`${metrics.good.toLocaleString()} Good through ${selectedMcp}`}
                     icon={TrendingUp}
                     accentClass="bg-green-500/15 text-green-500"
                     theme={theme}
                 />
-                <KpiCard
-                    label="Reject Total"
-                    value={formatPct(metrics.pctP)}
-                    subtitle={`${metrics.reject.toLocaleString()} pcs · through ${selectedMcp}`}
-                    icon={AlertTriangle}
-                    accentClass="bg-amber-500/15 text-amber-400"
-                    theme={theme}
-                />
-                <KpiCard
-                    label="Scrap Total"
-                    value={formatPct(metrics.pctC)}
+                <CompareKpiCard
+                    label="Actual / Planning Scrap"
+                    actualPct={actualScrapPct}
+                    planPct={planningScrapPct}
+                    loading={planningMeta?.loading}
                     subtitle={`${metrics.scrap.toLocaleString()} pcs · through ${selectedMcp}`}
                     icon={Trash2}
                     accentClass="bg-red-500/15 text-red-500"
                     theme={theme}
+                    invertDiff
+                />
+                <KpiCard
+                    label="Reject"
+                    value={formatPctRatio(metrics.pctP)}
+                    subtitle={`${metrics.reject.toLocaleString()} pcs`}
+                    icon={AlertTriangle}
+                    accentClass="bg-amber-500/15 text-amber-400"
+                    theme={theme}
+                    compact
                 />
             </div>
             <p className={`text-[10px] ${theme.textMuted}`}>
-                Cumulative through {selectedMcp} along {roundLabel} · vs Process({divisorCp})
+                Actual (↑/↓diff) / Planning · through {selectedMcp} along {roundLabel} · vs Process({divisorCp})
             </p>
         </div>
     );

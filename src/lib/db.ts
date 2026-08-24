@@ -4,7 +4,7 @@ const config: sql.config = {
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     server: process.env.DB_SERVER || 'localhost',
-    database: process.env.DB_NAME,
+    database: process.env.DB_NAME || process.env.DB_DATABASE,
     port: 1433,
     connectionTimeout: 30000,
     requestTimeout: 120000,

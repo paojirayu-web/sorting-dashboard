@@ -1,5 +1,5 @@
 import type { CPData } from '@/types/dashboard';
-import { sortCpBreakdownForDisplay } from '@/lib/firing-cycle-labels';
+import { isSpecialFiringProduct, sortCpBreakdownForDisplay } from '@/lib/firing-cycle-labels';
 
 export type YieldPlanningRow = {
     mCp: string;
@@ -30,12 +30,21 @@ export type YieldRoundOption = {
     index: number;
 };
 
-/** Baseline input round: prefer glaze round C, else first firing C1. */
+/** Baseline input round: C1 for somboon special (1st firing), else glaze round C. */
 export function getYieldDivisorCp(cpBreakdown: CPData[]): CPData | null {
+    const isSpecial = isSpecialFiringProduct(cpBreakdown);
+
+    if (isSpecial) {
+        const c1 = cpBreakdown.find((cp) => cp.m_cp === 'C1' && (cp.metrics.totalQtyp || 0) > 0);
+        if (c1) return c1;
+    }
+
     const c = cpBreakdown.find((cp) => cp.m_cp === 'C' && (cp.metrics.totalQtyp || 0) > 0);
     if (c) return c;
+
     const c1 = cpBreakdown.find((cp) => cp.m_cp === 'C1' && (cp.metrics.totalQtyp || 0) > 0);
     if (c1) return c1;
+
     return null;
 }
 

@@ -69,6 +69,107 @@ export function SettingsView({ theme, currentTheme, setCurrentTheme }: SettingsV
                     theme={theme}
                 >
                 <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.8 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-06</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Added</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Overview — Data Sorting Logs Export Excel:</strong> Button next to CP / Unit / Search filters; downloads via <code className={`${theme.inputBg} px-1 rounded`}>/api/export/overview-sorting-log/excel</code>.</li>
+                                <li><strong>Excel columns:</strong> Same compact Qty / % layout as Product Analysis, plus <strong>Item number</strong> and separate <strong>Description1</strong> / <strong>Description2</strong> columns, with a Total row.</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Fixed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Overview Excel date range:</strong> Export now includes the full filtered <strong>7-day</strong> set (UI table still shows only the latest 100 rows for performance).</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.7 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-04</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Product / Monthly Analysis — product select freeze</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Race fix:</strong> Selecting a ware now waits for auto date-range to finish before loading PA/MA stats — aborted requests no longer clear the loading flag of the in-flight request (UI looked frozen with no data).</li>
+                                <li><strong>Browser compat:</strong> Polyfilled <code className={`${theme.inputBg} px-1 rounded`}>AbortSignal.any</code> for older Chrome / Edge / Safari that otherwise failed silently after product pick.</li>
+                                <li><strong>Abort-safe loading:</strong> Raw data, monthly stats, and reason-log fetches only clear their own loading state when they are still the active request.</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Product Analysis — Top Scrap / Reject data log</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Timeout align:</strong> Reason-log client timeout raised to <strong>120s</strong> to match the DB request timeout (was 60s → skeleton then empty).</li>
+                                <li><strong>Faster query:</strong> <code className={`${theme.inputBg} px-1 rounded`}>/api/product-reason-log</code> reduced to two light scans with <code className={`${theme.inputBg} px-1 rounded`}>NOLOCK</code> (clicked reason + monthly totals) instead of pulling every scrap/reject reason or stacking many CTEs.</li>
+                                <li><strong>Clear errors:</strong> Timeout / API failures show an explicit message instead of a blank “No records” state; reason selection clears when switching product.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.6 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-07-20</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Product Analysis — Planning Yield (Table)</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Actual vs Plan:</strong> Yield / Scrap cards show <code className={`${theme.inputBg} px-1 rounded`}>actual% (↑/↓diff%) / plan%</code> on one line; plan % comes from shipment <code className={`${theme.inputBg} px-1 rounded`}>yield_pct</code> via <code className={`${theme.inputBg} px-1 rounded`}>/api/product-planning-yield</code>.</li>
+                                <li><strong>Scrap plan:</strong> Scrap plan uses <code className={`${theme.inputBg} px-1 rounded`}>100 − plan yield</code> with inverted better/worse coloring.</li>
+                                <li><strong>Card order:</strong> Baseline → Yield → Scrap → Reject (Reject narrower).</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Product Analysis — Table timeline filter</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Separate filters:</strong> Cards and Table keep independent date ranges so switching tabs does not overwrite the other.</li>
+                                <li><strong>Month / Year bar:</strong> Table tab uses a labeled period bar (Month or Year unit); drag across cells to set the range; month labels appear on the bar itself.</li>
+                                <li><strong>Date capsules:</strong> Days with sorting data in range appear as capsules; selecting them filters the whole Table page (Firing Cycle, Yield cards, and Sorting Log).</li>
+                                <li><strong>Hit-test:</strong> Each month/year cell is its own click target so selection matches the cell under the cursor.</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Product Analysis — loading &amp; stability</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Stay on Table tab:</strong> Changing the timeline no longer remounts the whole page (which previously reset back to Cards).</li>
+                                <li><strong>Skeleton load:</strong> Only Firing Cycle / Yield (and Cards content) show skeleton while stats refresh; Sorting Log uses its own loading state.</li>
+                                <li><strong>Debounced fetch:</strong> Timeline range updates wait ~500ms after the last change before calling product-stats / raw APIs — avoids SQL timeout storms while dragging.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.5 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-06-24</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Defect Analysis — ware breakdown (Top 10)</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Top 10 panel:</strong> Ware ranking shown directly in the right breakdown panel (no popup); default month = latest month in the trend.</li>
+                                <li><strong>Ranking rule:</strong> Sorted by <strong>defect %</strong> (<code className={`${theme.inputBg} px-1 rounded`}>qty ÷ qtyproc</code>) high → low; only wares with <strong>qtyproc ≥ 500</strong> are eligible.</li>
+                                <li><strong>C/P = ALL:</strong> Each ware row shows a <strong>C / P / C1</strong> badge and ranks separately per C/P (no longer merged across rounds).</li>
+                                <li><strong>Unit tabs:</strong> <strong>White / Black</strong> tabs on the breakdown panel filter ware + kiln data; trend chart still uses combined unit scope.</li>
+                                <li><strong>Lazy load:</strong> Breakdown loads per selected month only; click a point on the <strong>Defect %</strong> line to switch month.</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Defect Analysis — kiln breakdown</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Collapsed by default:</strong> Kiln share hidden until you click a ware row (chevron indicator).</li>
+                                <li><strong>Lazy load:</strong> Kiln data fetched only when a ware is expanded.</li>
+                                <li><strong>WW fix:</strong> Kiln query no longer requires empty <code className={`${theme.inputBg} px-1 rounded`}>pt_desc2</code> — WW wares with brand sub-lines (e.g. IITTALA) load kiln data correctly.</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Defect Analysis — loading &amp; performance</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Defect switch:</strong> Changing defect clears stale chart data immediately and shows <strong>Loading defect trend…</strong> instead of the previous defect&apos;s graph.</li>
+                                <li><strong>Synced panels:</strong> Breakdown waits for the trend to finish, then loads — both sides show loading states to avoid mixed old/new data.</li>
+                                <li><strong>Faster breakdown:</strong> Split API into <code className={`${theme.inputBg} px-1 rounded`}>part=chart</code> / <code className={`${theme.inputBg} px-1 rounded`}>breakdown</code> / <code className={`${theme.inputBg} px-1 rounded`}>kilns</code>; monthly breakdown scoped to one month with client-side cache.</li>
+                                <li><strong>API fix:</strong> Removed server cache on breakdown responses that exceeded Next.js 2&nbsp;MB limit (was causing <strong>Failed to load month breakdown</strong> / HTTP 500).</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
                     <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.4 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-06-22</span></h3>
                     <div className="space-y-4">
                         <div>
