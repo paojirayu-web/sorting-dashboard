@@ -69,6 +69,661 @@ export function SettingsView({ theme, currentTheme, setCurrentTheme }: SettingsV
                     theme={theme}
                 >
                 <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.64 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-02</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>DW codeware:</strong> desc1 uses the family color (Inglaze amber, Onglaze purple). desc2 is white. Onglaze no longer reuses the Inglaze orange.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.63 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-02</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Production Mix:</strong> All firing pie combines P1–P5 as <strong>P</strong>. White / Black (All) adds Top 3 customers + Other below the pie.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.62 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-31</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Production Mix:</strong> FF keeps FRIT and BOM separate (progress, pie, and Year Comparison). All still combines them as Custom.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.61 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-29</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Production Mix:</strong> Production Qty and the firing pie combine FRIT + BOM as <strong>Custom</strong>. Order is Standard (C), Custom, Custom (C), then P1–P5.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.60 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-29</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Production Mix:</strong> Filters stay one row by shrinking width. Height and icons stay the same.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.59 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-29</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Production Mix:</strong> FF hides Custom (C). In All, Custom (C) is capped at that item’s FRIT/BOM qty. Production Qty uses a separate progress bar for each firing type.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.58 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-29</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Production Mix:</strong> Production Qty keeps the large total and uses a stacked progress bar instead of written counts. Glaze filter uses the glaze code prefix: T Transparent, G Glossy, A Art, SM Semi-matte, M Matte. All firing view adds <strong>Custom (C)</strong> — the C qty of FRIT/BOM items that also had a C firing.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.57 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-29</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Production Mix:</strong> Production Qty card uses a progress mix instead of large counts. Donut slices and legends sort from largest to smallest.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.56 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-29</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Production Mix:</strong> Year Comparison All is back to Standard as bars and FRIT / BOM as lines. P is a line on the same right axis when All firings is on.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.55 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-29</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Production Mix:</strong> Default is first fire only (FF). An <strong>FF / All</strong> switch sits next to Refresh. All includes P1–P5; the Firing filter shows P rounds only in All.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.54 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-29</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Production Mix:</strong> WW kiln mix now includes P1–P5 as their own firing qty (not folded into first-fire Standard / FRIT / BOM). All totals include P. Year Comparison All adds a combined <strong>P</strong> series. The Firing filter has P1–P5 each.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.53 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-29</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Product / Monthly:</strong> Codeware title sits flush under the top nav with no gap.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.52 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-29</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Product / Monthly:</strong> Codeware title stays pinned at the top while scrolling.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.51 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-29</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Product / Monthly search:</strong> Product names use memory + disk cache, warm on server start, and show the last list while a background refresh runs (2 hours). Refresh still reloads immediately.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.50 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-29</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Production Mix:</strong> Shape / Forming mini charts sit in a two-column grid. The qty table scrolls so the panel stays closer in height to Year Comparison.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.49 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-29</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Production Mix:</strong> Shape / Forming sparklines show X/Y axes, grid, and dots on each period.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.48 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-29</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Production Mix:</strong> Shape / Forming trend is sparkline small multiples (one line per group) so monthly mix stays readable next to Year Comparison.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.47 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-29</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Fixed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Production Mix:</strong> Restored readable labels (middle dots, year range, Updating, and the FRIT/BOM complete note).</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Production Mix:</strong> Year Comparison and Shape / Forming mix sit on one row from lg screens. Charts share height; tables stay compact with scroll if needed.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.46 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-29</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Production Mix:</strong> Shape / Forming mix is a full-width grouped bar. Shape is Top 3 + Other.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.45 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-29</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Production Mix:</strong> Customer donut is Top 3 + Other. Shape / Forming is a stacked bar like Year Comparison, with one Shape / Forming toggle.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.44 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-29</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Production Mix:</strong> White / Black shows Customer mix. Shape Vessel is labeled Pitcher.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.43 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-29</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Production Mix:</strong> Filter icons. Shape trend is qty-only again. White/Black donut uses <code className={`${theme.inputBg} px-1 rounded`}>unit</code>. White or Black selected shows Forming mix in that card.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.42 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-29</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Production Mix:</strong> Page renamed from Qty Process. Tone filter is All / White / Black. Trend by Shape and Forming shows Standard / FRIT / BOM qty in each group (Firing tab removed).</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.41 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-29</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Added</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Qty Process:</strong> Line filter WW / BW, Customer from <code className={`${theme.inputBg} px-1 rounded`}>pt_desc2</code>, and Trend by Firing (Standard / FRIT / BOM).</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.40 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-28</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Qty Process:</strong> FRIT / BOM complete uses first-firing <code className={`${theme.inputBg} px-1 rounded`}>qtycomp</code> plus C1 special reasons (พ่นฟริต / วางบอม). Stacked chart shows % with a minimum segment size for labels.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.39 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-28</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Qty Process:</strong> Process vs Complete / Scrap / Reject is a stacked bar with qty labels. Reject is included from <code className={`${theme.inputBg} px-1 rounded`}>qtyrjct</code>.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.38 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-28</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Fixed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Qty Process:</strong> White/Black donut showed no data because mix lacked <code className={`${theme.inputBg} px-1 rounded`}>tone</code>. It falls back to yearly White/Black, then rebuilds cache from <code className={`${theme.inputBg} px-1 rounded`}>unit</code> W5240 / W5241.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.37 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-28</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Qty Process:</strong> White/Black donut follows Firing / Shape / Forming. Standard shows bars only. Firing label is Custom (FRIT+BOM).</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.36 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-28</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Qty Process:</strong> White/Black donut follows BOM / FRIT / Special filters. Year Comparison is a bar chart for those firing filters.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.35 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-27</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Qty Process:</strong> Process vs Complete vs Scrap switches to monthly when a year is selected; All years stays yearly.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.34 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-27</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Fixed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Kiln badges:</strong> On Overview and Product Analysis tables, the kiln pill uses that row’s category color when All is selected (not the All blue).</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.33 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-27</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Fixed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Overview:</strong> When All is selected, table rows keep each category’s color (WW White / Black, DW Inglaze / Onglaze) on kiln badges and the left accent bar.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.32 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-27</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Qty Process:</strong> Display years start at 2567. Year Comparison and Trend are yearly for All years, monthly when one year is selected. Trend hides empty / zero series.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.31 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-27</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Qty Process:</strong> Opens from the last cache immediately, then refreshes in the background. SQL is split by year; cache warms when the server starts.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.30 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-27</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Qty Process:</strong> Faster load — simpler WW query, no Overview/Product API while this page is open, 30-minute cache.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.29 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-27</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Qty Process:</strong> All / WW / DW toggle is hidden. The page loads WW data only (kilndb), not DW.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.28 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-27</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Qty Process:</strong> Extra chart captions removed.</li>
+                                <li><strong>Qty Process:</strong> Process vs Complete vs Scrap is a dual-axis combo — Process qty on the left; Complete % and Scrap % share the right axis (0–100).</li>
+                                <li><strong>Qty Process:</strong> Trend tabs are Shape and Forming only (Monthly removed). Qty uses small multiples; Share is stacked %.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.27 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-27</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Qty Process:</strong> Trend chart tabs are Shape and Forming only; Monthly was removed.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.26 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-27</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Qty Process:</strong> Process vs Complete vs Scrap right axis is Complete % and Scrap % (0–100), independent of process volume.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.25 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-27</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Qty Process:</strong> Extra chart captions removed. Process vs Complete vs Scrap is a dual-axis combo (Process bar left; Complete and Scrap lines share the right axis).</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.24 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-27</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Qty Process:</strong> Shape / Forming trend is one mini chart per group (own scale + first→last %) so volume changes are readable. Share % stacked area is still available via Qty / Share.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.23 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-27</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Qty Process:</strong> Complete / Scrap are a stacked area (Scrap at the bottom) combined with the Process bar. Tooltips show readable series colors.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.22 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-27</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Qty Process:</strong> Process qty is blue on every chart. Complete / Scrap are green and red lines. Shape and Forming share one panel (capsule, default Forming).</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.21 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-27</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Qty Process:</strong> Special is split into <strong>FRIT</strong> (glaze not T) and <strong>BOM</strong> (glaze starts with T, e.g. <code className={`${theme.inputBg} px-1 rounded`}>/T0040</code>). Complete / Scrap now show on the combo chart.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.20 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-27</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Qty Process:</strong> Shape / Forming use ranked horizontal bars (qty + %). New combo chart: Process vs Complete vs Scrap by year.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.19 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-27</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Qty Process:</strong> Filters moved to the header as dropdowns. Year chart is stacked with %, trend is a stacked area (Month / Shape / Forming), and donuts show % plus legend in English.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.18 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-27</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Added</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Qty Process:</strong> New page for production qty (C/C1) by year, shape, and forming — same logic as the WW presentation, with the All / WW / DW toggle.</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Defect Analysis</strong> is hidden from the menu. Data and APIs are kept.</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Fixed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>DW Onglaze cards:</strong> Qty on Overview / Product Analysis cards no longer shows 0 when SDB stores process qty on Grade A rows or later reason rows.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.17 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-26</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Fixed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>DW Onglaze scrap/reject popup:</strong> Clicking a Data Sorting Log row now shows that job’s reasons, not the whole product’s reasons (Onglaze jobs have no job number).</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.16 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-26</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Fixed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Product Analysis:</strong> Changing category now returns to the start screen (clears product, Cards/Table tab, and stats).</li>
+                                <li><strong>DW Onglaze Data Sorting Log:</strong> Table now shows Onglaze jobs instead of an empty list.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.15 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-26</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Product Analysis Table / Data Sorting Log:</strong> The log loads job qty in one query. Scrap/reject reasons load when you click a row.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.14 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-26</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Product Analysis load:</strong> Faster after picking a product — date range is computed inside the stats call, duplicate SQL scans were merged, and the Table sorting log loads only when you open Table.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.13 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-26</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>WW White / Black search:</strong> Product / Monthly Analysis search lists only products that exist on that unit. Stats follow the same filter.</li>
+                                <li><strong>WW Black</strong> accent is magenta so it is distinct from <strong>All</strong> (blue).</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Fixed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>WW White / Black search:</strong> Product list now reloads automatically when unit flags are missing — no need to press Refresh first.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.12 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-26</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Category accent</strong> follows the selected family everywhere (sidebar, Cards/Table, badges, charts). DW Inglaze is amber; DW Onglaze is purple.</li>
+                                <li><strong>WW White</strong> is teal so it is visually distinct from <strong>All</strong> (blue).</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.11 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-26</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Category toggle</strong> is available on every page, including Product Analysis, Monthly Analysis, and Settings.</li>
+                                <li>Product / Monthly Analysis search popup shows only products in the selected category (filtered in memory from the cached list — no extra SQL).</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Fixed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>DW Onglaze product search:</strong> SDB product list query failed on date parameters, so Onglaze items never appeared in the search popup.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.10 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-26</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Category hierarchy:</strong> Overview and Defect Analysis use <strong>All / WW / DW</strong>. WW expands to <strong>All / White / Black</strong>. DW expands to <strong>All / Inglaze / Onglaze</strong>.</li>
+                                <li>WW White / Black is now a sub-filter of WW (replaces the Unit dropdown).</li>
+                                <li>Category changes fade the content and switch a light accent skin (All neutral, WW blue, DW Inglaze amber, DW Onglaze purple).</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.9 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-26</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Added</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>DW Onglaze source:</strong> Parallel connection to SDB (<code className={`${theme.inputBg} px-1 rounded`}>dbo.v_rpt_sort</code>).</li>
+                                <li>Product list includes Onglaze items tagged <code className={`${theme.inputBg} px-1 rounded`}>OG:</code> so Product / Monthly Analysis query SDB.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
                     <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.8 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-08-06</span></h3>
                     <div className="space-y-4">
                         <div>
@@ -212,7 +867,7 @@ export function SettingsView({ theme, currentTheme, setCurrentTheme }: SettingsV
                             <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Defect Analysis (new page)</h4>
                             <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
                                 <li><strong>Scrap / Reject toggle (header):</strong> Choose defect type before search — list and trend load only matching <code className={`${theme.inputBg} px-1 rounded`}>rsn_desc</code> rows.</li>
-                                <li><strong>Defect search:</strong> Search box lists <code className={`${theme.inputBg} px-1 rounded`}>rsn_desc</code> filtered by WW/DW/ALL and selected Scrap or Reject mode.</li>
+                                <li><strong>Defect search:</strong> Search box lists <code className={`${theme.inputBg} px-1 rounded`}>rsn_desc</code> filtered by ALL / WW / DW Inglaze / DW Onglaze and selected Scrap or Reject mode.</li>
                                 <li><strong>Monthly trend:</strong> Line chart and table for the selected defect, with C/P filter.</li>
                             </ul>
                         </div>
@@ -306,7 +961,7 @@ export function SettingsView({ theme, currentTheme, setCurrentTheme }: SettingsV
                             <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Product list &amp; data scope</h4>
                             <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
                                 <li><strong>Wider product search:</strong> Product dropdown/search loads codes from the last <strong>2 years</strong> (was effectively 1 year), so older active codes (e.g. 2024) appear again.</li>
-                                <li><strong>Cached list:</strong> <code className={`${theme.inputBg} px-1 rounded`}>/api/products</code> cached ~1 hour; <strong>Refresh</strong> on PA/MA passes <code className={`${theme.inputBg} px-1 rounded`}>?refresh=1</code> to reload immediately.</li>
+                                <li><strong>Cached list:</strong> <code className={`${theme.inputBg} px-1 rounded`}>/api/products</code> uses memory + disk cache (~2 hours), warmed on server start; stale lists return immediately then rebuild. <strong>Refresh</strong> on PA/MA passes <code className={`${theme.inputBg} px-1 rounded`}>?refresh=1</code> to reload immediately.</li>
                                 <li><strong>API lookback:</strong> Product stats / PA raw data: 2 years; Monthly stats: 3 years; Overview: 7 days (unchanged).</li>
                             </ul>
                         </div>

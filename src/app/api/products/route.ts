@@ -1,37 +1,17 @@
 import { NextResponse } from 'next/server';
-import { unstable_cache } from 'next/cache';
-import {
-    getProductListStartDate,
-    PRODUCT_LIST_CACHE_SECONDS,
-    queryProductListFromDb,
-    type ProductListItem,
-} from '@/lib/product-list';
+import { getProductListResponse } from '@/lib/product-list-cache';
 
-const getCachedProductList = unstable_cache(
-    async (startDate: string): Promise<ProductListItem[]> => queryProductListFromDb(startDate),
-    ['product-list'],
-    {
-        revalidate: PRODUCT_LIST_CACHE_SECONDS,
-        tags: ['product-list'],
-    },
-);
+export const maxDuration = 120;
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
     try {
         const { searchParams } = new URL(request.url);
-        const startDate = getProductListStartDate();
-        const items =
-            searchParams.get('refresh') === '1'
-                ? await queryProductListFromDb(startDate)
-                : await getCachedProductList(startDate);
-
-        const isRefresh = searchParams.get('refresh') === '1';
-        return NextResponse.json(items, {
+        const payload = await getProductListResponse(searchParams.get('refresh') === '1');
+        return NextResponse.json(payload, {
             headers: {
-                'Cache-Control': isRefresh
-                    ? 'no-store'
-                    : `private, max-age=${PRODUCT_LIST_CACHE_SECONDS}`,
-                'X-Product-List-Since': startDate,
+                'Cache-Control': 'no-store',
+                'X-Product-List-Since': payload.since,
             },
         });
     } catch (err) {

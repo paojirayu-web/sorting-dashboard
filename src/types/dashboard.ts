@@ -17,6 +17,10 @@ export interface DataItem {
     rsn_desc: string;
     unit: string;
     m_user: string;
+    /** Pre-aggregated C1 special qty (jobs-only sorting-log payload). */
+    c1_special_qty?: number;
+    /** kilndb = DW Inglaze / WW; sdb = DW Onglaze */
+    _source?: 'kilndb' | 'sdb';
 }
 
 // ─── Grouped Row (used in daily/activity tables) ─────────────
@@ -67,6 +71,7 @@ export interface ProductStats {
         };
     };
     cpBreakdown: CPData[];
+    dateRange?: { minDate: string; maxDate: string };
     totalStats?: {
         totalQty: number;
         totalPctA: number;
@@ -140,6 +145,10 @@ export interface ProductItem {
     label: string;
     /** Text matched against search query */
     searchText: string;
+    /** WW product exists on W5240 (White). Ignored for DW. */
+    hasWhite?: boolean;
+    /** WW product exists on W5241 (Black). Ignored for DW. */
+    hasBlack?: boolean;
 }
 
 export interface DefectReasonItem {
@@ -153,4 +162,4 @@ export interface DefectReasonItem {
 export type DefectListMode = 'scrap' | 'reject';
 
 // ─── View Types ──────────────────────────────────────────────
-export type ViewType = 'overview' | 'product-analysis' | 'monthly-analysis' | 'defect-analysis' | 'settings';
+export type ViewType = 'overview' | 'product-analysis' | 'monthly-analysis' | 'qty-process' | 'defect-analysis' | 'settings';

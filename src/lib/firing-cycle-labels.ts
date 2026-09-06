@@ -21,7 +21,7 @@ function getFiringCycleRowDefs(isSpecial: boolean): FiringCycleRowDef[] {
         ];
     }
 
-    /** กรณีปกติ: มีแค่ 1st Firing (= C) — แถว Frit ว่างเสมอ */
+    /** กรณีปกติ: 1st Firing = C — ไม่สร้างแถว Frit ว่าง */
     return [
         { id: 'first', label: '1st Firing', matchCp: (cp) => cp === 'C' },
         { id: 'frit', label: 'Frit Firing', matchCp: () => false },
@@ -60,18 +60,6 @@ function metricsFromCp(cp: CPData): Omit<FiringCycleQtyRow, 'label' | 'mCp'> {
     };
 }
 
-const emptyRow = (label: string, mCp?: string): FiringCycleQtyRow => ({
-    label,
-    mCp,
-    qtyProcess: 0,
-    qtyA: 0,
-    pctA: 0,
-    qtyB: 0,
-    pctB: 0,
-    qtyP: 0,
-    pctP: 0,
-});
-
 export function buildFiringCycleQtyRows(cpBreakdown: CPData[]): FiringCycleQtyRow[] {
     const isSpecial = isSpecialFiringProduct(cpBreakdown);
     const rowDefs = getFiringCycleRowDefs(isSpecial);
@@ -83,8 +71,6 @@ export function buildFiringCycleQtyRows(cpBreakdown: CPData[]): FiringCycleQtyRo
         if (match) {
             used.add(match.m_cp);
             rows.push({ label: def.label, mCp: match.m_cp, ...metricsFromCp(match) });
-        } else {
-            rows.push(emptyRow(def.label));
         }
     }
 

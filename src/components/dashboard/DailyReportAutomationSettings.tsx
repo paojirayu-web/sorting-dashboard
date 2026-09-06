@@ -147,7 +147,7 @@ export function DailyReportAutomationSettings({ theme }: DailyReportAutomationSe
                     type="button"
                     onClick={save}
                     disabled={saving}
-                    className={`flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold border border-blue-500/40 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-all disabled:opacity-50`}
+                    className={`flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold border ${theme.badgeBorder} ${theme.badgeBg} ${theme.accentText} hover:opacity-80 transition-all disabled:opacity-50`}
                 >
                     {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                     Save schedule

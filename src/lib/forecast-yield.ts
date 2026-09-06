@@ -1,4 +1,6 @@
-import { getConnection, sql } from "@/lib/db";
+import { sql } from "@/lib/db";
+import { querySortSources } from "@/lib/sort-query";
+import { SORT_VIEW_TOKEN } from "@/lib/sort-source";
 
 export type ForecastSource = "ww" | "bw" | "dw";
 
@@ -62,23 +64,25 @@ export async function fetchActualYieldByJobPart(
   const map = new Map<string, ActualYieldRates>();
   if (unique.size === 0) return map;
 
-  const pool = await getConnection();
   const from = startDate || `${new Date().getFullYear() - 1}-01-01`;
   const list = [...unique.values()];
   const chunkSize = 30;
 
   for (let i = 0; i < list.length; i += chunkSize) {
     const chunk = list.slice(i, i + chunkSize);
-    const req = pool.request();
-    req.input("startDate", sql.VarChar, from);
-
-    const ors = chunk.map((p, idx) => {
-      req.input(`j${idx}`, sql.NVarChar, p.job.trim().toUpperCase());
-      req.input(`p${idx}`, sql.NVarChar, p.part.trim());
-      return `(UPPER(RTRIM(LTRIM(m_job))) = @j${idx} AND RTRIM(LTRIM(m_part)) = @p${idx})`;
-    });
-
-    const result = await req.query(`
+    const ors = chunk
+      .map((_, idx) => `(UPPER(RTRIM(LTRIM(m_job))) = @j${idx} AND RTRIM(LTRIM(m_part)) = @p${idx})`)
+      .join(" OR ");
+    const result = await querySortSources<{
+      job: string;
+      part: string;
+      sample_jobs: number;
+      process_qty: number;
+      good_qty: number;
+      repair_qty: number;
+      scrap_qty: number;
+    }>(
+      `
       SELECT
         UPPER(RTRIM(LTRIM(m_job))) AS job,
         RTRIM(LTRIM(m_part)) AS part,
@@ -95,15 +99,25 @@ export async function fetchActualYieldByJobPart(
           MAX(qtycomp) AS qtycomp,
           MAX(qtyrjct) AS qtyrjct,
           MAX(qtyscrp) AS qtyscrp
-        FROM dbo.v_rpt_sort_1 WITH (NOLOCK)
+        FROM ${SORT_VIEW_TOKEN} WITH (NOLOCK)
         WHERE m_date >= @startDate
           AND UPPER(RTRIM(LTRIM(m_cp))) IN ('C', 'C1')
-          AND (${ors.join(" OR ")})
+          AND (${ors})
         GROUP BY m_job, m_part, m_doc, m_date, m_kiln, UPPER(RTRIM(LTRIM(m_cp)))
       ) jobs
       GROUP BY UPPER(RTRIM(LTRIM(m_job))), RTRIM(LTRIM(m_part))
       OPTION (RECOMPILE)
-    `);
+      `,
+      {
+        bind: (req) => {
+          req.input("startDate", sql.VarChar, from);
+          chunk.forEach((p, idx) => {
+            req.input(`j${idx}`, sql.NVarChar, p.job.trim().toUpperCase());
+            req.input(`p${idx}`, sql.NVarChar, p.part.trim());
+          });
+        },
+      },
+    );
 
     for (const row of result.recordset as Array<{
       job: string;
@@ -145,20 +159,21 @@ export async function fetchActualYieldByPart(
   const map = new Map<string, ActualYieldRates>();
   if (unique.length === 0) return map;
 
-  const pool = await getConnection();
   const from = startDate || `${new Date().getFullYear() - 1}-01-01`;
   const chunkSize = 40;
 
   for (let i = 0; i < unique.length; i += chunkSize) {
     const chunk = unique.slice(i, i + chunkSize);
-    const req = pool.request();
-    req.input("startDate", sql.VarChar, from);
-    const inList = chunk.map((p, idx) => {
-      req.input(`p${idx}`, sql.NVarChar, p);
-      return `@p${idx}`;
-    });
-
-    const result = await req.query(`
+    const inList = chunk.map((_, idx) => `@p${idx}`).join(",");
+    const result = await querySortSources<{
+      part: string;
+      sample_jobs: number;
+      process_qty: number;
+      good_qty: number;
+      repair_qty: number;
+      scrap_qty: number;
+    }>(
+      `
       SELECT
         RTRIM(LTRIM(m_part)) AS part,
         COUNT(*) AS sample_jobs,
@@ -174,15 +189,24 @@ export async function fetchActualYieldByPart(
           MAX(qtycomp) AS qtycomp,
           MAX(qtyrjct) AS qtyrjct,
           MAX(qtyscrp) AS qtyscrp
-        FROM dbo.v_rpt_sort_1 WITH (NOLOCK)
+        FROM ${SORT_VIEW_TOKEN} WITH (NOLOCK)
         WHERE m_date >= @startDate
           AND UPPER(RTRIM(LTRIM(m_cp))) IN ('C', 'C1')
-          AND RTRIM(LTRIM(m_part)) IN (${inList.join(",")})
+          AND RTRIM(LTRIM(m_part)) IN (${inList})
         GROUP BY m_part, m_doc, m_job, m_date, m_kiln, UPPER(RTRIM(LTRIM(m_cp)))
       ) jobs
       GROUP BY RTRIM(LTRIM(m_part))
       OPTION (RECOMPILE)
-    `);
+      `,
+      {
+        bind: (req) => {
+          req.input("startDate", sql.VarChar, from);
+          chunk.forEach((p, idx) => {
+            req.input(`p${idx}`, sql.NVarChar, p);
+          });
+        },
+      },
+    );
 
     for (const row of result.recordset as Array<{
       part: string;

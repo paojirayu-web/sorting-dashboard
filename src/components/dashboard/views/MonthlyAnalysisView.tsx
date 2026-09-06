@@ -3,14 +3,15 @@
 import React, { useMemo, useState } from 'react';
 import { AlertCircle, XCircle } from 'lucide-react';
 import { AreaChart, Area, BarChart, Bar, LineChart, Line, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LabelList, ReferenceLine } from 'recharts';
-import type { Theme, ThemeName } from '@/lib/themes';
+import { SKIN_ACCENT, SKIN_ACCENT_TEXT, type Theme, type ThemeName } from '@/lib/themes';
 import type { MonthlyStats, DataItem, GroupedRow } from '@/types/dashboard';
 import { SectionHeader } from '@/components/dashboard/SectionHeader';
+import { CodewareStickyTitle } from '@/components/dashboard/CodewareStickyTitle';
 import { isC1SpecialReasonForRecord, isSomboonCpC } from '@/lib/c1-special-reason';
 import { isDefectReasonSubTyp, isRejectSubTyp, isScrapSubTyp } from '@/lib/sub-typ';
-import { formatProductDescription, formatDateDisplay } from '@/lib/utils';
 import { DailyDetailModal } from '@/components/dashboard/DailyDetailModal';
 import { ResponsiveSortingLog } from '@/components/dashboard/ResponsiveSortingLog';
+import { matchesSelectedProduct, parseAnalysisProduct } from '@/lib/product-sorting-log';
 
 interface MonthlyAnalysisViewProps {
     theme: Theme;
@@ -18,12 +19,19 @@ interface MonthlyAnalysisViewProps {
     selectedProduct: string;
     selectedProductLabel: string;
     monthlyStats: MonthlyStats | null;
+    monthlyLoading?: boolean;
     showMonthlyReject: boolean;
     setShowMonthlyReject: (v: boolean) => void;
     // Data for sorting log
     allData: DataItem[];
     // CP and Kiln options for filters
     cpOptions: string[];
+    monthlyCpFilter: string;
+    setMonthlyCpFilter: (v: string) => void;
+    analysisStartDate: string;
+    setAnalysisStartDate: (d: string) => void;
+    analysisEndDate: string;
+    setAnalysisEndDate: (d: string) => void;
 }
 
 export function MonthlyAnalysisView({
@@ -32,10 +40,17 @@ export function MonthlyAnalysisView({
     selectedProduct,
     selectedProductLabel,
     monthlyStats,
+    monthlyLoading,
     showMonthlyReject,
     setShowMonthlyReject,
     allData,
     cpOptions,
+    monthlyCpFilter,
+    setMonthlyCpFilter,
+    analysisStartDate,
+    setAnalysisStartDate,
+    analysisEndDate,
+    setAnalysisEndDate,
 }: MonthlyAnalysisViewProps) {
     // State for filters and modal
     const [logCpFilter, setLogCpFilter] = useState('C');
@@ -73,30 +88,22 @@ export function MonthlyAnalysisView({
         });
     }, [monthlyStats]);
 
-    // Parse DW product value: "DW:${desc2}|||${desc1}" or legacy "DW:${desc2}"
-    const { isDw, dwDesc2, dwDesc1 } = useMemo(() => {
-        if (!selectedProduct.startsWith('DW:')) return { isDw: false, dwDesc2: '', dwDesc1: '' };
-        const rest = selectedProduct.slice(3);
-        const sepIdx = rest.indexOf('|||');
-        if (sepIdx !== -1) {
-            return { isDw: true, dwDesc2: rest.slice(0, sepIdx), dwDesc1: rest.slice(sepIdx + 3) };
-        }
-        return { isDw: true, dwDesc2: rest, dwDesc1: '' };
-    }, [selectedProduct]);
+    const parsedProduct = useMemo(() => parseAnalysisProduct(selectedProduct), [selectedProduct]);
+    const isDwStyle = parsedProduct.kind === 'dw' || parsedProduct.kind === 'og';
+    const dwDesc1 = parsedProduct.pt_desc1;
+    const dwDesc2 = parsedProduct.pt_desc2;
 
     // Get kiln options for filter
     const kilnOptions = useMemo(() => {
         if (!allData || !selectedProduct) return ['ALL'];
         const kilns = new Set<string>();
         allData
-            .filter(item => isDw
-                ? (item.pt_desc2 || '').trim() === dwDesc2 && (dwDesc1 ? (item.pt_desc1 || '').trim() === dwDesc1 : true) && (item.m_part || '').startsWith('143')
-                : (item.pt_desc1 || '').trim() === selectedProduct)
-            .forEach(item => {
+            .filter((item) => matchesSelectedProduct(item, selectedProduct))
+            .forEach((item) => {
                 if (item.m_kiln) kilns.add(item.m_kiln);
             });
         return ['ALL', ...Array.from(kilns).sort()];
-    }, [allData, selectedProduct, isDw, dwDesc2, dwDesc1]);
+    }, [allData, selectedProduct]);
 
     // Filter data for the selected product's m_desc (pt_desc1) with additional filters
     const filteredProductData = useMemo(() => {
@@ -105,20 +112,14 @@ export function MonthlyAnalysisView({
         const grouped = new Map<string, GroupedRow>();
 
         allData
-            .filter(item => {
-                // Filter by selected product
-                const matchesProduct = isDw
-                    ? (item.pt_desc2 || '').trim() === dwDesc2 && (dwDesc1 ? (item.pt_desc1 || '').trim() === dwDesc1 : true) && (item.m_part || '').startsWith('143')
-                    : (item.pt_desc1 || '').trim() === selectedProduct;
-                if (!matchesProduct) return false;
-                // Apply CP filter (compare against transformed CP value, same as display)
+            .filter((item) => {
+                if (!matchesSelectedProduct(item, selectedProduct)) return false;
                 const filterCp = isSomboonCpC(item) ? 'C1' : item.m_cp;
                 if (logCpFilter !== 'ALL' && filterCp !== logCpFilter) return false;
-                // Apply Kiln filter
                 if (logKilnFilter !== 'ALL' && item.m_kiln !== logKilnFilter) return false;
                 return true;
             })
-            .forEach(item => {
+            .forEach((item) => {
                 const dateStr = item.m_date.split('T')[0];
                 const displayCp = isSomboonCpC(item) ? 'C1' : item.m_cp;
                 const key = `${item.m_doc}-${item.m_job}-${dateStr}-${item.m_kiln}-${displayCp}`;
@@ -152,7 +153,7 @@ export function MonthlyAnalysisView({
                 const dateB = new Date(b.m_date).getTime();
                 return dateB - dateA;
             });
-    }, [allData, selectedProduct, isDw, dwDesc2, dwDesc1, logCpFilter, logKilnFilter]);
+    }, [allData, selectedProduct, logCpFilter, logKilnFilter]);
 
     // Build per-reason kiln breakdown from allData for Top2 kiln display
     // Map: month (YYYY-MM) → rsn_desc → m_kiln → qty
@@ -160,15 +161,12 @@ export function MonthlyAnalysisView({
         const map = new Map<string, Map<string, Map<string, number>>>();
         if (!allData || !selectedProduct) return map;
         allData
-            .filter(item => {
-                const matchesProduct = isDw
-                    ? (item.pt_desc2 || '').trim() === dwDesc2 && (dwDesc1 ? (item.pt_desc1 || '').trim() === dwDesc1 : true) && (item.m_part || '').startsWith('143')
-                    : (item.pt_desc1 || '').trim() === selectedProduct;
-                return matchesProduct &&
-                    item.rsn_desc &&
-                    isDefectReasonSubTyp(item.sub_typ);
-            })
-            .forEach(item => {
+            .filter((item) =>
+                matchesSelectedProduct(item, selectedProduct) &&
+                item.rsn_desc &&
+                isDefectReasonSubTyp(item.sub_typ),
+            )
+            .forEach((item) => {
                 const month = item.m_date.split('T')[0].slice(0, 7); // YYYY-MM
                 const rsn = (item.rsn_desc || '').trim();
                 const kiln = item.m_kiln || 'Unknown';
@@ -180,24 +178,59 @@ export function MonthlyAnalysisView({
                 kilnMap.set(kiln, (kilnMap.get(kiln) || 0) + qty);
             });
         return map;
-    }, [allData, selectedProduct, isDw, dwDesc2, dwDesc1]);
+    }, [allData, selectedProduct]);
 
     return (
-        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
+        <div className="animate-in fade-in duration-500 space-y-6">
+            <CodewareStickyTitle
+                theme={theme}
+                kicker="Monthly Analysis"
+                title={isDwStyle ? dwDesc1 : (selectedProductLabel || 'Select a Product')}
+                subtitle={isDwStyle ? dwDesc2 : undefined}
+            />
             {/* Header Controls */}
             <div className={`${theme.cardBg} border ${theme.borderColor} p-4 sm:p-6 rounded-2xl shadow-lg`}>
-                <div className="flex flex-col gap-2">
-                    <div>
-                        <p className={`text-xs font-bold uppercase ${theme.textMuted} mb-1`}>Monthly Analysis</p>
-                        {isDw ? (
-                            <div>
-                                <h1 className={`text-xl sm:text-2xl md:text-3xl font-black ${theme.textWhite} break-words`}>{dwDesc1}</h1>
-                                <p className={`text-lg font-bold mt-1 ${currentTheme === "dark" ? "text-blue-400" : "text-blue-700"}`}>{dwDesc2}</p>
-                            </div>
-                        ) : (
-                            <h1 className={`text-xl sm:text-2xl md:text-3xl font-black ${theme.textWhite} break-words`}>{selectedProductLabel || "Select a Product"}</h1>
-                        )}
+                <div className="flex flex-col gap-4">
+                    <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 sm:gap-3 w-full">
+                        <div className={`flex items-center gap-2 px-3 py-2 ${theme.inputBg} rounded-xl border ${theme.borderColor}`}>
+                            <span className={`text-xs font-bold ${theme.textMuted}`}>CP:</span>
+                            <select
+                                value={monthlyCpFilter}
+                                onChange={(e) => setMonthlyCpFilter(e.target.value)}
+                                className={`bg-transparent outline-none text-xs font-bold ${theme.textWhite} cursor-pointer`}
+                                title="MA CP filter"
+                            >
+                                {cpOptions.map((cp) => (
+                                    <option key={cp} value={cp} className={currentTheme === "dark" ? "bg-[#141414]" : "bg-white"}>{cp}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className={`flex items-center gap-2 px-3 py-2 ${theme.inputBg} rounded-xl border ${theme.borderColor}`}>
+                            <span className={`text-xs font-bold ${theme.textMuted}`}>From:</span>
+                            <input
+                                type="date"
+                                value={analysisStartDate}
+                                onChange={(e) => setAnalysisStartDate(e.target.value)}
+                                style={{ colorScheme: currentTheme }}
+                                className={`bg-transparent outline-none text-xs font-bold ${theme.textWhite} cursor-pointer`}
+                                title="MA Start Date"
+                            />
+                        </div>
+                        <div className={`flex items-center gap-2 px-3 py-2 ${theme.inputBg} rounded-xl border ${theme.borderColor}`}>
+                            <span className={`text-xs font-bold ${theme.textMuted}`}>To:</span>
+                            <input
+                                type="date"
+                                value={analysisEndDate}
+                                onChange={(e) => setAnalysisEndDate(e.target.value)}
+                                style={{ colorScheme: currentTheme }}
+                                className={`bg-transparent outline-none text-xs font-bold ${theme.textWhite} cursor-pointer`}
+                                title="Analysis end date (synced with Product Analysis)"
+                            />
+                        </div>
                     </div>
+                    {selectedProduct && monthlyLoading && !monthlyStats && (
+                        <p className={`text-xs font-bold ${theme.textMuted} animate-pulse`}>Updating…</p>
+                    )}
                 </div>
             </div>
 
@@ -396,8 +429,8 @@ export function MonthlyAnalysisView({
                                             
                                             {/* Blue line gradient */}
                                             <linearGradient id="lineGradient" x1="0" y1="0" x2="1" y2="0">
-                                                <stop offset="0%" stopColor={currentTheme === "dark" ? "#3b82f6" : "#2563eb"} stopOpacity={0.9} />
-                                                <stop offset="100%" stopColor={currentTheme === "dark" ? "#60a5fa" : "#3b82f6"} stopOpacity={0.9} />
+                                                <stop offset="0%" stopColor={SKIN_ACCENT} stopOpacity={0.9} />
+                                                <stop offset="100%" stopColor={SKIN_ACCENT_TEXT} stopOpacity={0.9} />
                                             </linearGradient>
                                             {/* Subtle shadow effect */}
                                             <filter id="subtleShadow">
@@ -490,7 +523,7 @@ export function MonthlyAnalysisView({
                                                     ];
                                                 } else if (name === 'cumulative') {
                                                     return [
-                                                        <span style={{ color: currentTheme === "dark" ? "#3b82f6" : "#2563eb", fontWeight: "500" }}>
+                                                        <span style={{ color: SKIN_ACCENT, fontWeight: "500" }}>
                                                             {Number(value).toFixed(2)}%
                                                         </span>, 
                                                         'Cumulative %'
@@ -559,14 +592,14 @@ export function MonthlyAnalysisView({
                                             stroke="url(#lineGradient)" 
                                             strokeWidth={2}
                                             dot={{ 
-                                                fill: currentTheme === "dark" ? "#3b82f6" : "#2563eb", 
+                                                fill: SKIN_ACCENT, 
                                                 r: 4,
                                                 stroke: currentTheme === "dark" ? "#1f2937" : "#ffffff",
                                                 strokeWidth: 1
                                             }}
                                             activeDot={{ 
                                                 r: 5,
-                                                fill: currentTheme === "dark" ? "#60a5fa" : "#3b82f6",
+                                                fill: SKIN_ACCENT_TEXT,
                                                 stroke: currentTheme === "dark" ? "#1f2937" : "#ffffff",
                                                 strokeWidth: 2
                                             }}
@@ -577,13 +610,13 @@ export function MonthlyAnalysisView({
                                         <ReferenceLine 
                                             yAxisId="right"
                                             y={80} 
-                                            stroke={currentTheme === "dark" ? "#3b82f6" : "#2563eb"} 
+                                            stroke={SKIN_ACCENT} 
                                             strokeDasharray="6 3" 
                                             strokeWidth={1.5}
                                             label={{ 
                                                 value: "80%", 
                                                 position: "left", 
-                                                fill: currentTheme === "dark" ? "#3b82f6" : "#2563eb", 
+                                                fill: SKIN_ACCENT, 
                                                 fontSize: 10,
                                                 fontWeight: "500"
                                             }}

@@ -3,7 +3,9 @@
 import type { Theme } from '@/lib/themes';
 import type { GroupedRow } from '@/types/dashboard';
 import { formatProductDescription, formatDateDisplay } from '@/lib/utils';
+import { KilnBadge } from './KilnBadge';
 import { getSortingLogMetrics } from './sorting-log-utils';
+import { dwDesc1Color, isDwCodeware } from '@/lib/sort-source';
 
 interface SortingLogCardProps {
     item: GroupedRow;
@@ -49,7 +51,8 @@ export function SortingLogCard({
     showDefectColumns = true,
 }: SortingLogCardProps) {
     const { compRate, scrapRate, rejectRate, cdTop2, pjTop2 } = getSortingLogMetrics(item);
-    const isDw = (item.pt_desc1 || '').startsWith('143') || (item.m_part || '').startsWith('143');
+    const isDw = isDwCodeware(item);
+    const desc1Color = dwDesc1Color(item, currentTheme === 'light');
 
     return (
         <button
@@ -59,11 +62,15 @@ export function SortingLogCard({
         >
             <div className="flex items-start justify-between gap-2 mb-2">
                 <div className="min-w-0 flex-1">
-                    <p className={`text-sm font-bold ${theme.textWhite} break-words`} title={item.pt_desc1}>
+                    <p
+                        className={`text-sm font-bold break-words ${desc1Color ? '' : theme.textWhite}`}
+                        style={desc1Color ? { color: desc1Color } : undefined}
+                        title={item.pt_desc1}
+                    >
                         {formatProductDescription(item.pt_desc1)}
                     </p>
                     {isDw && item.pt_desc2 && (
-                        <p className={`text-xs mt-0.5 font-medium break-words ${currentTheme === 'dark' ? 'text-orange-400' : 'text-orange-600'}`}>
+                        <p className={`text-xs mt-0.5 font-medium break-words ${theme.textWhite}`}>
                             {item.pt_desc2}
                         </p>
                     )}
@@ -75,9 +82,7 @@ export function SortingLogCard({
                 </div>
                 <div className="shrink-0 text-right">
                     <div className="flex items-center gap-1 justify-end flex-wrap">
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${theme.badgeBg} ${theme.accentText} border ${theme.badgeBorder}`}>
-                            {item.m_kiln}
-                        </span>
+                        <KilnBadge item={item} isLight={currentTheme === 'light'} />
                         <span className={`text-xs font-bold ${theme.textSecondary}`}>{item.m_cp}</span>
                     </div>
                     <p className={`text-[10px] ${theme.textMuted} mt-0.5`}>{formatDateDisplay(item.m_date)}</p>

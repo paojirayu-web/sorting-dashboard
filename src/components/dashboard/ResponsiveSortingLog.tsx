@@ -3,7 +3,9 @@
 import type { Theme, ThemeName } from '@/lib/themes';
 import type { GroupedRow } from '@/types/dashboard';
 import { formatProductDescription, formatDateDisplay } from '@/lib/utils';
+import { getRowSkin, dwDesc1Color, isDwCodeware } from '@/lib/sort-source';
 import { SortingLogCard } from './SortingLogCard';
+import { KilnBadge } from './KilnBadge';
 import { computeSortingLogTotals, getSortingLogMetrics } from './sorting-log-utils';
 
 export type SortingLogVariant = 'standard' | 'daily-monitor';
@@ -243,7 +245,8 @@ export function DailyMonitorDesktopTable({
             <tbody className={theme.tableDivide}>
                 {rows.map((item, idx) => {
                     const { compRate, scrapRate, rejectRate, cdTop2, pjTop2 } = getSortingLogMetrics(item);
-                    const isDw = (item.pt_desc1 || '').startsWith('143') || (item.m_part || '').startsWith('143');
+                    const isDw = isDwCodeware(item);
+                    const desc1Color = dwDesc1Color(item, currentTheme === 'light');
                     const descSize = d.descSize;
                     const subSize = d.subSize;
                     const kilnBadge = d.kilnBadge;
@@ -257,14 +260,19 @@ export function DailyMonitorDesktopTable({
                         <tr
                             key={idx}
                             onClick={onRowClick ? () => onRowClick(item) : undefined}
-                            className={`${theme.tableRowHover} transition-colors group cursor-pointer`}
+                            className={`row-skin ${theme.tableRowHover} transition-colors group cursor-pointer`}
+                            data-row-skin={getRowSkin(item)}
                         >
-                            <td className={`sticky left-0 z-20 ${bgRow} transition-colors ${d.cellPad} border-r ${theme.borderColor}`}>
-                                <div className={`${descSize} font-bold ${theme.textWhite} whitespace-normal`} title={item.pt_desc1}>
+                            <td className={`sticky left-0 z-20 ${bgRow} row-skin-edge transition-colors ${d.cellPad} border-r ${theme.borderColor}`}>
+                                <div
+                                    className={`${descSize} font-bold whitespace-normal ${desc1Color ? '' : theme.textWhite}`}
+                                    style={desc1Color ? { color: desc1Color } : undefined}
+                                    title={item.pt_desc1}
+                                >
                                     {formatProductDescription(item.pt_desc1)}
                                 </div>
                                 {isDw && item.pt_desc2 && (
-                                    <div className={`${density === 'line' ? 'text-base' : isFullscreen ? 'text-sm' : 'text-[9px]'} ${currentTheme === 'dark' ? 'text-orange-400' : 'text-orange-600'} whitespace-normal font-medium`} title={item.pt_desc2}>
+                                    <div className={`${density === 'line' ? 'text-base' : isFullscreen ? 'text-sm' : 'text-[9px]'} ${theme.textWhite} whitespace-normal font-medium`} title={item.pt_desc2}>
                                         {item.pt_desc2}
                                     </div>
                                 )}
@@ -273,7 +281,11 @@ export function DailyMonitorDesktopTable({
                             <td className={`sticky ${d.kilnSticky} z-20 ${bgRow} transition-colors ${d.cellPad} border-r ${theme.borderColor}`}>
                                 <div className="flex flex-col gap-0.5">
                                     <div className="flex items-center gap-1">
-                                        <span className={`px-1.5 py-0.5 rounded ${kilnBadge} font-bold ${theme.badgeBg} ${theme.accentText} border ${theme.badgeBorder}`}>{item.m_kiln}</span>
+                                        <KilnBadge
+                                            item={item}
+                                            isLight={currentTheme === 'light'}
+                                            className={`inline-flex px-1.5 py-0.5 rounded ${kilnBadge} font-bold border`}
+                                        />
                                         <span className={`${kilnCp} ${theme.textSecondary}`}>{item.m_cp}</span>
                                     </div>
                                     <span className={`${subSize} ${theme.textMuted}`}>{formatDateDisplay(item.m_date)}</span>
@@ -393,20 +405,26 @@ function StandardDesktopTable({
             <tbody className={theme.tableDivide}>
                 {rows.map((item, idx) => {
                     const { compRate, scrapRate, rejectRate, cdTop2, pjTop2 } = getSortingLogMetrics(item);
-                    const isDw = (item.pt_desc1 || '').startsWith('143') || (item.m_part || '').startsWith('143');
+                    const isDw = isDwCodeware(item);
+                    const desc1Color = dwDesc1Color(item, currentTheme === 'light');
 
                     return (
                         <tr
                             key={idx}
                             onClick={onRowClick ? () => onRowClick(item) : undefined}
-                            className={`${theme.tableRowHover} transition-colors group cursor-pointer`}
+                            className={`row-skin ${theme.tableRowHover} transition-colors group cursor-pointer`}
+                            data-row-skin={getRowSkin(item)}
                         >
-                            <td className={`sticky left-0 z-20 ${bgRow} transition-colors px-6 py-4 border-r ${theme.borderColor}`}>
-                                <div className={`text-xs ${theme.textSecondary} whitespace-normal font-bold`} title={item.pt_desc1}>
+                            <td className={`sticky left-0 z-20 ${bgRow} row-skin-edge transition-colors px-6 py-4 border-r ${theme.borderColor}`}>
+                                <div
+                                    className={`text-xs whitespace-normal font-bold ${desc1Color ? '' : theme.textSecondary}`}
+                                    style={desc1Color ? { color: desc1Color } : undefined}
+                                    title={item.pt_desc1}
+                                >
                                     {formatProductDescription(item.pt_desc1)}
                                 </div>
                                 {isDw && item.pt_desc2 && (
-                                    <div className={`text-[10px] ${currentTheme === 'dark' ? 'text-orange-400' : 'text-orange-600'} whitespace-normal font-medium`} title={item.pt_desc2}>
+                                    <div className={`text-[10px] ${theme.textWhite} whitespace-normal font-medium`} title={item.pt_desc2}>
                                         {item.pt_desc2}
                                     </div>
                                 )}
@@ -417,7 +435,11 @@ function StandardDesktopTable({
                             <td className={`sticky left-[200px] z-20 ${bgRow} transition-colors px-6 py-4 border-r ${theme.borderColor}`}>
                                 <div className="flex flex-col gap-0.5">
                                     <div className="flex items-center gap-2">
-                                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${theme.badgeBg} ${theme.accentText} border ${theme.badgeBorder}`}>{item.m_kiln}</span>
+                                        <KilnBadge
+                                            item={item}
+                                            isLight={currentTheme === 'light'}
+                                            className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold border"
+                                        />
                                         <span className={`text-xs ${theme.textSecondary}`}>{item.m_cp}</span>
                                     </div>
                                     <span className={`text-[10px] ${theme.textMuted}`}>{formatDateDisplay(item.m_date)}</span>

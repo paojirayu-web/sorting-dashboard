@@ -43,7 +43,7 @@ export function CompactCard({ cp, theme, showReject, onCardClick, onReasonClick 
                     onCardClick?.();
                 }
             }}
-            className={`${theme.cardBg} border ${theme.borderColor} rounded-xl p-2.5 shadow hover:shadow-md transition-all cursor-pointer`}
+            className={`${theme.cardBg} border ${theme.borderColor} rounded-xl p-2.5 shadow hover:shadow-md cursor-pointer skin-card-hover`}
             title="Click to view all defects"
         >
             {/* Compact Header */}

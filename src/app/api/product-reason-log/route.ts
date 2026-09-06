@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
-import { getConnection, sql } from '@/lib/db';
+import { sql } from '@/lib/db';
 import { buildProductFilter } from '@/lib/product-filter';
+import { querySortSources } from '@/lib/sort-query';
+import { SORT_VIEW_TOKEN, sourcesForProduct } from '@/lib/sort-source';
 import { SCRAP_SUB_TYP_SQL_IN } from '@/lib/sub-typ';
+import { buildUnitFilterSql, parseUnitFilterParam } from '@/lib/unit-filter';
 
 /**
  * Reason-log load path (kept intentionally light):
@@ -29,7 +32,7 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'product and rsn_desc are required' }, { status: 400 });
         }
 
-        const pool = await getConnection();
+        const sources = sourcesForProduct(product);
         const currentYear = new Date().getFullYear();
         const minAllowedDate = `${currentYear - 2}-01-01`;
         const defaultStartDate = `${currentYear - 1}-01-01`;
@@ -41,6 +44,7 @@ export async function GET(request: Request) {
 
         const selectedReasonDesc = rsnDesc.trim();
         const productFilter = buildProductFilter(product);
+        const unitSql = buildUnitFilterSql(parseUnitFilterParam(searchParams.get('unit')), 'WW');
 
         // Match product-stats date predicate style for stable SQL plans.
         const dateFilter = queryEndDate
@@ -69,11 +73,21 @@ export async function GET(request: Request) {
             subtypePred = `(UPPER(RTRIM(LTRIM(sub_typ))) = 'P' OR RTRIM(LTRIM(sub_typ)) = N'\u0E40\u0E08\u0E35\u0E22\u0E23\u0E4C')`;
         }
 
-        const baseWhere = `${productFilter} ${dateFilter} ${cpFilter}`;
+        const baseWhere = `${productFilter} AND ${unitSql} ${dateFilter} ${cpFilter}`;
         const wantRound1 = isRound1Param === '1' ? 1 : isRound1Param === '0' ? 0 : null;
 
         const [logResult, monthlyTotalResult] = await Promise.all([
-            pool.request().input('rsnDesc', sql.NVarChar(255), selectedReasonDesc).query(`
+            querySortSources<{
+                m_date: string;
+                m_doc: string;
+                m_job: string;
+                m_kiln: string;
+                m_cp: string;
+                qtyp: number;
+                is_round1: number;
+                rsn_qty: number;
+                total_defect_qty: number;
+            }>(`
                 SELECT
                     CONVERT(varchar(10), CAST(m_date AS date), 120) AS m_date,
                     m_doc,
@@ -92,7 +106,7 @@ export async function GET(request: Request) {
                             AND RTRIM(LTRIM(rsn_desc)) != ''
                         THEN sub_qty ELSE 0
                     END) AS total_defect_qty
-                FROM dbo.v_rpt_sort_1 WITH (NOLOCK)
+                FROM ${SORT_VIEW_TOKEN} WITH (NOLOCK)
                 WHERE ${baseWhere}
                 GROUP BY CAST(m_date AS date), m_doc, m_job, m_kiln, UPPER(RTRIM(LTRIM(m_cp)))
                 HAVING SUM(CASE
@@ -100,9 +114,15 @@ export async function GET(request: Request) {
                     THEN sub_qty ELSE 0
                 END) > 0
                 OPTION (RECOMPILE)
-            `),
+            `, {
+                sources,
+                required: true,
+                bind: (req) => {
+                    req.input('rsnDesc', sql.NVarChar(255), selectedReasonDesc);
+                },
+            }),
 
-            pool.request().query(`
+            querySortSources<{ month: string; total_defect_qty: number; total_qtyp: number }>(`
                 SELECT
                     CONVERT(varchar(7), m_date, 120) AS month,
                     SUM(sub_qty) AS total_defect_qty,
@@ -120,7 +140,7 @@ export async function GET(request: Request) {
                             THEN sub_qty ELSE 0
                         END) AS sub_qty,
                         MAX(CASE WHEN m_user LIKE 'somboon%' THEN 1 ELSE 0 END) AS is_round1
-                    FROM dbo.v_rpt_sort_1 WITH (NOLOCK)
+                    FROM ${SORT_VIEW_TOKEN} WITH (NOLOCK)
                     WHERE ${baseWhere}
                     GROUP BY CAST(m_date AS date), m_doc, m_job, m_kiln, UPPER(RTRIM(LTRIM(m_cp)))
                     HAVING SUM(CASE
@@ -133,7 +153,7 @@ export async function GET(request: Request) {
                 ${wantRound1 === null ? '' : `WHERE is_round1 = ${wantRound1}`}
                 GROUP BY CONVERT(varchar(7), m_date, 120)
                 OPTION (RECOMPILE)
-            `),
+            `, { sources }),
         ]);
 
         const log: {

@@ -1,28 +1,59 @@
 import { isC1SpecialReasonForRecord, isSomboonCpC } from '@/lib/c1-special-reason';
+import { DW_INGLAZE_PRODUCT_PREFIX, ONGLAZE_PRODUCT_PREFIX } from '@/lib/sort-source';
 import { isRejectSubTyp, isScrapSubTyp } from '@/lib/sub-typ';
 import { normalizeMDate } from '@/lib/utils';
 import type { DataItem, GroupedRow } from '@/types/dashboard';
+
+export function parseAnalysisProduct(product: string): {
+    kind: 'ww' | 'dw' | 'og';
+    pt_desc1: string;
+    pt_desc2: string;
+} {
+    if (product.startsWith(ONGLAZE_PRODUCT_PREFIX)) {
+        const rest = product.slice(ONGLAZE_PRODUCT_PREFIX.length);
+        const sepIdx = rest.indexOf('|||');
+        if (sepIdx !== -1) {
+            return {
+                kind: 'og',
+                pt_desc2: rest.slice(0, sepIdx).trim(),
+                pt_desc1: rest.slice(sepIdx + 3).trim(),
+            };
+        }
+        return { kind: 'og', pt_desc2: '', pt_desc1: rest.trim() };
+    }
+    if (product.startsWith(DW_INGLAZE_PRODUCT_PREFIX)) {
+        const rest = product.slice(DW_INGLAZE_PRODUCT_PREFIX.length);
+        const sepIdx = rest.indexOf('|||');
+        if (sepIdx !== -1) {
+            return {
+                kind: 'dw',
+                pt_desc2: rest.slice(0, sepIdx).trim(),
+                pt_desc1: rest.slice(sepIdx + 3).trim(),
+            };
+        }
+        return { kind: 'dw', pt_desc2: rest.trim(), pt_desc1: '' };
+    }
+    return { kind: 'ww', pt_desc1: product.trim(), pt_desc2: '' };
+}
 
 export function matchesSelectedProduct(
     item: DataItem,
     selectedProduct: string,
 ): boolean {
-    if (selectedProduct.startsWith('DW:')) {
-        const rest = selectedProduct.slice(3);
-        const sepIdx = rest.indexOf('|||');
-        if (sepIdx !== -1) {
-            const pt_desc2 = rest.slice(0, sepIdx).trim();
-            const pt_desc1 = rest.slice(sepIdx + 3).trim();
-            return (
-                (item.pt_desc2 || '').trim() === pt_desc2 &&
-                (item.pt_desc1 || '').trim() === pt_desc1 &&
-                (item.m_part || '').startsWith('143')
-            );
-        }
-        const pt_desc2 = rest.trim();
-        return (item.pt_desc2 || '').trim() === pt_desc2 && (item.m_part || '').startsWith('143');
+    const parsed = parseAnalysisProduct(selectedProduct);
+    const desc1 = (item.pt_desc1 || '').trim();
+    const desc2 = (item.pt_desc2 || '').trim();
+
+    if (parsed.kind === 'og') {
+        if (parsed.pt_desc2) return desc2 === parsed.pt_desc2 && desc1 === parsed.pt_desc1;
+        return desc1 === parsed.pt_desc1;
     }
-    return (item.pt_desc1 || '').trim() === selectedProduct.trim();
+    if (parsed.kind === 'dw') {
+        if (!(item.m_part || '').startsWith('143')) return false;
+        if (parsed.pt_desc1) return desc2 === parsed.pt_desc2 && desc1 === parsed.pt_desc1;
+        return desc2 === parsed.pt_desc2;
+    }
+    return desc1 === parsed.pt_desc1;
 }
 
 export function getDisplayCpFromItem(item: DataItem): string {
@@ -89,13 +120,16 @@ export function buildProductSortingLogRows(
             const key = `${item.m_doc}-${item.m_job}-${dateStr}-${item.m_kiln}-${displayCp}`;
 
             if (!grouped.has(key)) {
+                const c1Adj =
+                    isSomboonCpC(item) && !item.rsn_desc ? item.c1_special_qty || 0 : 0;
                 grouped.set(key, {
                     ...item,
                     m_cp: displayCp,
+                    qtycomp: (item.qtycomp || 0) + c1Adj,
                     cdReasons: new Map<string, number>(),
                     pjReasons: new Map<string, number>(),
                     totalScrap: item.qtyscrp || 0,
-                    totalReject: item.qtyrjct || 0,
+                    totalReject: Math.max(0, (item.qtyrjct || 0) - c1Adj),
                 });
             }
             const g = grouped.get(key)!;
@@ -177,6 +211,61 @@ export type ProductSortingLogExportRow = Pick<
     | 'totalScrap'
     | 'totalReject'
 >;
+
+export function jobReasonQueryCp(displayCp: string): string {
+    return displayCp === 'C1' ? 'C' : displayCp;
+}
+
+function sameBlankable(a: string | null | undefined, b: string | null | undefined): boolean {
+    return String(a || '').trim() === String(b || '').trim();
+}
+
+export function applyReasonRowsToGroupedRow(
+    row: GroupedRow,
+    reasons: Array<{
+        m_date?: string;
+        m_doc?: string;
+        m_job?: string;
+        m_kiln?: string;
+        m_cp?: string;
+        sub_typ?: string;
+        rsn_desc?: string;
+        sub_qty?: number;
+    }>,
+): GroupedRow {
+    const cdReasons = new Map<string, number>();
+    const pjReasons = new Map<string, number>();
+    const rawCp = jobReasonQueryCp(row.m_cp);
+    const rowDate = normalizeMDate(row.m_date);
+
+    for (const reason of reasons) {
+        if (reason.m_date && normalizeMDate(reason.m_date) !== rowDate) continue;
+        if (reason.m_doc != null && !sameBlankable(reason.m_doc, row.m_doc)) continue;
+        if (reason.m_job != null && !sameBlankable(reason.m_job, row.m_job)) continue;
+        if (reason.m_kiln != null && !sameBlankable(reason.m_kiln, row.m_kiln)) continue;
+        if (reason.m_cp != null && !sameBlankable(jobReasonQueryCp(String(reason.m_cp)), rawCp)) continue;
+
+        const desc = (reason.rsn_desc || '').trim();
+        if (!desc) continue;
+        if (
+            isC1SpecialReasonForRecord({
+                m_user: row.m_user,
+                m_cp: rawCp,
+                rsn_desc: desc,
+            })
+        ) {
+            continue;
+        }
+        const qty = reason.sub_qty || 0;
+        if (isScrapSubTyp(reason.sub_typ)) {
+            cdReasons.set(desc, (cdReasons.get(desc) || 0) + qty);
+        } else if (isRejectSubTyp(reason.sub_typ)) {
+            pjReasons.set(desc, (pjReasons.get(desc) || 0) + qty);
+        }
+    }
+
+    return { ...row, cdReasons, pjReasons };
+}
 
 export function toProductSortingLogExportRows(rows: GroupedRow[]): ProductSortingLogExportRow[] {
     return rows.map((row) => ({

@@ -3,6 +3,7 @@ import {
     ANALYSIS_AUTO_LOOKBACK_YEARS,
     queryProductDateRange,
 } from '@/lib/analysis-date-range';
+import { parseUnitFilterParam } from '@/lib/unit-filter';
 
 export async function GET(request: Request) {
     try {
@@ -19,7 +20,11 @@ export async function GET(request: Request) {
                 ? Math.floor(lookbackYears)
                 : ANALYSIS_AUTO_LOOKBACK_YEARS;
 
-        const range = await queryProductDateRange(product, safeYears);
+        const range = await queryProductDateRange(
+            product,
+            safeYears,
+            parseUnitFilterParam(searchParams.get('unit')),
+        );
         return NextResponse.json(range);
     } catch (err) {
         console.error('SQL error (product-date-range):', err);

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getConnection } from '@/lib/db';
+import { querySortSources } from '@/lib/sort-query';
+import { SORT_VIEW_TOKEN, sourcesForProduct } from '@/lib/sort-source';
 
 export async function GET(request: Request) {
     try {
@@ -13,7 +14,7 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'Product name is required' }, { status: 400 });
         }
 
-        const pool = await getConnection();
+        const sources = sourcesForProduct(product);
         const currentYear = new Date().getFullYear();
 
         const minAllowedYear = currentYear - 2;
@@ -35,8 +36,8 @@ export async function GET(request: Request) {
             ? `AND UPPER(RTRIM(LTRIM(m_cp))) = '${mcpFilter.toUpperCase().replace(/'/g, "''")}'`
             : '';
 
-        // Query: distinct job log entries sorted by date desc
-        const logResult = await pool.request().query(`
+        const [logResult, cpOptionsResult] = await Promise.all([
+            querySortSources<Record<string, unknown>>(`
             SELECT
                 CONVERT(varchar(10), m_date, 120) as m_date,
                 m_doc,
@@ -47,19 +48,18 @@ export async function GET(request: Request) {
                 MAX(qtycomp) as qtycomp,
                 MAX(qtyscrp) as qtyscrp,
                 MAX(qtyrjct) as qtyrjct
-            FROM dbo.v_rpt_sort_1
+            FROM ${SORT_VIEW_TOKEN}
             WHERE pt_desc1 = N'${product}' ${dateFilter} ${cpCondition}
             GROUP BY m_date, m_doc, m_job, m_kiln, UPPER(RTRIM(LTRIM(m_cp)))
             ORDER BY m_date DESC, m_doc DESC
-        `);
-
-        // Query: distinct m_cp options for this product in the date range
-        const cpOptionsResult = await pool.request().query(`
+        `, { sources, required: true }),
+            querySortSources<{ m_cp: string }>(`
             SELECT DISTINCT UPPER(RTRIM(LTRIM(m_cp))) as m_cp
-            FROM dbo.v_rpt_sort_1
+            FROM ${SORT_VIEW_TOKEN}
             WHERE pt_desc1 = N'${product}' ${dateFilter}
             ORDER BY m_cp
-        `);
+        `, { sources }),
+        ]);
 
         const cpOptions = cpOptionsResult.recordset.map((r: any) => r.m_cp).filter(Boolean);
 

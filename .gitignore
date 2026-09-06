@@ -36,8 +36,8 @@ yarn-error.log*
 # typescript
 next-env.d.ts
 
-# temp script output only
-scripts/tmp-*
+# qty process disk cache
+/data/qtyproc-cache.json
 
 # env (keep example only)
 .env

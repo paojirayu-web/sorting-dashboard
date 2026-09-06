@@ -66,6 +66,9 @@ export function buildCpBreakdownFromRaw(
                 qtyscrp: item.qtyscrp || 0,
                 qtyrjct: item.qtyrjct || 0,
             });
+            if (isSomboonCpC(item) && item.c1_special_qty) {
+                specialAdj.set(key, (specialAdj.get(key) || 0) + item.c1_special_qty);
+            }
         }
 
         if (isC1SpecialReasonForRecord(item)) {

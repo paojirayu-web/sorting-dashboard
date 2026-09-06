@@ -1,9 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from 'next/server';
-import { getConnection } from '@/lib/db';
 import { isC1SpecialReason } from '@/lib/c1-special-reason';
 import { buildProductFilter } from '@/lib/product-filter';
+import { querySortSources } from '@/lib/sort-query';
+import { SORT_VIEW_TOKEN, sourcesForProduct } from '@/lib/sort-source';
 import { mapSubTypToBucket } from '@/lib/sub-typ';
+import { buildUnitFilterSql, parseUnitFilterParam } from '@/lib/unit-filter';
 
 export async function GET(request: Request) {
     try {
@@ -12,6 +14,7 @@ export async function GET(request: Request) {
         const queryStartDate = searchParams.get('startDate');
         const queryEndDate = searchParams.get('endDate');
         const m_cp_filter = searchParams.get('m_cp');
+        const unitSql = buildUnitFilterSql(parseUnitFilterParam(searchParams.get('unit')), 'WW');
 
         if (!product) {
             return NextResponse.json({ error: 'Product name is required' }, { status: 400 });
@@ -20,7 +23,6 @@ export async function GET(request: Request) {
         // Debug Log
         console.log(`API /monthly-stats: Fetching for product '${product}'`);
 
-        const pool = await getConnection();
         const currentYear = new Date().getFullYear();
 
         // Safety Limit: Max 3 Years Back
@@ -38,7 +40,7 @@ export async function GET(request: Request) {
         }
 
         const dateFilter = queryEndDate
-            ? `AND m_date >= '${startDate}' AND m_date <= '${queryEndDate}'`
+            ? `AND m_date >= '${startDate}' AND m_date < DATEADD(day, 1, '${queryEndDate}')`
             : `AND m_date >= '${startDate}'`;
 
         // Base Query with CP Computation Logic
@@ -63,6 +65,7 @@ export async function GET(request: Request) {
         // Let's use a CTE or subquery to normalize the data first.
 
         const productFilter = buildProductFilter(product);
+        const sources = sourcesForProduct(product);
 
         const baseQuery = `
             SELECT
@@ -80,13 +83,13 @@ export async function GET(request: Request) {
                 MAX(qtycomp) as qtycomp,
                 MAX(qtyscrp) as qtyscrp,
                 MAX(qtyrjct) as qtyrjct
-            FROM dbo.v_rpt_sort_1
-            WHERE ${productFilter} ${dateFilter}
+            FROM ${SORT_VIEW_TOKEN}
+            WHERE ${productFilter} AND ${unitSql} ${dateFilter}
             GROUP BY m_doc, m_job, m_date, m_kiln, UPPER(RTRIM(LTRIM(m_cp))), pt_desc1
         `;
 
         const [metricsResult, jobFlagsResult, reasonsResultFinal, kilnResult] = await Promise.all([
-            pool.request().query(`
+            querySortSources<Record<string, any>>(`
             SELECT 
                 m_month,
                 computed_cp,
@@ -100,8 +103,8 @@ export async function GET(request: Request) {
             GROUP BY m_month, computed_cp
             ORDER BY m_month ASC
             OPTION (RECOMPILE)
-        `),
-            pool.request().query(`
+        `, { sources, required: true }),
+            querySortSources<Record<string, any>>(`
             SELECT 
                 CONVERT(varchar(10), CAST(m_date AS date), 120) AS m_date,
                 m_doc,
@@ -109,12 +112,12 @@ export async function GET(request: Request) {
                 m_kiln,
                 UPPER(RTRIM(LTRIM(m_cp))) AS m_cp,
                 MAX(CASE WHEN m_user LIKE 'somboon%' THEN 1 ELSE 0 END) AS is_round1
-            FROM dbo.v_rpt_sort_1 WITH (NOLOCK)
-            WHERE ${productFilter} ${dateFilter}
+            FROM ${SORT_VIEW_TOKEN} WITH (NOLOCK)
+            WHERE ${productFilter} AND ${unitSql} ${dateFilter}
             GROUP BY CAST(m_date AS date), m_doc, m_job, m_kiln, UPPER(RTRIM(LTRIM(m_cp)))
             OPTION (RECOMPILE)
-        `),
-            pool.request().query(`
+        `, { sources }),
+            querySortSources<Record<string, any>>(`
             SELECT 
                 LEFT(CONVERT(VARCHAR, m_date, 120), 7) as m_month,
                 CONVERT(varchar(10), CAST(m_date AS date), 120) AS m_date,
@@ -125,14 +128,14 @@ export async function GET(request: Request) {
                 RTRIM(LTRIM(sub_typ)) as sub_typ, 
                 RTRIM(LTRIM(rsn_desc)) as rsn_desc, 
                 SUM(sub_qty) as sub_qty
-            FROM dbo.v_rpt_sort_1 WITH (NOLOCK)
-            WHERE ${productFilter} ${dateFilter}
+            FROM ${SORT_VIEW_TOKEN} WITH (NOLOCK)
+            WHERE ${productFilter} AND ${unitSql} ${dateFilter}
                 AND rsn_desc IS NOT NULL
                 AND RTRIM(LTRIM(rsn_desc)) != ''
             GROUP BY LEFT(CONVERT(VARCHAR, m_date, 120), 7), CAST(m_date AS date), m_doc, m_job, m_kiln, UPPER(RTRIM(LTRIM(m_cp))), RTRIM(LTRIM(sub_typ)), RTRIM(LTRIM(rsn_desc))
             OPTION (RECOMPILE)
-        `),
-            pool.request().query(`
+        `, { sources }),
+            querySortSources<Record<string, any>>(`
              SELECT 
                 m_month,
                 m_kiln,
@@ -146,7 +149,7 @@ export async function GET(request: Request) {
             ) as distinct_jobs
             GROUP BY m_month, m_kiln, computed_cp
             OPTION (RECOMPILE)
-        `),
+        `, { sources }),
         ]);
 
         // Process Data in JS

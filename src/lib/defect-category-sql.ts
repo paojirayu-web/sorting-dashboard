@@ -1,8 +1,25 @@
-/** SQL fragment for WW / DW / ALL category on m_part. */
-export function buildCategoryPartSql(category: string): string {
-    if (category === 'WW') return "m_part LIKE '142%'";
-    if (category === 'DW') return "m_part LIKE '143%'";
+import type { SortSourceId } from '@/lib/sort-source';
+
+export const CATEGORY_SQL_TOKEN = '{{CATEGORY_SQL}}';
+export const CATEGORY_SQL_V_TOKEN = '{{CATEGORY_SQL_V}}';
+
+/** SQL fragment for WW / DW Inglaze / DW Onglaze / DW All / ALL on m_part (source-aware). */
+export function buildCategoryPartSql(
+    category: string,
+    source: SortSourceId = 'kilndb',
+    column = 'm_part',
+): string {
+    if (category === 'WW') return `${column} LIKE '142%'`;
+    if (category === 'DW') return source === 'sdb' ? '1=0' : `${column} LIKE '143%'`;
+    if (category === 'DW_ONGLAZE') return source === 'sdb' ? '1=1' : '1=0';
+    if (category === 'DW_ALL') return source === 'sdb' ? '1=1' : `${column} LIKE '143%'`;
     return '1=1';
+}
+
+export function injectCategorySql(sqlText: string, category: string, source: SortSourceId): string {
+    return sqlText
+        .split(CATEGORY_SQL_V_TOKEN).join(buildCategoryPartSql(category, source, 'v.m_part'))
+        .split(CATEGORY_SQL_TOKEN).join(buildCategoryPartSql(category, source, 'm_part'));
 }
 
 /** Exclude somboon C1 special reasons that shift qty to comp. */

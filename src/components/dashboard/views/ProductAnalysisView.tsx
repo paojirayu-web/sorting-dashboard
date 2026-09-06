@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, LayoutGrid, Maximize2, Minimize2, Table2, XCircle, X } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import type { Theme, ThemeName } from '@/lib/themes';
+import { SKIN_ACCENT, type Theme, type ThemeName } from '@/lib/themes';
 import type { CPData, DataItem, GroupedRow, ProductStats, SelectedReason, ReasonLogEntry, ReasonMonthlyEntry } from '@/types/dashboard';
 import { CompactCard } from '@/components/dashboard/CompactCard';
 import { FiringCycleQtyTable } from '@/components/dashboard/FiringCycleQtyTable';
@@ -15,6 +15,7 @@ import { DailyDetailModal } from '@/components/dashboard/DailyDetailModal';
 import { ExportProductSortingLogButton } from '@/components/dashboard/ExportProductSortingLogButton';
 import { QtyGradeSortingLog } from '@/components/dashboard/QtyGradeSortingLog';
 import { SectionHeader } from '@/components/dashboard/SectionHeader';
+import { CodewareStickyTitle } from '@/components/dashboard/CodewareStickyTitle';
 import { applyCpCardGrouping, collectPfiringCps } from '@/lib/cp-card-grouping';
 import { PCardModeToggle, type PCardMode } from '@/components/dashboard/PCardModeToggle';
 import {
@@ -23,16 +24,20 @@ import {
     sortCpBreakdownForDisplay,
 } from '@/lib/firing-cycle-labels';
 import {
+    applyReasonRowsToGroupedRow,
     buildProductSortingLogRows,
     collectCpValues,
     collectKilnValues,
     getDefaultLogKilnFilters,
+    jobReasonQueryCp,
     matchesSelectedProduct,
+    parseAnalysisProduct,
 } from '@/lib/product-sorting-log';
 import { buildCpBreakdownFromRaw } from '@/lib/build-cp-from-raw';
 import { buildYieldPlanningResult } from '@/lib/product-yield-planning';
 import { formatDateDisplay, normalizeMDate } from '@/lib/utils';
 import { TimelineDateFilter } from '@/components/dashboard/TimelineDateFilter';
+import type { UnitFilter } from '@/lib/unit-filter';
 
 type AnalysisLayoutMode = 'cards' | 'qty-table';
 
@@ -59,6 +64,8 @@ interface ProductAnalysisViewProps {
     setAnalysisStartDate: (d: string) => void;
     analysisEndDate: string;
     setAnalysisEndDate: (d: string) => void;
+    onNeedPaRawData?: () => void;
+    unitFilter: UnitFilter;
 }
 
 export function ProductAnalysisView({
@@ -84,6 +91,8 @@ export function ProductAnalysisView({
     setAnalysisStartDate,
     analysisEndDate,
     setAnalysisEndDate,
+    onNeedPaRawData,
+    unitFilter,
 }: ProductAnalysisViewProps) {
     const [layoutMode, setLayoutMode] = useState<AnalysisLayoutMode>('cards');
     const [pCardMode, setPCardMode] = useState<PCardMode>('separate');
@@ -92,6 +101,9 @@ export function ProductAnalysisView({
     const [logCpFilters, setLogCpFilters] = useState<string[]>(['ALL']);
     const [logKilnFilters, setLogKilnFilters] = useState<string[]>(['ALL']);
     const [selectedSortingLogRow, setSelectedSortingLogRow] = useState<GroupedRow | null>(null);
+    const [sortingLogReasonsLoading, setSortingLogReasonsLoading] = useState(false);
+    const jobReasonsCacheRef = useRef(new Map<string, GroupedRow>());
+    const jobReasonsReqRef = useRef(0);
     const [isSortingLogFullscreen, setIsSortingLogFullscreen] = useState(false);
     const [planningYieldPct, setPlanningYieldPct] = useState<number | null>(null);
     const [planningMeta, setPlanningMeta] = useState<{
@@ -153,6 +165,67 @@ export function ProductAnalysisView({
     useEffect(() => {
         setSelectedCapsuleDates([]);
     }, [selectedProduct]);
+
+    useEffect(() => {
+        if (layoutMode !== 'qty-table' || !selectedProduct) return;
+        onNeedPaRawData?.();
+    }, [layoutMode, selectedProduct, onNeedPaRawData]);
+
+    useEffect(() => {
+        jobReasonsCacheRef.current = new Map();
+        jobReasonsReqRef.current += 1;
+        setSortingLogReasonsLoading(false);
+        setSelectedSortingLogRow(null);
+    }, [paRawData, selectedProduct, analysisStartDate, analysisEndDate, unitFilter]);
+
+    const handleSortingLogRowClick = async (row: GroupedRow) => {
+        const cacheKey = `${normalizeMDate(row.m_date)}|${row.m_doc}|${row.m_job}|${row.m_kiln}|${row.m_cp}`;
+        const cached = jobReasonsCacheRef.current.get(cacheKey);
+        if (cached) {
+            setSelectedSortingLogRow(cached);
+            return;
+        }
+        if (row.cdReasons.size > 0 || row.pjReasons.size > 0) {
+            jobReasonsCacheRef.current.set(cacheKey, row);
+            setSelectedSortingLogRow(row);
+            return;
+        }
+
+        setSelectedSortingLogRow(row);
+        if (row.totalScrap === 0 && row.totalReject === 0) {
+            jobReasonsCacheRef.current.set(cacheKey, row);
+            return;
+        }
+
+        const reqId = ++jobReasonsReqRef.current;
+        setSortingLogReasonsLoading(true);
+        try {
+            const params = new URLSearchParams({
+                startDate: analysisStartDate,
+                endDate: analysisEndDate,
+                product: selectedProduct,
+                unit: unitFilter,
+                jobReasons: '1',
+                m_doc: row.m_doc || '',
+                m_job: row.m_job || '',
+                m_date: normalizeMDate(row.m_date),
+                m_kiln: row.m_kiln || '',
+                m_cp: jobReasonQueryCp(row.m_cp),
+            });
+            const res = await fetch(`/api/data?${params.toString()}`);
+            const reasons = await res.json();
+            if (jobReasonsReqRef.current !== reqId) return;
+            const enriched = Array.isArray(reasons)
+                ? applyReasonRowsToGroupedRow(row, reasons)
+                : row;
+            jobReasonsCacheRef.current.set(cacheKey, enriched);
+            setSelectedSortingLogRow(enriched);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            if (jobReasonsReqRef.current === reqId) setSortingLogReasonsLoading(false);
+        }
+    };
 
     /** Table tab CP metrics: capsule selection rebuilds from raw; else use API stats for table range. */
     const tableCpBreakdown = useMemo(() => {
@@ -231,12 +304,9 @@ export function ProductAnalysisView({
         const part = (info?.m_part || '').trim();
         // DW product key is "DW:desc2:desc1" — prefer info.pt_desc1 when present
         let resolvedDesc1 = desc1;
-        if (!info?.pt_desc1 && selectedProduct.startsWith('DW:')) {
-            const rest = selectedProduct.slice(3);
-            const idx = rest.indexOf(':');
-            resolvedDesc1 = idx >= 0 ? rest.slice(idx + 1).trim() : rest.trim();
-        } else if (!info?.pt_desc1 && selectedProduct && !selectedProduct.startsWith('DW:')) {
-            resolvedDesc1 = selectedProduct.trim();
+        if (!info?.pt_desc1 && selectedProduct) {
+            const parsed = parseAnalysisProduct(selectedProduct);
+            resolvedDesc1 = parsed.pt_desc1 || selectedProduct.trim();
         }
         return { desc1: resolvedDesc1, part };
     }, [productStats?.totalStats?.info, selectedProduct, selectedProductLabel]);
@@ -361,49 +431,49 @@ export function ProductAnalysisView({
     }, [isSortingLogFullscreen, selectedCpCard]);
 
     return (
-        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
+        <div className="animate-in fade-in duration-500 space-y-6">
+            <CodewareStickyTitle
+                theme={theme}
+                title={
+                    (productStats?.totalStats?.info?.m_part || '').startsWith('143') && productStats?.totalStats?.info?.pt_desc2
+                        ? (productStats.totalStats.info.pt_desc1 || selectedProductLabel)
+                        : (selectedProduct ? selectedProductLabel : 'Select a Product')
+                }
+                subtitle={
+                    (productStats?.totalStats?.info?.m_part || '').startsWith('143') && productStats?.totalStats?.info?.pt_desc2
+                        ? productStats.totalStats.info.pt_desc2
+                        : undefined
+                }
+                actions={selectedProduct ? (
+                    <div className={`flex rounded-lg border ${theme.borderColor} overflow-hidden`}>
+                        <button
+                            type="button"
+                            onClick={() => setLayoutMode('cards')}
+                            className={`text-[10px] px-3 py-1.5 font-bold flex items-center gap-1.5 transition-all ${layoutMode === 'cards'
+                                ? `${theme.accentBg} text-white`
+                                : `${theme.inputBg} ${theme.textMuted} hover:${theme.textWhite}`
+                                }`}
+                        >
+                            <LayoutGrid size={14} />
+                            Cards
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setLayoutMode('qty-table')}
+                            className={`text-[10px] px-3 py-1.5 font-bold flex items-center gap-1.5 transition-all border-l ${theme.borderColor} ${layoutMode === 'qty-table'
+                                ? `${theme.accentBg} text-white`
+                                : `${theme.inputBg} ${theme.textMuted} hover:${theme.textWhite}`
+                                }`}
+                        >
+                            <Table2 size={14} />
+                            Table
+                        </button>
+                    </div>
+                ) : undefined}
+            />
             {/* Product Info Header */}
             <div className={`${theme.cardBg} border ${theme.borderColor} p-4 sm:p-6 rounded-2xl shadow-lg`}>
                 <div className="flex flex-col gap-4">
-                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                        <div className="min-w-0">
-                            <p className={`text-xs font-bold uppercase ${theme.textMuted} mb-1`}>Codeware</p>
-                            {(productStats?.totalStats?.info?.m_part || '').startsWith('143') && productStats?.totalStats?.info?.pt_desc2 ? (
-                                <div>
-                                    <h1 className={`text-2xl font-black ${theme.textWhite}`}>{productStats.totalStats.info.pt_desc1 || selectedProductLabel}</h1>
-                                    <p className={`text-lg font-bold mt-1 ${currentTheme === "dark" ? "text-blue-400" : "text-blue-700"}`}>{productStats.totalStats.info.pt_desc2}</p>
-                                </div>
-                            ) : (
-                                <h1 className={`text-xl sm:text-2xl md:text-3xl font-black ${theme.textWhite} break-words`}>{selectedProductLabel}</h1>
-                            )}
-                        </div>
-                        {selectedProduct && (
-                            <div className={`flex rounded-lg border ${theme.borderColor} overflow-hidden shrink-0 self-start sm:self-auto`}>
-                                <button
-                                    type="button"
-                                    onClick={() => setLayoutMode('cards')}
-                                    className={`text-[10px] px-3 py-1.5 font-bold flex items-center gap-1.5 transition-all ${layoutMode === 'cards'
-                                        ? `${theme.accentBg} text-white`
-                                        : `${theme.inputBg} ${theme.textMuted} hover:${theme.textWhite}`
-                                        }`}
-                                >
-                                    <LayoutGrid size={14} />
-                                    Cards
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setLayoutMode('qty-table')}
-                                    className={`text-[10px] px-3 py-1.5 font-bold flex items-center gap-1.5 transition-all border-l ${theme.borderColor} ${layoutMode === 'qty-table'
-                                        ? `${theme.accentBg} text-white`
-                                        : `${theme.inputBg} ${theme.textMuted} hover:${theme.textWhite}`
-                                        }`}
-                                >
-                                    <Table2 size={14} />
-                                    Table
-                                </button>
-                            </div>
-                        )}
-                    </div>
                     <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 sm:gap-3 w-full">
                         {layoutMode === 'qty-table' ? (
                             <TimelineDateFilter
@@ -599,7 +669,7 @@ export function ProductAnalysisView({
                                                 currentTheme={currentTheme}
                                                 loading={paRawLoading}
                                                 emptyMessage="No sorting activity for this product and filters."
-                                                onRowClick={setSelectedSortingLogRow}
+                                                onRowClick={handleSortingLogRowClick}
                                                 isFullscreen={isSortingLogFullscreen}
                                             />
                                         </div>
@@ -680,8 +750,8 @@ export function ProductAnalysisView({
                                                 <stop offset="95%" stopColor={selectedReason.sub_type === 'P' ? '#eab308' : '#ef4444'} stopOpacity={0} />
                                             </linearGradient>
                                             <linearGradient id="reasonGrad" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#2563eb" stopOpacity={0.3} />
-                                                <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
+                                                <stop offset="5%" stopColor={SKIN_ACCENT} stopOpacity={0.3} />
+                                                <stop offset="95%" stopColor={SKIN_ACCENT} stopOpacity={0} />
                                             </linearGradient>
                                         </defs>
                                         <CartesianGrid strokeDasharray="3 3" stroke={currentTheme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'} />
@@ -700,7 +770,7 @@ export function ProductAnalysisView({
                                             fill="url(#totalGrad)"
                                         />
                                         <Area type="monotone" dataKey="pct" name={`${selectedReason.rsn_desc}`}
-                                            stroke="#2563eb"
+                                            stroke={SKIN_ACCENT}
                                             strokeWidth={2} strokeDasharray="5 5"
                                             fill="url(#reasonGrad)"
                                         />
@@ -817,7 +887,11 @@ export function ProductAnalysisView({
                     row={selectedSortingLogRow}
                     theme={theme}
                     currentTheme={currentTheme}
-                    onClose={() => setSelectedSortingLogRow(null)}
+                    reasonsLoading={sortingLogReasonsLoading}
+                    onClose={() => {
+                        setSelectedSortingLogRow(null);
+                        setSortingLogReasonsLoading(false);
+                    }}
                 />
             )}
         </div>

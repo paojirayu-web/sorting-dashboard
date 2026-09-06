@@ -1,5 +1,6 @@
 import type { DataItem } from '@/types/dashboard';
 import { isSomboonCpC } from '@/lib/c1-special-reason';
+import { isGlazeDwCategory } from '@/lib/sort-source';
 
 export type UnitFilter = 'ALL' | 'WW_WHITE' | 'WW_BLACK';
 
@@ -9,6 +10,11 @@ export const UNIT_LABELS: Record<UnitFilter, string> = {
     WW_BLACK: 'WW(black)',
 };
 
+export function parseUnitFilterParam(value: string | null | undefined): UnitFilter {
+    if (value === 'WW_WHITE' || value === 'WW_BLACK') return value;
+    return 'ALL';
+}
+
 export function buildUnitFilterSql(unitFilter: UnitFilter, category: string): string {
     const effective = getEffectiveUnitFilter(unitFilter, category);
     if (effective === 'WW_WHITE') return "RTRIM(LTRIM(ISNULL(unit, ''))) LIKE 'W5240%'";
@@ -17,7 +23,7 @@ export function buildUnitFilterSql(unitFilter: UnitFilter, category: string): st
 }
 
 export function getEffectiveUnitFilter(unitFilter: UnitFilter, category: string): UnitFilter {
-    return category === 'DW' ? 'ALL' : unitFilter;
+    return isGlazeDwCategory(category) ? 'ALL' : unitFilter;
 }
 
 export function matchesUnitFilter(item: DataItem, unitFilter: UnitFilter, category: string): boolean {
@@ -51,8 +57,12 @@ export function filterByCategory(data: DataItem[], category: string): DataItem[]
     return data
         .map((item) => ({ ...item, m_cp: normalizeCp(item.m_cp) }))
         .filter((item) => {
-            if (category === 'WW') return item.m_part.startsWith('142');
-            if (category === 'DW') return item.m_part.startsWith('143');
+            if (category === 'WW') return item._source !== 'sdb' && item.m_part.startsWith('142');
+            if (category === 'DW') return item._source !== 'sdb' && item.m_part.startsWith('143');
+            if (category === 'DW_ONGLAZE') return item._source === 'sdb';
+            if (category === 'DW_ALL') {
+                return item._source === 'sdb' || item.m_part.startsWith('143');
+            }
             return true;
         });
 }

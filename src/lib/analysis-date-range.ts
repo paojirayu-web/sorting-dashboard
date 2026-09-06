@@ -1,6 +1,9 @@
-import { getConnection, sql } from '@/lib/db';
 import { buildProductFilter } from '@/lib/product-filter';
 import { PRODUCT_LIST_LOOKBACK_YEARS } from '@/lib/product-list';
+import { querySortSources, type SortQueryBind } from '@/lib/sort-query';
+import { bindIsoDate } from '@/lib/sql-params';
+import { SORT_VIEW_TOKEN, sourcesForProduct } from '@/lib/sort-source';
+import { buildUnitFilterSql, type UnitFilter } from '@/lib/unit-filter';
 
 /** Shared PA + MA auto-range (matches product-stats / product list). */
 export const ANALYSIS_AUTO_LOOKBACK_YEARS = PRODUCT_LIST_LOOKBACK_YEARS;
@@ -60,41 +63,47 @@ export function resolveAutoDisplayDateRange(
 export async function queryProductDateRange(
     product: string,
     lookbackYears: number = ANALYSIS_AUTO_LOOKBACK_YEARS,
+    unitFilter: UnitFilter = 'ALL',
 ): Promise<ProductDateRange> {
     const lookbackStart = getAnalysisLookbackStartDate(lookbackYears);
     const lookbackEnd = getTodayDateString();
-    const pool = await getConnection();
     const productFilter = buildProductFilter(product);
+    const unitSql = buildUnitFilterSql(unitFilter, 'WW');
+    const sources = sourcesForProduct(product);
+    const bindLookback: SortQueryBind = (req) => {
+        bindIsoDate(req, 'lookbackStart', lookbackStart);
+        bindIsoDate(req, 'lookbackEnd', lookbackEnd);
+    };
 
-    const [boundsResult, yearsResult] = await Promise.all([
-        pool
-            .request()
-            .input('lookbackStart', sql.Date, lookbackStart)
-            .input('lookbackEnd', sql.Date, lookbackEnd)
-            .query(`
-                SELECT
-                    CONVERT(varchar(10), MIN(CAST(m_date AS date)), 120) AS minDate,
-                    CONVERT(varchar(10), MAX(CAST(m_date AS date)), 120) AS maxDate
-                FROM dbo.v_rpt_sort_1 WITH (NOLOCK)
-                WHERE ${productFilter}
-                    AND m_date >= @lookbackStart
-                    AND m_date < DATEADD(day, 1, @lookbackEnd)
-            `),
-        pool
-            .request()
-            .input('lookbackStart', sql.Date, lookbackStart)
-            .input('lookbackEnd', sql.Date, lookbackEnd)
-            .query(`
-                SELECT DISTINCT YEAR(CAST(m_date AS date)) AS dataYear
-                FROM dbo.v_rpt_sort_1 WITH (NOLOCK)
-                WHERE ${productFilter}
-                    AND m_date >= @lookbackStart
-                    AND m_date < DATEADD(day, 1, @lookbackEnd)
-                ORDER BY dataYear
-            `),
-    ]);
+    const yearRowsResult = await querySortSources<{
+        dataYear: number;
+        minDate: string | null;
+        maxDate: string | null;
+    }>(
+        `
+            SELECT
+                YEAR(CAST(m_date AS date)) AS dataYear,
+                CONVERT(varchar(10), MIN(CAST(m_date AS date)), 120) AS minDate,
+                CONVERT(varchar(10), MAX(CAST(m_date AS date)), 120) AS maxDate
+            FROM ${SORT_VIEW_TOKEN} WITH (NOLOCK)
+            WHERE ${productFilter} AND ${unitSql}
+                AND m_date >= @lookbackStart
+                AND m_date < DATEADD(day, 1, @lookbackEnd)
+            GROUP BY YEAR(CAST(m_date AS date))
+        `,
+        { sources, bind: bindLookback, required: true },
+    );
 
-    const row = boundsResult.recordset[0] as { minDate: string | null; maxDate: string | null };
+    const yearRows = yearRowsResult.recordset;
+    const mins = yearRows.map((r) => r.minDate?.trim()).filter(Boolean) as string[];
+    const maxs = yearRows.map((r) => r.maxDate?.trim()).filter(Boolean) as string[];
+    const yearsWithData = [...new Set(
+        yearRows.map((r) => r.dataYear).filter((year) => Number.isFinite(year)),
+    )];
+    const row = {
+        minDate: mins.sort()[0] || null,
+        maxDate: maxs.sort().at(-1) || null,
+    };
     const rawMin = row?.minDate?.trim() || '';
     const rawMax = row?.maxDate?.trim() || '';
     const hasData = Boolean(rawMin && rawMax);
@@ -111,9 +120,6 @@ export async function queryProductDateRange(
 
     const boundedMin = rawMin < lookbackStart ? lookbackStart : rawMin;
     const boundedMax = rawMax > lookbackEnd ? lookbackEnd : rawMax;
-    const yearsWithData = (yearsResult.recordset as { dataYear: number }[]).map(
-        (r) => r.dataYear,
-    );
 
     const { minDate, maxDate } = resolveAutoDisplayDateRange(
         boundedMin,

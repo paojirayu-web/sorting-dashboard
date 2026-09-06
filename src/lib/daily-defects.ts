@@ -1,6 +1,7 @@
 import type { DataItem, GroupedRow } from '@/types/dashboard';
 import { isC1SpecialReasonForRecord } from '@/lib/c1-special-reason';
 import { formatProductDescription, formatDateDisplay, normalizeMDate } from '@/lib/utils';
+import { isGlazeDwCategory } from '@/lib/sort-source';
 import { getDisplayCp, matchesUnitFilter } from '@/lib/unit-filter';
 import { isRejectSubTyp, isScrapSubTyp } from '@/lib/sub-typ';
 
@@ -82,7 +83,7 @@ export function buildDailyActivityTable(
             const compPct = item.qtyp > 0 ? (item.qtycomp / item.qtyp) * 100 : 0;
 
             let meetsThreshold = false;
-            if (category === 'DW') {
+            if (isGlazeDwCategory(category)) {
                 meetsThreshold =
                     item.qtyp >= 300 &&
                     (scrapPct >= 10 || rejectPct >= 20 || compPct <= 70);

@@ -45,17 +45,13 @@ interface OverviewViewProps {
     cpFilter: string;
     setCpFilter: (v: string) => void;
     unitFilter: string;
-    setUnitFilter: (v: string) => void;
     searchQuery: string;
     setSearchQuery: (v: string) => void;
     cpOptions: string[];
     // Fullscreen filters
     overallCpFilter: string;
     setOverallCpFilter: (v: string) => void;
-    overallUnitFilter: string;
-    setOverallUnitFilter: (v: string) => void;
     setSelectedDate: (d: string) => void;
-    category: string;
 }
 
 export function OverviewView({
@@ -74,16 +70,12 @@ export function OverviewView({
     cpFilter,
     setCpFilter,
     unitFilter,
-    setUnitFilter,
     searchQuery,
     setSearchQuery,
     cpOptions,
     overallCpFilter,
     setOverallCpFilter,
-    overallUnitFilter,
-    setOverallUnitFilter,
     setSelectedDate,
-    category,
 }: OverviewViewProps) {
     return (
         <>
@@ -94,7 +86,7 @@ export function OverviewView({
                 </div>
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
                     {/* Qty Processed */}
-                    <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-5 shadow-lg relative overflow-hidden group hover:border-blue-500/30 transition-all`}>
+                    <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-5 shadow-lg relative overflow-hidden group skin-card-hover`}>
                         <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
                             <TrendingUp size={40} />
                         </div>
@@ -266,20 +258,6 @@ export function OverviewView({
                                                 {cpOptions.map(cp => <option key={cp} value={cp} className={currentTheme === "dark" ? "bg-[#141414]" : "bg-white"}>{cp}</option>)}
                                             </select>
                                         </div>
-                                        <div className={`flex items-center gap-2 px-2 md:px-3 py-1.5 md:py-2 ${theme.inputBg} rounded-xl border ${theme.borderColor} ${category === 'DW' ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                                            <span className={`text-[10px] md:text-xs font-bold ${theme.textMuted} hidden md:inline`}>Unit:</span>
-                                            <select
-                                                value={overallUnitFilter}
-                                                onChange={(e) => setOverallUnitFilter(e.target.value)}
-                                                disabled={category === 'DW'}
-                                                className={`bg-transparent outline-none text-[10px] md:text-xs font-bold ${theme.textWhite} cursor-pointer min-w-[70px]`}
-                                                title="Select Unit"
-                                            >
-                                                <option value="ALL" className={currentTheme === "dark" ? "bg-[#141414]" : "bg-white"}>ALL</option>
-                                                <option value="WW_WHITE" className={currentTheme === "dark" ? "bg-[#141414]" : "bg-white"}>WW(white)</option>
-                                                <option value="WW_BLACK" className={currentTheme === "dark" ? "bg-[#141414]" : "bg-white"}>WW(black)</option>
-                                            </select>
-                                        </div>
                                         <div className={`flex items-center gap-2 px-2 md:px-3 py-1.5 md:py-2 ${theme.inputBg} rounded-xl border ${theme.borderColor}`}>
                                             <Calendar size={14} className={`${theme.textMuted} hidden md:block`} />
                                             <input
@@ -342,19 +320,6 @@ export function OverviewView({
                                 title="Control Point Filter"
                             >
                                 {cpOptions.map(cp => <option key={cp} value={cp} className={currentTheme === "dark" ? "bg-[#141414]" : "bg-white"}>{cp}</option>)}
-                            </select>
-                        </div>
-                        <div className={`flex items-center gap-2 px-3 py-2 ${theme.inputBg} rounded-xl border ${theme.borderColor}`}>
-                            <span className={`text-xs font-bold ${theme.textMuted}`}>Unit:</span>
-                            <select
-                                value={unitFilter}
-                                onChange={(e) => setUnitFilter(e.target.value)}
-                                className={`bg-transparent outline-none text-xs font-bold ${theme.textWhite} cursor-pointer`}
-                                title="Unit Filter"
-                            >
-                                <option value="ALL" className={currentTheme === "dark" ? "bg-[#141414]" : "bg-white"}>ALL</option>
-                                <option value="WW_WHITE" className={currentTheme === "dark" ? "bg-[#141414]" : "bg-white"}>WW(white)</option>
-                                <option value="WW_BLACK" className={currentTheme === "dark" ? "bg-[#141414]" : "bg-white"}>WW(black)</option>
                             </select>
                         </div>
                         <div className={`flex items-center gap-3 px-4 py-2.5 ${theme.inputBg} rounded-xl border ${theme.borderColor} flex-1 md:w-64`}>

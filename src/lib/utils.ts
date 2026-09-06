@@ -1,5 +1,21 @@
 import type { DataItem } from '@/types/dashboard';
 
+/** Coerce mssql numeric / string / Decimal-like values to a finite number. */
+export function toFiniteNumber(value: unknown): number {
+    if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+    if (typeof value === 'bigint') return Number(value);
+    if (typeof value === 'string') {
+        const n = Number(value.replace(/,/g, '').trim());
+        return Number.isFinite(n) ? n : 0;
+    }
+    if (value && typeof value === 'object' && 'valueOf' in value) {
+        const n = Number((value as { valueOf: () => unknown }).valueOf());
+        if (Number.isFinite(n)) return n;
+    }
+    const n = Number(value);
+    return Number.isFinite(n) ? n : 0;
+}
+
 /** Normalize m_date from SQL (Date object) or string to YYYY-MM-DD */
 export function normalizeMDate(value: unknown): string {
     if (value == null || value === '') return '';
@@ -27,15 +43,17 @@ export function normalizeDataItem(row: Record<string, unknown>): DataItem {
         pt_desc1: String(row.pt_desc1 ?? ''),
         pt_desc2: row.pt_desc2 != null ? String(row.pt_desc2) : undefined,
         m_cp: String(row.m_cp ?? ''),
-        qtyp: Number(row.qtyp) || 0,
-        qtycomp: Number(row.qtycomp) || 0,
-        qtyscrp: Number(row.qtyscrp) || 0,
-        qtyrjct: Number(row.qtyrjct) || 0,
+        qtyp: toFiniteNumber(row.qtyp),
+        qtycomp: toFiniteNumber(row.qtycomp),
+        qtyscrp: toFiniteNumber(row.qtyscrp),
+        qtyrjct: toFiniteNumber(row.qtyrjct),
         sub_typ: String(row.sub_typ ?? ''),
-        sub_qty: Number(row.sub_qty) || 0,
+        sub_qty: toFiniteNumber(row.sub_qty),
         rsn_desc: String(row.rsn_desc ?? ''),
         unit: String(row.unit ?? ''),
         m_user: String(row.m_user ?? ''),
+        c1_special_qty: row.c1_special_qty != null ? Number(row.c1_special_qty) || 0 : undefined,
+        _source: row._source === 'sdb' ? 'sdb' : row._source === 'kilndb' ? 'kilndb' : undefined,
     };
 }
 

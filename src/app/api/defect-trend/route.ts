@@ -10,6 +10,7 @@ import {
 } from '@/lib/defect-reason-query';
 import { PRODUCT_LIST_CACHE_SECONDS } from '@/lib/product-list';
 import type { UnitFilter } from '@/lib/unit-filter';
+import { isValidCategory } from '@/lib/sort-source';
 
 const getCachedDefectJobMetrics = unstable_cache(
     async (startDate: string, endDate: string, category: string, unit: UnitFilter) =>
@@ -62,7 +63,7 @@ export async function GET(request: Request) {
         if (startDate > endDate) {
             return NextResponse.json({ error: 'Invalid date range' }, { status: 400 });
         }
-        if (!['ALL', 'WW', 'DW'].includes(category)) {
+        if (!isValidCategory(category)) {
             return NextResponse.json({ error: 'Invalid category' }, { status: 400 });
         }
         if (!['scrap', 'reject'].includes(mode)) {

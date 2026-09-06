@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { themes, type ThemeName } from "@/lib/themes";
-import { formatDateShort, formatProductDescription } from "@/lib/utils";
+import { formatDateShort, formatProductDescription, normalizeDataRows } from "@/lib/utils";
 import type { DataItem, ProductStats, MonthlyStats, SelectedReason, ViewType, GroupedRow, ReasonLogEntry, ReasonMonthlyEntry, ProductItem, DefectReasonItem, DefectListMode } from "@/types/dashboard";
 import type { DefectTrendPayload, DefectJobMetricRow } from "@/lib/defect-reason-query";
 import {
@@ -12,14 +12,38 @@ import {
     OverviewView,
     ProductAnalysisView,
     MonthlyAnalysisView,
-    DefectAnalysisView,
+    QtyProcessView,
     SettingsView,
 } from "@/components/dashboard";
 import { buildDailyActivityTable } from "@/lib/daily-defects";
 import { isC1SpecialReasonForRecord, isSomboonCpC } from "@/lib/c1-special-reason";
 import { isRejectSubTyp, isScrapSubTyp } from "@/lib/sub-typ";
 import type { UnitFilter } from "@/lib/unit-filter";
-import { getEffectiveUnitFilter } from "@/lib/unit-filter";
+import { filterByCategory, getEffectiveUnitFilter } from "@/lib/unit-filter";
+import {
+    deriveCategory,
+    deriveUnitFilter,
+    getDashboardSkin,
+    getHierarchyLabel,
+    isGlazeDwCategory,
+    productListHasWwUnitFlags,
+    productMatchesSearch,
+    ONGLAZE_PRODUCT_PREFIX,
+    type DwKind,
+    type LineFamily,
+    type WwTone,
+} from "@/lib/sort-source";
+import {
+    qtyProcLineMatches,
+    qtyProcMixKeys,
+    qtyProcRowMatches,
+    pRoundOf,
+    type QtyProcCpFilter,
+    type QtyProcLineFilter,
+    type QtyProcPayload,
+    type QtyProcScope,
+    type QtyProcYearFilter,
+} from "@/lib/qtyproc";
 
 type DefectTrendCacheEntry = {
     trend?: DefectTrendPayload["trend"];
@@ -65,6 +89,7 @@ export default function Dashboard() {
     const MONTHLY_STATS_TIMEOUT_MS = 120000;
     const MONTHLY_RAW_TIMEOUT_MS = 120000;
     const DEFECT_CHART_TIMEOUT_MS = 120000;
+    const QTYPROC_TIMEOUT_MS = 120000;
     // ─── UI State ────────────────────────────────────────────
     const [isSidebarOpen, setSidebarOpen] = useState(false);
     const [currentTheme, setCurrentTheme] = useState<ThemeName>("dark");
@@ -74,13 +99,17 @@ export default function Dashboard() {
     // ─── Overview State ──────────────────────────────────────
     const [data, setData] = useState<DataItem[]>([]);
     const [loading, setLoading] = useState(true);
-    const [category, setCategory] = useState("ALL");
+    const [lineFamily, setLineFamily] = useState<LineFamily>("ALL");
+    const [wwTone, setWwTone] = useState<WwTone>("ALL");
+    const [dwKind, setDwKind] = useState<DwKind>("ALL");
+    const category = deriveCategory(lineFamily, dwKind);
+    const unitFilter = deriveUnitFilter(lineFamily, wwTone);
+    const overallUnitFilter = unitFilter;
+    const defectUnitFilter = unitFilter;
     const [selectedDate, setSelectedDate] = useState<string>("");
     const [searchQuery, setSearchQuery] = useState("");
     const [cpFilter, setCpFilter] = useState("ALL");
-    const [unitFilter, setUnitFilter] = useState("ALL");
     const [overallCpFilter, setOverallCpFilter] = useState("ALL");
-    const [overallUnitFilter, setOverallUnitFilter] = useState("ALL");
     const [refreshing, setRefreshing] = useState(false);
     const [isDailyMonitorFullscreen, setIsDailyMonitorFullscreen] = useState(false);
     const [selectedDailyRow, setSelectedDailyRow] = useState<GroupedRow | null>(null);
@@ -120,6 +149,18 @@ export default function Dashboard() {
     const [paRawData, setPaRawData] = useState<DataItem[]>([]);
     const [paRawLoading, setPaRawLoading] = useState(false);
 
+    const [qtyProcPayload, setQtyProcPayload] = useState<QtyProcPayload | null>(null);
+    const [qtyProcLoading, setQtyProcLoading] = useState(false);
+    const [qtyProcError, setQtyProcError] = useState<string | null>(null);
+    const [qtyProcYear, setQtyProcYear] = useState<QtyProcYearFilter>('all');
+    const [qtyProcLine, setQtyProcLine] = useState<QtyProcLineFilter>('all');
+    const [qtyProcCp, setQtyProcCp] = useState<QtyProcCpFilter>('all');
+    const [qtyProcScope, setQtyProcScope] = useState<QtyProcScope>('ff');
+    const [qtyProcShape, setQtyProcShape] = useState('all');
+    const [qtyProcForming, setQtyProcForming] = useState('all');
+    const [qtyProcCustomer, setQtyProcCustomer] = useState('all');
+    const [qtyProcGlaze, setQtyProcGlaze] = useState('all');
+
     // ─── Defect Analysis State ───────────────────────────────
     const [defectReasonList, setDefectReasonList] = useState<DefectReasonItem[]>([]);
     const [selectedDefect, setSelectedDefect] = useState("");
@@ -132,7 +173,6 @@ export default function Dashboard() {
         wareKilns: [],
     });
     const [defectListMode, setDefectListMode] = useState<DefectListMode>("scrap");
-    const [defectUnitFilter, setDefectUnitFilter] = useState<UnitFilter>("WW_WHITE");
     const [defectListLoading, setDefectListLoading] = useState(false);
     const [defectTrendLoading, setDefectTrendLoading] = useState(false);
     const defectListAbortRef = useRef<AbortController | null>(null);
@@ -146,10 +186,61 @@ export default function Dashboard() {
     const paRawAbortRef = useRef<AbortController | null>(null);
     const reasonLogAbortRef = useRef<AbortController | null>(null);
     const monthlyStatsAbortRef = useRef<AbortController | null>(null);
+    const dataAbortRef = useRef<AbortController | null>(null);
+    const productListAbortRef = useRef<AbortController | null>(null);
     /** Product whose auto date range was last applied (skip repeat API on PA↔MA switch). */
     const appliedAutoDateRangeProductRef = useRef<string | null>(null);
     /** When set to selectedProduct, PA/MA data fetches may run with current analysis dates. */
     const [analysisDateRangeReadyFor, setAnalysisDateRangeReadyFor] = useState<string | null>(null);
+    const skinId = getDashboardSkin(lineFamily, wwTone, dwKind);
+    const hierarchyLabel = getHierarchyLabel(lineFamily, wwTone, dwKind);
+    const qtyProcLineMix = useMemo(
+        () => (qtyProcPayload?.mix || []).filter((r) => (
+            qtyProcLineMatches(qtyProcLine, r.tone)
+            && qtyProcRowMatches('all', r.cp, qtyProcScope)
+        )),
+        [qtyProcPayload, qtyProcLine, qtyProcScope],
+    );
+    const qtyProcCustomerKeys = useMemo(() => qtyProcMixKeys(qtyProcLineMix, 'customer'), [qtyProcLineMix]);
+    const qtyProcScopedMix = useMemo(
+        () => qtyProcCustomer === 'all'
+            ? qtyProcLineMix
+            : qtyProcLineMix.filter((r) => (r.customer || '(blank)') === qtyProcCustomer),
+        [qtyProcLineMix, qtyProcCustomer],
+    );
+    const qtyProcShapeKeys = useMemo(() => qtyProcMixKeys(qtyProcScopedMix, 'shape'), [qtyProcScopedMix]);
+    const qtyProcFormingKeys = useMemo(() => qtyProcMixKeys(qtyProcScopedMix, 'forming'), [qtyProcScopedMix]);
+    const [skinFadeOn, setSkinFadeOn] = useState(false);
+
+    useEffect(() => {
+        if (qtyProcCustomer !== 'all' && !qtyProcCustomerKeys.includes(qtyProcCustomer)) {
+            setQtyProcCustomer('all');
+        }
+    }, [qtyProcCustomer, qtyProcCustomerKeys]);
+
+    useEffect(() => {
+        if (qtyProcShape !== 'all' && !qtyProcShapeKeys.includes(qtyProcShape)) {
+            setQtyProcShape('all');
+        }
+    }, [qtyProcShape, qtyProcShapeKeys]);
+
+    useEffect(() => {
+        if (qtyProcForming !== 'all' && !qtyProcFormingKeys.includes(qtyProcForming)) {
+            setQtyProcForming('all');
+        }
+    }, [qtyProcForming, qtyProcFormingKeys]);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            setSkinFadeOn(false);
+            return;
+        }
+        setSkinFadeOn(false);
+        const id = requestAnimationFrame(() => {
+            requestAnimationFrame(() => setSkinFadeOn(true));
+        });
+        return () => cancelAnimationFrame(id);
+    }, [skinId]);
 
     const isValidDateRange = useCallback((startDate: string, endDate: string) => {
         return Boolean(startDate && endDate && startDate <= endDate);
@@ -183,8 +274,9 @@ export default function Dashboard() {
 
     // ─── Data Fetching ───────────────────────────────────────
     const fetchProductAutoDateRange = useCallback(async (product: string) => {
+        const unitQs = unitFilter !== 'ALL' ? `&unit=${unitFilter}` : '';
         const res = await fetch(
-            `/api/product-date-range?product=${encodeURIComponent(product)}`,
+            `/api/product-date-range?product=${encodeURIComponent(product)}${unitQs}`,
         );
         const range = await res.json();
         if (range?.error) return null;
@@ -192,21 +284,108 @@ export default function Dashboard() {
             return { minDate: range.minDate as string, maxDate: range.maxDate as string };
         }
         return null;
-    }, []);
+    }, [unitFilter]);
 
     const fetchProductList = useCallback(async (forceRefresh = false) => {
+        productListAbortRef.current?.abort();
+        const controller = new AbortController();
+        productListAbortRef.current = controller;
         try {
             const url = forceRefresh ? "/api/products?refresh=1" : "/api/products";
-            const res = await fetch(url, forceRefresh ? { cache: 'no-store' } : undefined);
-            const products = await res.json();
-            if (Array.isArray(products)) setProductList(products);
-        } catch (e) { console.error(e); }
+            const res = await fetch(url, { cache: 'no-store', signal: controller.signal });
+            const data = await res.json();
+            if (productListAbortRef.current !== controller) return;
+            if (data?.error) return;
+            const products: ProductItem[] = Array.isArray(data)
+                ? data
+                : Array.isArray(data?.items) ? data.items : [];
+            if (!products.length) return;
+            const hasOnglaze = products.some((item: ProductItem) =>
+                String(item.value || '').startsWith(ONGLAZE_PRODUCT_PREFIX),
+            );
+            const hasUnitFlags = productListHasWwUnitFlags(products);
+            if (!forceRefresh && (!hasOnglaze || !hasUnitFlags)) {
+                await fetchProductList(true);
+                return;
+            }
+            setProductList(products);
+            if (!forceRefresh && data?.stale) {
+                void fetchProductList(true);
+            }
+        } catch (e) {
+            if (!isAbortError(e)) console.error(e);
+        }
     }, []);
 
     const lastProductStatsKeyRef = useRef<string | null>(null);
+    const autoAppliedStatsRangeRef = useRef<string | null>(null);
+    const [paRawNeeded, setPaRawNeeded] = useState(false);
+    const unitFilterRef = useRef(unitFilter);
+    const analysisDatesRef = useRef({ start: analysisStartDate, end: analysisEndDate });
+    unitFilterRef.current = unitFilter;
+    analysisDatesRef.current = { start: analysisStartDate, end: analysisEndDate };
 
-    const fetchProductStats = useCallback(async (product: string) => {
-        if (!isValidDateRange(analysisStartDate, analysisEndDate)) {
+    const resetAnalysisSelection = useCallback(() => {
+        productStatsAbortRef.current?.abort();
+        paRawAbortRef.current?.abort();
+        reasonLogAbortRef.current?.abort();
+        monthlyStatsAbortRef.current?.abort();
+        lastProductStatsKeyRef.current = null;
+        autoAppliedStatsRangeRef.current = null;
+        appliedAutoDateRangeProductRef.current = null;
+        setSelectedProduct("");
+        setIsProductListOpen(false);
+        setProductSearch("");
+        setProductStats(null);
+        setStatsLoading(false);
+        setMonthlyStats(null);
+        setMonthlyLoading(false);
+        setPaRawData([]);
+        setPaRawNeeded(false);
+        setPaRawLoading(false);
+        setMonthlyRawData([]);
+        setSelectedReason(null);
+        setReasonLogData([]);
+        setReasonMonthly([]);
+        setReasonLogError(null);
+        setReasonChartMonth(null);
+        setAnalysisDateRangeReadyFor(null);
+        setMonthlyCpFilter("ALL");
+        setShowReject(false);
+        setShowMonthlyReject(false);
+        setQtyProcYear('all');
+        setQtyProcCp('all');
+        setQtyProcScope('ff');
+        setQtyProcShape('all');
+        setQtyProcForming('all');
+        setQtyProcGlaze('all');
+    }, []);
+
+    const handleLineFamilyChange = useCallback((next: LineFamily) => {
+        if (next === lineFamily) return;
+        setLineFamily(next);
+        resetAnalysisSelection();
+    }, [lineFamily, resetAnalysisSelection]);
+
+    const handleWwToneChange = useCallback((next: WwTone) => {
+        if (next === wwTone) return;
+        setWwTone(next);
+        resetAnalysisSelection();
+    }, [wwTone, resetAnalysisSelection]);
+
+    const handleDwKindChange = useCallback((next: DwKind) => {
+        if (next === dwKind) return;
+        setDwKind(next);
+        resetAnalysisSelection();
+    }, [dwKind, resetAnalysisSelection]);
+
+    const analysisViewResetKey = `${lineFamily}|${wwTone}|${dwKind}`;
+
+    const fetchProductStats = useCallback(async (product: string, options?: { autoRange?: boolean }) => {
+        const autoRange = Boolean(options?.autoRange);
+        const unit = unitFilterRef.current;
+        const { start, end } = analysisDatesRef.current;
+        if (!autoRange && !isValidDateRange(start, end)) {
             setProductStats(null);
             setStatsLoading(false);
             return;
@@ -214,22 +393,37 @@ export default function Dashboard() {
         productStatsAbortRef.current?.abort();
         const controller = new AbortController();
         productStatsAbortRef.current = controller;
-        const requestKey = `${product}|${analysisStartDate}|${analysisEndDate}`;
-        // Clear only when product changes — keep stale stats on date refresh so the view stays mounted (tab preserved).
+        const requestKey = autoRange
+            ? `${product}|auto|${unit}`
+            : `${product}|${start}|${end}|${unit}`;
         if (lastProductStatsKeyRef.current?.split('|')[0] !== product) {
             setProductStats(null);
         }
         lastProductStatsKeyRef.current = requestKey;
         setStatsLoading(true);
         try {
-            const dateParams = `&startDate=${analysisStartDate}&endDate=${analysisEndDate}`;
+            const dateParams = autoRange
+                ? `&unit=${unit}`
+                : `&startDate=${start}&endDate=${end}&unit=${unit}`;
             const result = await fetchJsonWithTimeout(
                 `/api/product-stats?product=${encodeURIComponent(product)}${dateParams}`,
                 PRODUCT_STATS_TIMEOUT_MS,
                 controller.signal
             );
             if (lastProductStatsKeyRef.current !== requestKey) return;
-            setProductStats(result.error ? null : result);
+            if (result.error) {
+                setProductStats(null);
+                return;
+            }
+            setProductStats(result);
+            if (autoRange && result.dateRange?.minDate && result.dateRange?.maxDate) {
+                const stamp = `${product}|${unit}|${result.dateRange.minDate}|${result.dateRange.maxDate}`;
+                autoAppliedStatsRangeRef.current = stamp;
+                appliedAutoDateRangeProductRef.current = `${product}|${unit}`;
+                setAnalysisStartDate(result.dateRange.minDate);
+                setAnalysisEndDate(result.dateRange.maxDate);
+                setAnalysisDateRangeReadyFor(product);
+            }
         } catch (e) {
             if (!isAbortError(e)) {
                 console.error(e);
@@ -239,7 +433,7 @@ export default function Dashboard() {
         finally {
             if (lastProductStatsKeyRef.current === requestKey) setStatsLoading(false);
         }
-    }, [analysisStartDate, analysisEndDate, isValidDateRange, fetchJsonWithTimeout]);
+    }, [isValidDateRange, fetchJsonWithTimeout]);
 
     const fetchProductRawData = useCallback(async (product: string) => {
         if (!isValidDateRange(analysisStartDate, analysisEndDate)) {
@@ -253,7 +447,7 @@ export default function Dashboard() {
         setPaRawLoading(true);
         try {
             const result = await fetchJsonWithTimeout(
-                `/api/data?startDate=${analysisStartDate}&endDate=${analysisEndDate}&product=${encodeURIComponent(product)}`,
+                `/api/data?startDate=${analysisStartDate}&endDate=${analysisEndDate}&product=${encodeURIComponent(product)}&unit=${unitFilter}&jobsOnly=1`,
                 MONTHLY_RAW_TIMEOUT_MS,
                 controller.signal,
             );
@@ -269,11 +463,11 @@ export default function Dashboard() {
                 setPaRawLoading(false);
             }
         }
-    }, [analysisStartDate, analysisEndDate, isValidDateRange, fetchJsonWithTimeout]);
+    }, [analysisStartDate, analysisEndDate, unitFilter, isValidDateRange, fetchJsonWithTimeout]);
 
     const buildDefectScopeKey = useCallback(() => {
-        return `${analysisStartDate}|${analysisEndDate}|${category}|${defectListMode}`;
-    }, [analysisStartDate, analysisEndDate, category, defectListMode]);
+        return `${analysisStartDate}|${analysisEndDate}|${category}|${defectListMode}|${unitFilter}`;
+    }, [analysisStartDate, analysisEndDate, category, defectListMode, unitFilter]);
 
     const buildDefectTrendKey = useCallback(
         (rsnDesc: string, unit: UnitFilter = getEffectiveUnitFilter(defectUnitFilter, category)) =>
@@ -409,7 +603,7 @@ export default function Dashboard() {
                 endDate: analysisEndDate,
                 category,
                 mode: defectListMode,
-                unit: getEffectiveUnitFilter('ALL', category),
+                unit: getEffectiveUnitFilter(unitFilter, category),
             });
             if (forceRefresh) params.set('refresh', '1');
             const result = await fetchJsonWithTimeout(
@@ -430,7 +624,7 @@ export default function Dashboard() {
                 setDefectListLoading(false);
             }
         }
-    }, [analysisStartDate, analysisEndDate, category, defectListMode, buildDefectScopeKey, isValidDateRange, fetchJsonWithTimeout]);
+    }, [analysisStartDate, analysisEndDate, category, unitFilter, defectListMode, buildDefectScopeKey, isValidDateRange, fetchJsonWithTimeout]);
 
     const fetchDefectChart = useCallback(async (
         rsnDesc: string,
@@ -494,7 +688,7 @@ export default function Dashboard() {
                 applyDefectTrendPayload({ trend, jobMetrics }, trendKey);
             }
 
-            if (!options?.prefetch && category !== 'DW') {
+            if (!options?.prefetch && !isGlazeDwCategory(category)) {
                 const siblingUnit: UnitFilter | undefined =
                     unit === 'WW_WHITE' ? 'WW_BLACK' : unit === 'WW_BLACK' ? 'WW_WHITE' : undefined;
                 if (siblingUnit) {
@@ -585,6 +779,7 @@ export default function Dashboard() {
                 endDate: analysisEndDate,
                 rsn_desc: reason.rsn_desc,
                 sub_type: reason.sub_type,
+                unit: unitFilter,
             });
             if (reason.combined_p_cps?.length) {
                 params.set('combined_p_cps', reason.combined_p_cps.join(','));
@@ -626,7 +821,7 @@ export default function Dashboard() {
                 setReasonLogLoading(false);
             }
         }
-    }, [analysisStartDate, analysisEndDate, isValidDateRange, fetchJsonWithTimeout]);
+    }, [analysisStartDate, analysisEndDate, unitFilter, isValidDateRange, fetchJsonWithTimeout]);
 
     const fetchMonthlyStats = useCallback(async (product: string) => {
         if (!isValidDateRange(analysisStartDate, analysisEndDate)) {
@@ -642,7 +837,7 @@ export default function Dashboard() {
         setMonthlyRawData([]);
         setMonthlyLoading(true);
         try {
-            const dateParams = `&startDate=${analysisStartDate}&endDate=${analysisEndDate}`;
+            const dateParams = `&startDate=${analysisStartDate}&endDate=${analysisEndDate}&unit=${unitFilter}`;
             const cpParam = monthlyCpFilter !== 'ALL' ? `&m_cp=${encodeURIComponent(monthlyCpFilter)}` : '';
             const statsResult = await fetchJsonWithTimeout(
                 `/api/monthly-stats?product=${encodeURIComponent(product)}${dateParams}${cpParam}`,
@@ -654,7 +849,7 @@ export default function Dashboard() {
             setMonthlyLoading(false);
 
             fetchJsonWithTimeout(
-                `/api/data?startDate=${analysisStartDate}&endDate=${analysisEndDate}&product=${encodeURIComponent(product)}`,
+                `/api/data?startDate=${analysisStartDate}&endDate=${analysisEndDate}&product=${encodeURIComponent(product)}&unit=${unitFilter}`,
                 MONTHLY_RAW_TIMEOUT_MS,
                 controller.signal
             ).then((rawResult) => {
@@ -679,24 +874,58 @@ export default function Dashboard() {
                 setMonthlyLoading(false);
             }
         }
-    }, [analysisStartDate, analysisEndDate, monthlyCpFilter, isValidDateRange, fetchJsonWithTimeout]);
+    }, [analysisStartDate, analysisEndDate, unitFilter, monthlyCpFilter, isValidDateRange, fetchJsonWithTimeout]);
 
     const fetchData = useCallback(async (date?: string) => {
+        dataAbortRef.current?.abort();
+        const controller = new AbortController();
+        dataAbortRef.current = controller;
         setLoading(true); setRefreshing(true);
         try {
             const url = date ? `/api/data?date=${date}` : "/api/data";
-            const res = await fetch(url);
+            const res = await fetch(url, { signal: controller.signal });
             const result = await res.json();
+            if (dataAbortRef.current !== controller) return;
             if (Array.isArray(result)) {
-                setData(result);
+                setData(normalizeDataRows(result));
                 if (result.length > 0 && !date) {
                     const latest = result[0].m_date.split("T")[0];
                     setSelectedDate(prev => prev || latest);
                 }
+            } else {
+                setData([]);
             }
-        } catch (e) { console.error(e); }
-        finally { setLoading(false); setRefreshing(false); }
+        } catch (e) {
+            if (!isAbortError(e)) console.error(e);
+        } finally {
+            if (dataAbortRef.current === controller) {
+                setLoading(false); setRefreshing(false);
+            }
+        }
     }, []);
+
+    const fetchQtyProc = useCallback(async (forceRefresh = false, silent = false) => {
+        if (!silent) setQtyProcLoading(true);
+        setQtyProcError(null);
+        try {
+            const qs = new URLSearchParams({ category: 'WW', unit: 'ALL' });
+            if (forceRefresh) qs.set('refresh', '1');
+            const result = await fetchJsonWithTimeout(`/api/qtyproc?${qs}`, QTYPROC_TIMEOUT_MS);
+            if (result?.error) {
+                setQtyProcError(String(result.error));
+                return;
+            }
+            setQtyProcPayload(result as QtyProcPayload);
+            if (!forceRefresh && result?.stale) {
+                void fetchQtyProc(true, true);
+            }
+        } catch (e) {
+            console.error(e);
+            if (!silent) setQtyProcError(e instanceof Error ? e.message : 'Production Mix failed');
+        } finally {
+            if (!silent) setQtyProcLoading(false);
+        }
+    }, [fetchJsonWithTimeout]);
 
     const handleRefresh = useCallback(async () => {
         if (view === "overview") {
@@ -709,14 +938,22 @@ export default function Dashboard() {
                 await fetchProductList(true);
                 if (selectedProduct) {
                     if (view === "product-analysis") {
-                        await Promise.all([
-                            fetchProductStats(selectedProduct),
-                            fetchProductRawData(selectedProduct),
-                        ]);
+                        const tasks: Promise<unknown>[] = [fetchProductStats(selectedProduct)];
+                        if (paRawNeeded) tasks.push(fetchProductRawData(selectedProduct));
+                        await Promise.all(tasks);
                     } else {
                         await fetchMonthlyStats(selectedProduct);
                     }
                 }
+            } finally {
+                setRefreshing(false);
+            }
+            return;
+        }
+        if (view === "qty-process") {
+            setRefreshing(true);
+            try {
+                await fetchQtyProc(true);
             } finally {
                 setRefreshing(false);
             }
@@ -748,20 +985,50 @@ export default function Dashboard() {
         fetchMonthlyStats,
         fetchDefectReasonList,
         ensureDefectTrendLoaded,
+        fetchQtyProc,
         selectedDefect,
+        paRawNeeded,
     ]);
 
     // ─── Effects ─────────────────────────────────────────────
     useEffect(() => {
+        if (view !== "overview") {
+            dataAbortRef.current?.abort();
+            return;
+        }
         if (selectedDate) fetchData(selectedDate);
         else fetchData();
-    }, [selectedDate, fetchData]);
+    }, [view, selectedDate, fetchData]);
 
     useEffect(() => {
-        if (view === "product-analysis" || view === "monthly-analysis") {
-            fetchProductList();
+        if (view !== "product-analysis" && view !== "monthly-analysis") {
+            productListAbortRef.current?.abort();
+            return;
         }
+        void fetchProductList(false);
     }, [view, fetchProductList]);
+
+    useEffect(() => {
+        if (view !== "product-analysis" && view !== "monthly-analysis") return;
+        const needsOnglaze = category === "DW_ONGLAZE" || category === "DW_ALL";
+        const hasOnglaze = productList.some((item) =>
+            String(item.value || "").startsWith(ONGLAZE_PRODUCT_PREFIX),
+        );
+        const needsUnitFlags = category === "WW" && wwTone !== "ALL";
+        const hasUnitFlags = productListHasWwUnitFlags(productList);
+        void fetchProductList(
+            (needsOnglaze && !hasOnglaze) || (needsUnitFlags && !hasUnitFlags),
+        );
+    }, [view, category, wwTone, fetchProductList]);
+
+    useEffect(() => {
+        if (view === "defect-analysis") setView("qty-process");
+    }, [view]);
+
+    useEffect(() => {
+        if (view !== "qty-process") return;
+        void fetchQtyProc(false);
+    }, [view, fetchQtyProc]);
 
     useEffect(() => {
         if (view !== "defect-analysis") return;
@@ -776,12 +1043,14 @@ export default function Dashboard() {
             setReasonLogData([]);
             setReasonMonthly([]);
             setReasonLogError(null);
+            setPaRawNeeded(false);
+            setPaRawData([]);
             return;
         }
         if (view !== "product-analysis" && view !== "monthly-analysis") return;
 
-        // Same product already ranged (e.g. switch PA ↔ MA) — allow fetches immediately.
-        if (appliedAutoDateRangeProductRef.current === selectedProduct) {
+        const appliedKey = `${selectedProduct}|${unitFilter}`;
+        if (appliedAutoDateRangeProductRef.current === appliedKey) {
             setAnalysisDateRangeReadyFor(selectedProduct);
             return;
         }
@@ -794,12 +1063,14 @@ export default function Dashboard() {
         setReasonMonthly([]);
         setReasonLogError(null);
         setReasonLogLoading(false);
-        if (view === "monthly-analysis") setMonthlyLoading(true);
+
         if (view === "product-analysis") {
             setStatsLoading(true);
-            setPaRawLoading(true);
+            void fetchProductStats(selectedProduct, { autoRange: true });
+            return;
         }
 
+        setMonthlyLoading(true);
         void (async () => {
             try {
                 const range = await fetchProductAutoDateRange(selectedProduct);
@@ -813,21 +1084,36 @@ export default function Dashboard() {
                 if (cancelled) return;
             }
             if (cancelled) return;
-            appliedAutoDateRangeProductRef.current = selectedProduct;
+            appliedAutoDateRangeProductRef.current = appliedKey;
             setAnalysisDateRangeReadyFor(selectedProduct);
         })();
 
         return () => {
             cancelled = true;
         };
-    }, [selectedProduct, view, fetchProductAutoDateRange]);
+    }, [selectedProduct, unitFilter, view, fetchProductAutoDateRange, fetchProductStats]);
 
     useEffect(() => {
         if (!selectedProduct || view !== "product-analysis") return;
         if (analysisDateRangeReadyFor !== selectedProduct) return;
+        if (appliedAutoDateRangeProductRef.current !== `${selectedProduct}|${unitFilter}`) return;
+        const stamp = `${selectedProduct}|${unitFilter}|${analysisStartDate}|${analysisEndDate}`;
+        if (autoAppliedStatsRangeRef.current === stamp) {
+            autoAppliedStatsRangeRef.current = null;
+            return;
+        }
         fetchProductStats(selectedProduct);
+    }, [selectedProduct, view, analysisDateRangeReadyFor, analysisStartDate, analysisEndDate, unitFilter, fetchProductStats]);
+
+    useEffect(() => {
+        if (!paRawNeeded || !selectedProduct || view !== "product-analysis") return;
+        if (analysisDateRangeReadyFor !== selectedProduct) return;
         fetchProductRawData(selectedProduct);
-    }, [selectedProduct, view, analysisDateRangeReadyFor, analysisStartDate, analysisEndDate, fetchProductStats, fetchProductRawData]);
+    }, [paRawNeeded, selectedProduct, view, analysisDateRangeReadyFor, analysisStartDate, analysisEndDate, fetchProductRawData]);
+
+    const requestPaRawData = useCallback(() => {
+        setPaRawNeeded(true);
+    }, []);
 
     useEffect(() => {
         if (view !== "defect-analysis" || !selectedDefect) {
@@ -858,7 +1144,6 @@ export default function Dashboard() {
     useEffect(() => {
         if (view !== "defect-analysis") return;
         setSelectedDefect("");
-        setDefectUnitFilter("WW_WHITE");
         setDefectTrendPayload({ trend: [], jobMetrics: [], products: [], wareKilns: [] });
         defectDisplayedTrendKeyRef.current = "";
     }, [view, category, defectListMode]);
@@ -881,22 +1166,14 @@ export default function Dashboard() {
             monthlyStatsAbortRef.current?.abort();
             defectListAbortRef.current?.abort();
             defectChartAbortRef.current?.abort();
+            dataAbortRef.current?.abort();
+            productListAbortRef.current?.abort();
         };
     }, []);
 
     // ─── Data Processing ─────────────────────────────────────
     const filteredData = useMemo(() => {
-        return data.map(item => {
-            let cp = item.m_cp || '';
-            if (cp === 'c') cp = 'C';
-            if (cp === 'C(FRIT&BOM)' || cp === 'Cs') cp = 'C1';
-            return { ...item, m_cp: cp };
-        }).filter(item => {
-            const part = item.m_part || '';
-            if (category === "WW") return part.startsWith("142");
-            if (category === "DW") return part.startsWith("143");
-            return true;
-        });
+        return filterByCategory(data, category);
     }, [data, category]);
 
     const aggregateMetrics = (items: DataItem[]) => {
@@ -904,9 +1181,21 @@ export default function Dashboard() {
         const specialAdjustments = new Map<string, number>();
 
         items.forEach(item => {
-            const key = `${item.m_doc}-${item.m_job}-${item.m_date}-${item.m_kiln}-${item.m_cp}`;
-            if (!uniqueGroups.has(key)) {
-                uniqueGroups.set(key, { qtyp: item.qtyp || 0, qtycomp: item.qtycomp || 0, qtyscrp: item.qtyscrp || 0, qtyrjct: item.qtyrjct || 0 });
+            const key = `${item.m_doc}|${item.m_job}|${item.m_date}|${item.m_kiln}|${item.m_cp}|${item.pt_desc1}|${item.pt_desc2 || ''}`;
+            const next = {
+                qtyp: item.qtyp || 0,
+                qtycomp: item.qtycomp || 0,
+                qtyscrp: item.qtyscrp || 0,
+                qtyrjct: item.qtyrjct || 0,
+            };
+            const existing = uniqueGroups.get(key);
+            if (!existing) {
+                uniqueGroups.set(key, next);
+            } else {
+                existing.qtyp = Math.max(existing.qtyp, next.qtyp);
+                existing.qtycomp = Math.max(existing.qtycomp, next.qtycomp);
+                existing.qtyscrp = Math.max(existing.qtyscrp, next.qtyscrp);
+                existing.qtyrjct = Math.max(existing.qtyrjct, next.qtyrjct);
             }
             if (isC1SpecialReasonForRecord(item)) {
                 specialAdjustments.set(key, (specialAdjustments.get(key) || 0) + (item.sub_qty || 0));
@@ -941,8 +1230,19 @@ export default function Dashboard() {
 
     const filteredProducts = useMemo(() => {
         const q = productSearch.toLowerCase();
-        return productList.filter(p => (p.searchText || '').toLowerCase().includes(q));
-    }, [productList, productSearch]);
+        return productList.filter((p) =>
+            productMatchesSearch(p, category, wwTone)
+            && (p.searchText || '').toLowerCase().includes(q),
+        );
+    }, [productList, productSearch, category, wwTone]);
+
+    useEffect(() => {
+        if (!selectedProduct) return;
+        if (productList.length === 0) return;
+        const item = productList.find((p) => p.value === selectedProduct);
+        if (productMatchesSearch(item ?? { value: selectedProduct }, category, wwTone)) return;
+        resetAnalysisSelection();
+    }, [category, wwTone, selectedProduct, productList, resetAnalysisSelection]);
 
     const filteredDefects = useMemo(() => {
         const query = defectSearch.toLowerCase().trim();
@@ -963,7 +1263,7 @@ export default function Dashboard() {
     const dailyMetrics = useMemo(() => {
         const dayData = filteredData.filter(item => {
             if (!item.m_date.startsWith(selectedDate)) return false;
-            const effectiveUnit = category === 'DW' ? 'ALL' : overallUnitFilter;
+            const effectiveUnit = isGlazeDwCategory(category) ? 'ALL' : overallUnitFilter;
             if (effectiveUnit === "WW_WHITE" && !(item.unit || '').startsWith("W5240")) return false;
             if (effectiveUnit === "WW_BLACK" && !(item.unit || '').startsWith("W5241")) return false;
             if (overallCpFilter !== "ALL") { if (getEffectiveCp(item) !== overallCpFilter) return false; }
@@ -974,7 +1274,7 @@ export default function Dashboard() {
 
     const weeklyMetrics = useMemo(() => {
         const weekData = filteredData.filter(item => {
-            const effectiveUnit = category === 'DW' ? 'ALL' : overallUnitFilter;
+            const effectiveUnit = isGlazeDwCategory(category) ? 'ALL' : overallUnitFilter;
             if (effectiveUnit === "WW_WHITE" && !(item.unit || '').startsWith("W5240")) return false;
             if (effectiveUnit === "WW_BLACK" && !(item.unit || '').startsWith("W5241")) return false;
             if (overallCpFilter !== "ALL") { if (getEffectiveCp(item) !== overallCpFilter) return false; }
@@ -988,7 +1288,7 @@ export default function Dashboard() {
         return dates.slice(-7).map(d => {
             const dData = filteredData.filter(item => {
                 if (!item.m_date.startsWith(d)) return false;
-                const effectiveUnit = category === 'DW' ? 'ALL' : overallUnitFilter;
+                const effectiveUnit = isGlazeDwCategory(category) ? 'ALL' : overallUnitFilter;
                 if (effectiveUnit === "WW_WHITE" && !(item.unit || '').startsWith("W5240")) return false;
                 if (effectiveUnit === "WW_BLACK" && !(item.unit || '').startsWith("W5241")) return false;
                 if (overallCpFilter !== "ALL") { if (getEffectiveCp(item) !== overallCpFilter) return false; }
@@ -1031,7 +1331,7 @@ export default function Dashboard() {
         if (!selectedDate) return [];
         return buildDailyActivityTable(filteredData, {
             date: selectedDate,
-            unitFilter: (category === 'DW' ? 'ALL' : overallUnitFilter) as UnitFilter,
+            unitFilter: (isGlazeDwCategory(category) ? 'ALL' : overallUnitFilter) as UnitFilter,
             cpFilter: overallCpFilter,
             category,
         });
@@ -1043,7 +1343,7 @@ export default function Dashboard() {
 
         filteredData
             .filter(item => {
-                const effectiveUnit = category === 'DW' ? 'ALL' : unitFilter;
+                const effectiveUnit = isGlazeDwCategory(category) ? 'ALL' : unitFilter;
                 if (effectiveUnit === "ALL") return true;
                 if (effectiveUnit === "WW_WHITE") return (item.unit || '').startsWith("W5240");
                 if (effectiveUnit === "WW_BLACK") return (item.unit || '').startsWith("W5241");
@@ -1105,10 +1405,11 @@ export default function Dashboard() {
     }, [filteredData, searchQuery, cpFilter, unitFilter, category]);
 
     const activityTable = useMemo(() => activityTableAll.slice(0, 100), [activityTableAll]);
+    const pinCodewareTitle = view === "product-analysis" || view === "monthly-analysis";
 
     // ─── Render ──────────────────────────────────────────────
     return (
-        <div className={`flex h-screen ${theme.pageBg} ${theme.textPrimary} font-sans overflow-hidden transition-colors duration-300`}>
+        <div className={`dash-skin flex h-screen ${theme.pageBg} ${theme.textPrimary} font-sans overflow-hidden transition-colors duration-300`} data-skin={skinId} data-ui-theme={currentTheme}>
             {/* Sidebar Overlay for Mobile */}
             {isSidebarOpen && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden transition-opacity duration-300" onClick={() => setSidebarOpen(false)} />
@@ -1116,9 +1417,9 @@ export default function Dashboard() {
 
             <Sidebar
                 theme={theme}
-                view={view}
+                view={view === "defect-analysis" ? "qty-process" : view}
                 isSidebarOpen={isSidebarOpen}
-                onSetView={setView}
+                onSetView={(next) => setView(next === "defect-analysis" ? "qty-process" : next)}
                 onClose={() => setSidebarOpen(false)}
             />
 
@@ -1128,8 +1429,12 @@ export default function Dashboard() {
                     currentTheme={currentTheme}
                     setCurrentTheme={setCurrentTheme}
                     view={view}
-                    category={category}
-                    setCategory={setCategory}
+                    lineFamily={lineFamily}
+                    setLineFamily={handleLineFamilyChange}
+                    wwTone={wwTone}
+                    setWwTone={handleWwToneChange}
+                    dwKind={dwKind}
+                    setDwKind={handleDwKindChange}
                     selectedDate={selectedDate}
                     setSelectedDate={setSelectedDate}
                     refreshing={refreshing}
@@ -1146,16 +1451,7 @@ export default function Dashboard() {
                     selectedProductLabel={selectedProductLabel}
                     overallCpFilter={overallCpFilter}
                     setOverallCpFilter={setOverallCpFilter}
-                    overallUnitFilter={overallUnitFilter}
-                    setOverallUnitFilter={setOverallUnitFilter}
                     cpOptions={cpOptions}
-                    monthlyCpFilter={monthlyCpFilter}
-                    setMonthlyCpFilter={setMonthlyCpFilter}
-                    monthlyCpOptions={monthlyCpOptions}
-                    analysisStartDate={analysisStartDate}
-                    setAnalysisStartDate={setAnalysisStartDate}
-                    analysisEndDate={analysisEndDate}
-                    setAnalysisEndDate={setAnalysisEndDate}
                     defectSearch={defectSearch}
                     setDefectSearch={setDefectSearch}
                     isDefectListOpen={isDefectListOpen}
@@ -1168,16 +1464,41 @@ export default function Dashboard() {
                     setDefectListMode={setDefectListMode}
                     defectListLoading={defectListLoading}
                     defectReasonCount={defectReasonList.length}
+                    qtyProcYear={qtyProcYear}
+                    setQtyProcYear={setQtyProcYear}
+                    qtyProcLine={qtyProcLine}
+                    setQtyProcLine={setQtyProcLine}
+                    qtyProcCp={qtyProcCp}
+                    setQtyProcCp={setQtyProcCp}
+                    qtyProcScope={qtyProcScope}
+                    setQtyProcScope={(next) => {
+                        setQtyProcScope(next);
+                        if (next === 'ff' && pRoundOf(qtyProcCp)) setQtyProcCp('all');
+                    }}
+                    qtyProcShape={qtyProcShape}
+                    setQtyProcShape={setQtyProcShape}
+                    qtyProcForming={qtyProcForming}
+                    setQtyProcForming={setQtyProcForming}
+                    qtyProcCustomer={qtyProcCustomer}
+                    setQtyProcCustomer={setQtyProcCustomer}
+                    qtyProcGlaze={qtyProcGlaze}
+                    setQtyProcGlaze={setQtyProcGlaze}
+                    qtyProcShapeKeys={qtyProcShapeKeys}
+                    qtyProcFormingKeys={qtyProcFormingKeys}
+                    qtyProcCustomerKeys={qtyProcCustomerKeys}
                 />
+                {!pinCodewareTitle && <div className="dash-skin-bar" />}
 
-                <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-8 space-y-6 sm:space-y-8 md:space-y-10 min-h-0">
-                    {((loading && view === "overview") || (view === "monthly-analysis" && monthlyLoading && !monthlyStats)) ? (
+                <div className={`flex-1 overflow-y-auto overflow-x-hidden min-h-0 ${
+                    pinCodewareTitle
+                        ? 'pt-0 px-3 sm:px-4 md:px-8 pb-3 sm:pb-4 md:pb-8'
+                        : 'p-3 sm:p-4 md:p-8'
+                } space-y-6 sm:space-y-8 md:space-y-10 ${skinFadeOn ? 'dash-fade' : ''}`}>
+                    {((loading && view === "overview")) ? (
                         <div className="flex flex-col items-center justify-center h-64 space-y-4">
-                            <div className={`w-12 h-12 border-4 ${theme.badgeBorder} border-t-blue-500 rounded-full animate-spin`} />
+                            <div className={`w-12 h-12 border-4 ${theme.badgeBorder} skin-accent-spinner rounded-full animate-spin`} />
                             <p className={`${theme.textMuted} font-medium animate-pulse`}>
-                                {view === "overview" ? "Fetching latest sorting data..." :
-                                    view === "monthly-analysis" ? "Aggregating monthly statistics..." :
-                                        "Loading..."}
+                                Fetching latest sorting data...
                             </p>
                         </div>
                     ) : view === "overview" ? (
@@ -1197,19 +1518,16 @@ export default function Dashboard() {
                             cpFilter={cpFilter}
                             setCpFilter={setCpFilter}
                             unitFilter={unitFilter}
-                            setUnitFilter={setUnitFilter}
                             searchQuery={searchQuery}
                             setSearchQuery={setSearchQuery}
                             cpOptions={cpOptions}
                             overallCpFilter={overallCpFilter}
                             setOverallCpFilter={setOverallCpFilter}
-                            overallUnitFilter={overallUnitFilter}
-                            setOverallUnitFilter={setOverallUnitFilter}
                             setSelectedDate={setSelectedDate}
-                            category={category}
                         />
                     ) : view === "product-analysis" ? (
                         <ProductAnalysisView
+                            key={analysisViewResetKey}
                             theme={theme}
                             currentTheme={currentTheme}
                             selectedProduct={selectedProduct}
@@ -1232,35 +1550,45 @@ export default function Dashboard() {
                             setAnalysisStartDate={setAnalysisStartDate}
                             analysisEndDate={analysisEndDate}
                             setAnalysisEndDate={setAnalysisEndDate}
+                            onNeedPaRawData={requestPaRawData}
+                            unitFilter={unitFilter}
                         />
                     ) : view === "monthly-analysis" ? (
                         <MonthlyAnalysisView
+                            key={analysisViewResetKey}
                             theme={theme}
                             currentTheme={currentTheme}
                             selectedProduct={selectedProduct}
                             selectedProductLabel={selectedProductLabel}
                             monthlyStats={monthlyStats}
+                            monthlyLoading={monthlyLoading}
                             showMonthlyReject={showMonthlyReject}
                             setShowMonthlyReject={setShowMonthlyReject}
                             allData={monthlyRawData}
                             cpOptions={['ALL', ...monthlyCpOptions]}
-                        />
-                    ) : view === "defect-analysis" ? (
-                        <DefectAnalysisView
-                            theme={theme}
-                            currentTheme={currentTheme}
-                            category={category}
-                            defectMode={defectListMode}
-                            selectedDefect={selectedDefect}
-                            selectedDefectLabel={selectedDefectLabel}
-                            trendPayload={defectTrendPayload}
-                            chartPending={defectChartPending}
-                            breakdownUnitFilter={defectUnitFilter}
-                            setBreakdownUnitFilter={setDefectUnitFilter}
+                            monthlyCpFilter={monthlyCpFilter}
+                            setMonthlyCpFilter={setMonthlyCpFilter}
                             analysisStartDate={analysisStartDate}
                             setAnalysisStartDate={setAnalysisStartDate}
                             analysisEndDate={analysisEndDate}
                             setAnalysisEndDate={setAnalysisEndDate}
+                        />
+                    ) : view === "qty-process" || view === "defect-analysis" ? (
+                        <QtyProcessView
+                            theme={theme}
+                            currentTheme={currentTheme}
+                            payload={qtyProcPayload}
+                            loading={qtyProcLoading}
+                            error={qtyProcError}
+                            categoryLabel={qtyProcLine === 'all' ? 'WW' : qtyProcLine === 'WHITE' ? 'WW · White' : 'WW · Black'}
+                            year={qtyProcYear}
+                            line={qtyProcLine}
+                            cp={qtyProcCp}
+                            scope={qtyProcScope}
+                            shape={qtyProcShape}
+                            forming={qtyProcForming}
+                            customer={qtyProcCustomer}
+                            glaze={qtyProcGlaze}
                         />
                     ) : (
                         <SettingsView

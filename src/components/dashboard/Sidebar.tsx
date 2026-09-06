@@ -1,8 +1,9 @@
 "use client";
 
-import { LayoutDashboard, BarChart3, Settings, TrendingUp, LineChart, X, ChevronLeft } from 'lucide-react';
+import { LayoutDashboard, BarChart3, Settings, TrendingUp, PieChart, X, ChevronLeft } from 'lucide-react';
 import type { Theme } from '@/lib/themes';
 import type { ViewType } from '@/types/dashboard';
+import { QTYPROC_PAGE_TITLE } from '@/lib/qtyproc';
 
 interface SidebarProps {
     theme: Theme;
@@ -64,12 +65,12 @@ export function Sidebar({ theme, view, isSidebarOpen, onSetView, onClose }: Side
                     {isSidebarOpen && <span className={view === "monthly-analysis" ? "font-semibold" : "font-medium"}>Monthly Analysis</span>}
                 </button>
                 <button
-                    onClick={() => handleNav("defect-analysis")}
-                    className={`w-full flex items-center gap-3 sm:gap-4 px-3 sm:px-4 py-3 rounded-xl transition-all touch-manipulation ${view === "defect-analysis" ? `${theme.accentBg} text-white shadow-lg ${theme.accentShadow}` : `${theme.textSecondary} hover:${theme.tableRowHover}`}`}
-                    title="Defect Analysis"
+                    onClick={() => handleNav("qty-process")}
+                    className={`w-full flex items-center gap-3 sm:gap-4 px-3 sm:px-4 py-3 rounded-xl transition-all touch-manipulation ${view === "qty-process" ? `${theme.accentBg} text-white shadow-lg ${theme.accentShadow}` : `${theme.textSecondary} hover:${theme.tableRowHover}`}`}
+                    title={QTYPROC_PAGE_TITLE}
                 >
-                    <LineChart size={20} />
-                    {isSidebarOpen && <span className={view === "defect-analysis" ? "font-semibold" : "font-medium"}>Defect Analysis</span>}
+                    <PieChart size={20} />
+                    {isSidebarOpen && <span className={view === "qty-process" ? "font-semibold" : "font-medium"}>{QTYPROC_PAGE_TITLE}</span>}
                 </button>
             </nav>
 

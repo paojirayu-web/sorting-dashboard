@@ -4,6 +4,8 @@ import type { Theme, ThemeName } from '@/lib/themes';
 import type { GroupedRow } from '@/types/dashboard';
 import { formatProductDescription, formatDateDisplay } from '@/lib/utils';
 import { computeSortingLogTotals } from './sorting-log-utils';
+import { KilnBadge, KilnName } from './KilnBadge';
+import { dwDesc1Color, isDwCodeware } from '@/lib/sort-source';
 
 interface QtyGradeSortingLogProps {
     rows: GroupedRow[];
@@ -105,17 +107,26 @@ export function QtyGradeSortingLog({
                     const compRate = item.qtyp > 0 ? (item.qtycomp / item.qtyp) * 100 : 0;
                     const scrapRate = item.qtyp > 0 ? (item.totalScrap / item.qtyp) * 100 : 0;
                     const rejectRate = item.qtyp > 0 ? (item.totalReject / item.qtyp) * 100 : 0;
+                    const desc1Color = dwDesc1Color(item, !isDark);
+                    const isDw = isDwCodeware(item);
                     return (
                         <div
                             key={`${item.m_doc}-${item.m_job}-${idx}`}
                             onClick={onRowClick ? () => onRowClick(item) : undefined}
                             className={`p-2 rounded-lg border ${theme.borderColor} ${theme.cardBg} ${onRowClick ? 'cursor-pointer hover:opacity-90 transition-opacity' : ''}`}
                         >
-                            <p className={`text-sm font-bold ${theme.textWhite}`}>
+                            <p
+                                className={`text-sm font-bold ${desc1Color ? '' : theme.textWhite}`}
+                                style={desc1Color ? { color: desc1Color } : undefined}
+                            >
                                 {formatProductDescription(item.pt_desc1)}
                             </p>
+                            {isDw && item.pt_desc2 && (
+                                <p className={`text-[10px] font-medium ${theme.textWhite}`}>{item.pt_desc2}</p>
+                            )}
                             <p className={`text-[10px] ${theme.textMuted} mt-0.5`}>
-                                {formatDateDisplay(item.m_date)} · {item.m_cp} · {item.m_kiln}
+                                {formatDateDisplay(item.m_date)} · {item.m_cp} ·{' '}
+                                <KilnName item={item} isLight={!isDark} className="font-bold" />
                             </p>
                             <div className="grid grid-cols-4 gap-1 mt-1 text-center text-[10px]">
                                 <div>
@@ -248,9 +259,8 @@ export function QtyGradeSortingLog({
                             const compRate = item.qtyp > 0 ? (item.qtycomp / item.qtyp) * 100 : 0;
                             const scrapRate = item.qtyp > 0 ? (item.totalScrap / item.qtyp) * 100 : 0;
                             const rejectRate = item.qtyp > 0 ? (item.totalReject / item.qtyp) * 100 : 0;
-                            const isDw =
-                                (item.pt_desc1 || '').startsWith('143') ||
-                                (item.m_part || '').startsWith('143');
+                            const isDw = isDwCodeware(item);
+                            const desc1Color = dwDesc1Color(item, !isDark);
 
                             return (
                                 <tr
@@ -262,15 +272,14 @@ export function QtyGradeSortingLog({
                                         className={stickyCell('left-0', 'z-20', bgRow, 'px-4 py-1.5')}
                                     >
                                         <div
-                                            className={`text-xs font-bold leading-tight ${theme.textWhite}`}
+                                            className={`text-xs font-bold leading-tight ${desc1Color ? '' : theme.textWhite}`}
+                                            style={desc1Color ? { color: desc1Color } : undefined}
                                             title={item.pt_desc1}
                                         >
                                             {formatProductDescription(item.pt_desc1)}
                                         </div>
                                         {isDw && item.pt_desc2 && (
-                                            <div
-                                                className={`text-[10px] leading-tight ${currentTheme === 'dark' ? 'text-orange-400' : 'text-orange-600'}`}
-                                            >
+                                            <div className={`text-[10px] leading-tight ${theme.textWhite}`}>
                                                 {item.pt_desc2}
                                             </div>
                                         )}
@@ -292,11 +301,11 @@ export function QtyGradeSortingLog({
                                     <td
                                         className={stickyCell('left-[370px]', 'z-20', bgRow, 'px-3 py-1.5')}
                                     >
-                                        <span
-                                            className={`inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold ${theme.badgeBg} ${theme.accentText} border ${theme.badgeBorder}`}
-                                        >
-                                            {item.m_kiln}
-                                        </span>
+                                        <KilnBadge
+                                            item={item}
+                                            isLight={!isDark}
+                                            className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold border"
+                                        />
                                     </td>
                                     <td className={`${metricCell} font-medium ${theme.textPrimary}`}>
                                         {item.qtyp.toLocaleString()}

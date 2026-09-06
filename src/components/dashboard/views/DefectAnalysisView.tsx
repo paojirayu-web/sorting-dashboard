@@ -13,7 +13,8 @@ import {
     XAxis,
     YAxis,
 } from 'recharts';
-import type { Theme, ThemeName } from '@/lib/themes';
+import { SKIN_ACCENT, type Theme, type ThemeName } from '@/lib/themes';
+import { isGlazeDwCategory } from '@/lib/sort-source';
 import {
     BREAKDOWN_PANEL_TOP_N,
     BREAKDOWN_MIN_QTYPROC,
@@ -36,6 +37,7 @@ interface DefectAnalysisViewProps {
     theme: Theme;
     currentTheme: ThemeName;
     category: string;
+    categoryLabel?: string;
     defectMode: DefectListMode;
     selectedDefect: string;
     selectedDefectLabel: string;
@@ -108,7 +110,7 @@ function TrendTooltip({
                     </p>
                 </div>
                 <div>
-                    <p className="text-blue-500 font-semibold">
+                    <p className="font-semibold skin-accent-text">
                         {row.defectPct != null ? `${row.defectPct}%` : '—'} · Defect / output
                     </p>
                     <p className={isDark ? 'text-zinc-400' : 'text-gray-500'}>
@@ -151,7 +153,7 @@ function DefectTrendDot({
             cx={cx}
             cy={cy}
             r={radius}
-            fill="#2563eb"
+            fill={SKIN_ACCENT}
             stroke="#ffffff"
             strokeWidth={1.5}
             style={{ cursor: 'pointer' }}
@@ -189,7 +191,6 @@ function BreakdownWareLabel({
     labelSub,
     mCp,
     theme,
-    isDark,
 }: {
     label: string;
     labelSub?: string;
@@ -197,7 +198,8 @@ function BreakdownWareLabel({
     theme: Theme;
     isDark: boolean;
 }) {
-    const subColor = isDark ? 'text-orange-400' : 'text-orange-600';
+    const subColor = theme.textWhite;
+    const titleColor = labelSub ? theme.accentText : theme.textWhite;
     const cpBadge = mCp ? (
         <span
             className={`shrink-0 text-[9px] font-bold px-1 py-px rounded border ${theme.badgeBg} ${theme.badgeBorder} ${theme.textMuted}`}
@@ -210,7 +212,7 @@ function BreakdownWareLabel({
     if (!labelSub) {
         return (
             <div className="flex items-center gap-1 min-w-0" title={mCp ? `${label} (${mCp})` : label}>
-                <p className={`text-[11px] font-medium truncate ${theme.textWhite}`}>{label}</p>
+                <p className={`text-[11px] font-medium truncate ${titleColor}`}>{label}</p>
                 {cpBadge}
             </div>
         );
@@ -219,7 +221,7 @@ function BreakdownWareLabel({
     return (
         <div className="min-w-0" title={mCp ? `${label}\n${labelSub}\nC/P: ${mCp}` : `${label}\n${labelSub}`}>
             <div className="flex items-center gap-1 min-w-0">
-                <p className={`text-[11px] font-medium truncate leading-tight ${theme.textWhite}`}>{label}</p>
+                <p className={`text-[11px] font-medium truncate leading-tight ${titleColor}`}>{label}</p>
                 {cpBadge}
             </div>
             <p className={`text-[10px] font-medium truncate leading-tight ${subColor}`}>{labelSub}</p>
@@ -429,7 +431,7 @@ function BreakdownPanel({
     kilnLoadingKeys: ReadonlySet<string>;
     onWareClick: (row: DefectMonthlyBreakdownRow) => void;
 }) {
-    const showUnitTabs = category !== 'DW';
+    const showUnitTabs = false;
 
     return (
         <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl overflow-hidden shadow-lg h-full flex flex-col min-h-0`}>
@@ -499,6 +501,7 @@ export function DefectAnalysisView({
     theme,
     currentTheme,
     category,
+    categoryLabel: categoryLabelProp,
     defectMode,
     selectedDefect,
     selectedDefectLabel,
@@ -552,7 +555,7 @@ export function DefectAnalysisView({
 
     const prefetchMonthBreakdown = useCallback(
         async (month: string, unit: UnitFilter) => {
-            if (!selectedDefect || category === 'DW') return;
+            if (!selectedDefect || isGlazeDwCategory(category)) return;
             const cacheKey = getMonthCacheKey(month, unit);
             if (monthProductsCacheRef.current.has(cacheKey)) return;
 
@@ -758,7 +761,7 @@ export function DefectAnalysisView({
     }, [selectedMonth, breakdownUnitFilter, loadMonthBreakdown, chartPending]);
 
     useEffect(() => {
-        if (chartPending || !selectedDefect || category === 'DW') return;
+        if (chartPending || !selectedDefect || isGlazeDwCategory(category)) return;
         const months = trend.chartData.map((row) => row.month).sort((a, b) => b.localeCompare(a));
         if (months.length === 0) return;
 
@@ -806,7 +809,7 @@ export function DefectAnalysisView({
     const isDark = currentTheme === 'dark';
     const selectClass = isDark ? 'bg-[#1f1f1f] text-white' : 'bg-white text-gray-900';
     const defectLabel = defectMode === 'scrap' ? 'Scrap' : 'Reject';
-    const categoryLabel = category === 'ALL' ? 'ALL' : category;
+    const categoryLabel = categoryLabelProp ?? (category === 'ALL' ? 'All' : category);
 
     const panelRows = useMemo(() => {
         if (!selectedMonth) return [];
@@ -914,7 +917,7 @@ export function DefectAnalysisView({
                                     ? 'Loading chart…'
                                     : [
                                           mCpFilter === 'ALL' ? null : `C/P ${mCpFilter}`,
-                                          category !== 'DW' ? UNIT_LABELS[breakdownUnitFilter] : null,
+                                          breakdownUnitFilter !== 'ALL' ? UNIT_LABELS[breakdownUnitFilter] : null,
                                           'คลิกจุดบนเส้น Defect % เพื่อเลือกเดือน',
                                       ]
                                           .filter(Boolean)
@@ -983,7 +986,7 @@ export function DefectAnalysisView({
                                                 yAxisId="defect"
                                                 orientation="right"
                                                 width={TREND_CHART_Y_WIDTH}
-                                                tick={{ fill: '#2563eb', fontSize: 10 }}
+                                                tick={{ fill: SKIN_ACCENT, fontSize: 10 }}
                                                 axisLine={false}
                                                 tickLine={false}
                                                 domain={[0, defectAxisMax]}
@@ -994,7 +997,7 @@ export function DefectAnalysisView({
                                                     angle: 90,
                                                     position: 'insideRight',
                                                     offset: 6,
-                                                    style: { fill: '#2563eb', fontSize: 10, fontWeight: 600 },
+                                                    style: { fill: SKIN_ACCENT, fontSize: 10, fontWeight: 600 },
                                                 }}
                                             />
                                             <Tooltip
@@ -1027,7 +1030,7 @@ export function DefectAnalysisView({
                                                 type="monotone"
                                                 dataKey="defectPct"
                                                 name="Defect %"
-                                                stroke="#2563eb"
+                                                stroke={SKIN_ACCENT}
                                                 strokeWidth={2}
                                                 strokeDasharray="5 5"
                                                 dot={(props: { cx?: number; cy?: number; payload?: DefectChartRow }) => (

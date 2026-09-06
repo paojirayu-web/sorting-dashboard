@@ -1,19 +1,23 @@
 "use client";
 
-import { X, AlertCircle, XCircle } from 'lucide-react';
+import { X, AlertCircle, XCircle, Loader2 } from 'lucide-react';
 import type { Theme } from '@/lib/themes';
 import type { GroupedRow } from '@/types/dashboard';
 import { formatProductDescription, formatDateDisplay } from '@/lib/utils';
 import { ReasonDetailList } from '@/components/dashboard/ReasonDetailList';
+import { KilnName } from '@/components/dashboard/KilnBadge';
+import { dwDesc1Color } from '@/lib/sort-source';
 
 interface DailyDetailModalProps {
     row: GroupedRow;
     theme: Theme;
     currentTheme: string;
     onClose: () => void;
+    reasonsLoading?: boolean;
 }
 
-export function DailyDetailModal({ row, theme, currentTheme, onClose }: DailyDetailModalProps) {
+export function DailyDetailModal({ row, theme, currentTheme, onClose, reasonsLoading = false }: DailyDetailModalProps) {
+    const desc1Color = dwDesc1Color(row, currentTheme === 'light');
     return (
         <>
             <div className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-sm" onClick={onClose} />
@@ -21,13 +25,18 @@ export function DailyDetailModal({ row, theme, currentTheme, onClose }: DailyDet
                 {/* Modal Header */}
                 <div className={`flex items-start justify-between px-4 sm:px-6 py-4 sm:py-5 border-b ${theme.borderColor} shrink-0 gap-3`}>
                     <div className="min-w-0 flex-1">
-                        <h2 className={`text-sm sm:text-base font-bold ${theme.textWhite} break-words`}>{formatProductDescription(row.pt_desc1)}</h2>
-                        {((row.pt_desc1 || '').startsWith('143') || (row.m_part || '').startsWith('143')) && row.pt_desc2 && (
-                            <p className={`text-xs ${currentTheme === "dark" ? "text-orange-400" : "text-orange-600"} font-medium mt-0.5 break-words`}>{row.pt_desc2}</p>
+                        <h2
+                            className={`text-sm sm:text-base font-bold break-words ${desc1Color ? '' : theme.textWhite}`}
+                            style={desc1Color ? { color: desc1Color } : undefined}
+                        >
+                            {formatProductDescription(row.pt_desc1)}
+                        </h2>
+                        {row.pt_desc2 && (
+                            <p className={`text-xs ${theme.textWhite} font-medium mt-0.5 break-words`}>{row.pt_desc2}</p>
                         )}
                         <p className={`text-[10px] sm:text-xs ${theme.textMuted} mt-1.5 flex flex-wrap gap-x-2 gap-y-1`}>
                             <span>{row.m_doc}</span>
-                            <span className={`font-bold ${theme.accentText}`}>{row.m_kiln}</span>
+                            <KilnName item={row} isLight={currentTheme === 'light'} />
                             <span>CP: <span className="font-bold">{row.m_cp}</span></span>
                             <span>{formatDateDisplay(row.m_date)}</span>
                             <span className="break-all">{row.m_job} | {row.m_part}</span>
@@ -156,7 +165,13 @@ export function DailyDetailModal({ row, theme, currentTheme, onClose }: DailyDet
                         </div>
                     )}
 
-                    {row.cdReasons.size === 0 && row.pjReasons.size === 0 && (
+                    {reasonsLoading && row.cdReasons.size === 0 && row.pjReasons.size === 0 && (
+                        <div className={`py-12 text-center ${theme.textMuted} text-sm flex flex-col items-center gap-2`}>
+                            <Loader2 size={20} className={`animate-spin ${theme.accentText}`} />
+                            Loading defect details…
+                        </div>
+                    )}
+                    {!reasonsLoading && row.cdReasons.size === 0 && row.pjReasons.size === 0 && (
                         <div className={`py-12 text-center ${theme.textMuted} text-sm`}>No defect detail data available</div>
                     )}
                 </div>

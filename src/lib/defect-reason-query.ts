@@ -1,5 +1,8 @@
-import { getConnection, sql } from '@/lib/db';
-import { buildCategoryPartSql, buildSubTypSql, C1_SPECIAL_REASON_SQL_EXCLUDE, type DefectListMode } from '@/lib/defect-category-sql';
+import { sql } from '@/lib/db';
+import { CATEGORY_SQL_TOKEN, CATEGORY_SQL_V_TOKEN, buildSubTypSql, C1_SPECIAL_REASON_SQL_EXCLUDE, type DefectListMode } from '@/lib/defect-category-sql';
+import { mergeSumByKeys, querySortSources } from '@/lib/sort-query';
+import { bindIsoDate } from '@/lib/sql-params';
+import { SORT_VIEW_TOKEN, sourcesForCategory, type SortSourceId } from '@/lib/sort-source';
 import { buildUnitFilterSql, type UnitFilter } from '@/lib/unit-filter';
 import type { DefectReasonItem } from '@/types/dashboard';
 
@@ -57,71 +60,74 @@ export async function queryDefectReasonList(
     mode: DefectListMode,
     unitFilter: UnitFilter = 'ALL',
 ): Promise<DefectReasonItem[]> {
-    const pool = await getConnection();
-    const categorySql = buildCategoryPartSql(category);
     const subTypSql = buildSubTypSql(mode);
     const unitSql = buildUnitFilterSql(unitFilter, category);
+    const sources = sourcesForCategory(category);
 
-    const result = await pool
-        .request()
-        .input('startDate', sql.Date, startDate)
-        .input('endDate', sql.Date, endDate)
-        .query(`
+    const result = await querySortSources<{ rsn_desc: string; qty: number }>(
+        `
             SELECT
                 RTRIM(LTRIM(rsn_desc)) AS rsn_desc,
                 SUM(sub_qty) AS qty
-            FROM dbo.v_rpt_sort_1 WITH (NOLOCK)
+            FROM ${SORT_VIEW_TOKEN} WITH (NOLOCK)
             WHERE m_date >= @startDate
                 AND m_date < DATEADD(day, 1, @endDate)
                 AND rsn_desc IS NOT NULL
                 AND RTRIM(LTRIM(rsn_desc)) != ''
-                AND ${categorySql}
+                AND ${CATEGORY_SQL_TOKEN}
                 AND ${C1_SPECIAL_REASON_SQL_EXCLUDE}
                 AND ${subTypSql}
                 AND ${unitSql}
             GROUP BY RTRIM(LTRIM(rsn_desc))
             HAVING SUM(sub_qty) > 0
             ORDER BY SUM(sub_qty) DESC
-        `);
+        `,
+        {
+            sources,
+            category,
+            bind: (req) => {
+                bindIsoDate(req, 'startDate', startDate);
+                bindIsoDate(req, 'endDate', endDate);
+            },
+        },
+    );
 
-    return (result.recordset as { rsn_desc: string; qty: number }[])
+    return mergeSumByKeys(result.recordset, ['rsn_desc'], ['qty'])
         .map((row) => {
-            const label = row.rsn_desc.trim();
+            const label = (row.rsn_desc || '').trim();
             return {
                 value: label,
                 label,
                 searchText: label,
                 qty: Number(row.qty) || 0,
             };
-        });
+        })
+        .filter((row) => row.value && row.qty > 0)
+        .sort((a, b) => b.qty - a.qty);
 }
 
 async function queryDefectTrendRecords(
-    pool: Awaited<ReturnType<typeof getConnection>>,
+    sources: SortSourceId[],
     startDate: string,
     endDate: string,
-    categorySql: string,
+    category: string,
     subTypSql: string,
     unitSql: string,
     rsnDesc: string,
 ): Promise<DefectTrendRecord[]> {
-    const result = await pool
-        .request()
-        .input('startDate', sql.Date, startDate)
-        .input('endDate', sql.Date, endDate)
-        .input('rsnDesc', sql.NVarChar, rsnDesc)
-        .query(`
+    const result = await querySortSources<DefectTrendRecord>(
+        `
             SELECT
                 LEFT(CONVERT(VARCHAR(10), CAST(m_date AS date), 120), 7) AS month,
                 UPPER(RTRIM(LTRIM(m_cp))) AS m_cp,
                 RTRIM(LTRIM(m_user)) AS m_user,
                 RTRIM(LTRIM(sub_typ)) AS sub_typ,
                 SUM(sub_qty) AS sub_qty
-            FROM dbo.v_rpt_sort_1 WITH (NOLOCK)
+            FROM ${SORT_VIEW_TOKEN} WITH (NOLOCK)
             WHERE m_date >= @startDate
                 AND m_date < DATEADD(day, 1, @endDate)
                 AND RTRIM(LTRIM(rsn_desc)) = @rsnDesc
-                AND ${categorySql}
+                AND ${CATEGORY_SQL_TOKEN}
                 AND ${C1_SPECIAL_REASON_SQL_EXCLUDE}
                 AND ${subTypSql}
                 AND ${unitSql}
@@ -132,9 +138,19 @@ async function queryDefectTrendRecords(
                 RTRIM(LTRIM(sub_typ))
             HAVING SUM(sub_qty) > 0
             ORDER BY month
-        `);
+        `,
+        {
+            sources,
+            category,
+            bind: (req) => {
+                bindIsoDate(req, 'startDate', startDate);
+                bindIsoDate(req, 'endDate', endDate);
+                req.input('rsnDesc', sql.NVarChar, rsnDesc);
+            },
+        },
+    );
 
-    return (result.recordset as DefectTrendRecord[]).map((row) => ({
+    return mergeSumByKeys(result.recordset, ['month', 'm_cp', 'm_user', 'sub_typ'], ['sub_qty']).map((row) => ({
         month: row.month,
         m_cp: row.m_cp || '',
         m_user: row.m_user || '',
@@ -144,17 +160,14 @@ async function queryDefectTrendRecords(
 }
 
 async function queryMonthlyJobMetrics(
-    pool: Awaited<ReturnType<typeof getConnection>>,
+    sources: SortSourceId[],
     startDate: string,
     endDate: string,
-    categorySql: string,
+    category: string,
     unitSql: string,
 ): Promise<DefectJobMetricRow[]> {
-    const result = await pool
-        .request()
-        .input('startDate', sql.Date, startDate)
-        .input('endDate', sql.Date, endDate)
-        .query(`
+    const result = await querySortSources<DefectJobMetricRow>(
+        `
             SELECT
                 month,
                 m_cp,
@@ -170,10 +183,10 @@ async function queryMonthlyJobMetrics(
                     MAX(qtyp) AS job_qtyp,
                     MAX(qtyscrp) AS job_scrap,
                     MAX(qtyrjct) AS job_reject
-                FROM dbo.v_rpt_sort_1 WITH (NOLOCK)
+                FROM ${SORT_VIEW_TOKEN} WITH (NOLOCK)
                 WHERE m_date >= @startDate
                     AND m_date < DATEADD(day, 1, @endDate)
-                    AND ${categorySql}
+                    AND ${CATEGORY_SQL_TOKEN}
                     AND ${unitSql}
                 GROUP BY
                     CAST(m_date AS date),
@@ -183,9 +196,18 @@ async function queryMonthlyJobMetrics(
                     UPPER(RTRIM(LTRIM(m_cp)))
             ) jobs
             GROUP BY month, m_cp, m_user
-        `);
+        `,
+        {
+            sources,
+            category,
+            bind: (req) => {
+                bindIsoDate(req, 'startDate', startDate);
+                bindIsoDate(req, 'endDate', endDate);
+            },
+        },
+    );
 
-    return (result.recordset as DefectJobMetricRow[]).map((row) => ({
+    return mergeSumByKeys(result.recordset, ['month', 'm_cp', 'm_user'], ['qtyp', 'qtyscrp', 'qtyrjct']).map((row) => ({
         month: row.month,
         m_cp: row.m_cp || '',
         m_user: row.m_user || '',
@@ -232,7 +254,7 @@ function bindQueryDateRange(
     queryStart: string,
     queryEnd: string,
 ): sql.Request {
-    return request.input('queryStart', sql.Date, queryStart).input('queryEnd', sql.Date, queryEnd);
+    return bindIsoDate(bindIsoDate(request, 'queryStart', queryStart), 'queryEnd', queryEnd);
 }
 
 const QUERY_DATE_RANGE_SQL = 'm_date >= @queryStart AND m_date < DATEADD(day, 1, @queryEnd)';
@@ -251,10 +273,10 @@ function attachQtyprocToProducts(
 }
 
 async function queryBulkWareQtyproc(
-    pool: Awaited<ReturnType<typeof getConnection>>,
+    sources: SortSourceId[],
     startDate: string,
     endDate: string,
-    categorySql: string,
+    category: string,
     unitSql: string,
     productsBase: Omit<DefectProductMonthRow, 'qtyproc'>[],
     month?: string,
@@ -265,19 +287,22 @@ async function queryBulkWareQtyproc(
 
     const { queryStart, queryEnd, singleMonth } = resolveQueryDateRange(startDate, endDate, month);
     const ptDesc1In = ptDesc1Set.map((value) => `N'${escapeSqlLiteral(value)}'`).join(', ');
-    const categoryFilter = categorySql.replace(/\bm_part\b/g, 'v.m_part');
     const unitFilter = unitSql.replace(/\bunit\b/g, 'v.unit');
-
-    const request = bindQueryDateRange(pool.request(), queryStart, queryEnd);
-    if (singleMonth) request.input('singleMonth', sql.NVarChar, singleMonth);
 
     const monthSelect = singleMonth
         ? '@singleMonth AS month'
         : 'LEFT(CONVERT(VARCHAR(10), job_date, 120), 7) AS month';
     const monthOuterGroup = singleMonth ? '' : 'LEFT(CONVERT(VARCHAR(10), job_date, 120), 7),';
 
-    // Dedup once per job (m_date/m_doc/m_job/m_kiln); product attrs are constant per job.
-    const result = await request.query(`
+    const result = await querySortSources<{
+        month: string;
+        pt_desc1: string;
+        pt_desc2: string;
+        m_cp: string;
+        m_user: string;
+        qtyproc: number;
+    }>(
+        `
             SELECT
                 ${monthSelect},
                 pt_desc1,
@@ -293,13 +318,13 @@ async function queryBulkWareQtyproc(
                     MAX(UPPER(RTRIM(LTRIM(v.m_cp)))) AS m_cp,
                     MAX(RTRIM(LTRIM(v.m_user))) AS m_user,
                     MAX(v.qtyp) AS job_qtyp
-                FROM dbo.v_rpt_sort_1 v WITH (NOLOCK)
+                FROM ${SORT_VIEW_TOKEN} v WITH (NOLOCK)
                 WHERE v.m_date >= @queryStart
                     AND v.m_date < DATEADD(day, 1, @queryEnd)
                     AND v.pt_desc1 IS NOT NULL
                     AND RTRIM(LTRIM(v.pt_desc1)) != ''
                     AND RTRIM(LTRIM(v.pt_desc1)) IN (${ptDesc1In})
-                    AND ${categoryFilter}
+                    AND ${CATEGORY_SQL_V_TOKEN}
                     AND ${unitFilter}
                 GROUP BY
                     CAST(v.m_date AS date),
@@ -313,28 +338,30 @@ async function queryBulkWareQtyproc(
                 pt_desc2,
                 m_cp,
                 m_user
-        `);
+        `,
+        {
+            sources,
+            category,
+            bind: (req) => {
+                bindQueryDateRange(req, queryStart, queryEnd);
+                if (singleMonth) req.input('singleMonth', sql.NVarChar, singleMonth);
+            },
+        },
+    );
 
-    (result.recordset as {
-        month: string;
-        pt_desc1: string;
-        pt_desc2: string;
-        m_cp: string;
-        m_user: string;
-        qtyproc: number;
-    }[]).forEach((row) => {
+    result.recordset.forEach((row) => {
         const key = [row.month, row.pt_desc1, row.pt_desc2, row.m_cp, row.m_user].join('\0');
-        byKey.set(key, Number(row.qtyproc) || 0);
+        byKey.set(key, (byKey.get(key) || 0) + (Number(row.qtyproc) || 0));
     });
 
     return byKey;
 }
 
 async function queryDefectProductBreakdown(
-    pool: Awaited<ReturnType<typeof getConnection>>,
+    sources: SortSourceId[],
     startDate: string,
     endDate: string,
-    categorySql: string,
+    category: string,
     subTypSql: string,
     unitSql: string,
     rsnDesc: string,
@@ -348,10 +375,8 @@ async function queryDefectProductBreakdown(
         ? ''
         : 'LEFT(CONVERT(VARCHAR(10), CAST(m_date AS date), 120), 7),';
 
-    const request = bindQueryDateRange(pool.request(), queryStart, queryEnd).input('rsnDesc', sql.NVarChar, rsnDesc);
-    if (singleMonth) request.input('singleMonth', sql.NVarChar, singleMonth);
-
-    const result = await request.query(`
+    const result = await querySortSources<Omit<DefectProductMonthRow, 'qtyproc'>>(
+        `
             SELECT
                 ${monthSelect},
                 RTRIM(LTRIM(pt_desc1)) AS pt_desc1,
@@ -360,12 +385,12 @@ async function queryDefectProductBreakdown(
                 UPPER(RTRIM(LTRIM(m_cp))) AS m_cp,
                 RTRIM(LTRIM(m_user)) AS m_user,
                 SUM(sub_qty) AS qty
-            FROM dbo.v_rpt_sort_1 WITH (NOLOCK)
+            FROM ${SORT_VIEW_TOKEN} WITH (NOLOCK)
             WHERE ${QUERY_DATE_RANGE_SQL}
                 AND RTRIM(LTRIM(rsn_desc)) = @rsnDesc
                 AND pt_desc1 IS NOT NULL
                 AND RTRIM(LTRIM(pt_desc1)) != ''
-                AND ${categorySql}
+                AND ${CATEGORY_SQL_TOKEN}
                 AND ${C1_SPECIAL_REASON_SQL_EXCLUDE}
                 AND ${subTypSql}
                 AND ${unitSql}
@@ -376,17 +401,30 @@ async function queryDefectProductBreakdown(
                 UPPER(RTRIM(LTRIM(m_cp))),
                 RTRIM(LTRIM(m_user))
             HAVING SUM(sub_qty) > 0
-        `);
+        `,
+        {
+            sources,
+            category,
+            bind: (req) => {
+                bindQueryDateRange(req, queryStart, queryEnd).input('rsnDesc', sql.NVarChar, rsnDesc);
+                if (singleMonth) req.input('singleMonth', sql.NVarChar, singleMonth);
+            },
+        },
+    );
 
-    return (result.recordset as Omit<DefectProductMonthRow, 'qtyproc'>[]).map((row) => ({
-        month: row.month,
-        pt_desc1: row.pt_desc1 || '',
-        pt_desc2: row.pt_desc2 || '',
-        m_part: row.m_part || '',
-        m_cp: row.m_cp || '',
-        m_user: row.m_user || '',
-        qty: Number(row.qty) || 0,
-    }));
+    return mergeSumByKeys(
+        result.recordset.map((row) => ({
+            month: row.month,
+            pt_desc1: row.pt_desc1 || '',
+            pt_desc2: row.pt_desc2 || '',
+            m_part: row.m_part || '',
+            m_cp: row.m_cp || '',
+            m_user: row.m_user || '',
+            qty: Number(row.qty) || 0,
+        })),
+        ['month', 'pt_desc1', 'pt_desc2', 'm_cp', 'm_user'],
+        ['qty'],
+    );
 }
 
 export type DefectTrendChartPayload = Pick<DefectTrendPayload, 'trend' | 'jobMetrics'>;
@@ -403,33 +441,28 @@ export async function queryDefectWareKilnsForWare(
     ptDesc1: string,
     ptDesc2: string,
 ): Promise<DefectWareKilnMonthRow[]> {
-    const pool = await getConnection();
-    const categorySql = buildCategoryPartSql(category);
     const subTypSql = buildSubTypSql(mode);
     const unitSql = buildUnitFilterSql(unitFilter, category);
+    const sources = sourcesForCategory(category);
     const { queryStart, queryEnd } = resolveQueryDateRange(startDate, endDate, month);
     const ptDesc2Trimmed = (ptDesc2 || '').trim();
     const ptDesc2Sql = ptDesc2Trimmed
         ? `AND RTRIM(LTRIM(ISNULL(pt_desc2, ''))) = @ptDesc2`
         : '';
 
-    const request = bindQueryDateRange(pool.request(), queryStart, queryEnd)
-        .input('rsnDesc', sql.NVarChar, rsnDesc)
-        .input('ptDesc1', sql.NVarChar, ptDesc1);
-    if (ptDesc2Trimmed) request.input('ptDesc2', sql.NVarChar, ptDesc2Trimmed);
-
-    const result = await request.query(`
+    const result = await querySortSources<{ kiln: string; m_cp: string; m_user: string; qty: number }>(
+        `
             SELECT
                 RTRIM(LTRIM(ISNULL(m_kiln, ''))) AS kiln,
                 UPPER(RTRIM(LTRIM(m_cp))) AS m_cp,
                 RTRIM(LTRIM(m_user)) AS m_user,
                 SUM(sub_qty) AS qty
-            FROM dbo.v_rpt_sort_1 WITH (NOLOCK)
+            FROM ${SORT_VIEW_TOKEN} WITH (NOLOCK)
             WHERE ${QUERY_DATE_RANGE_SQL}
                 AND RTRIM(LTRIM(rsn_desc)) = @rsnDesc
                 AND RTRIM(LTRIM(pt_desc1)) = @ptDesc1
                 ${ptDesc2Sql}
-                AND ${categorySql}
+                AND ${CATEGORY_SQL_TOKEN}
                 AND ${C1_SPECIAL_REASON_SQL_EXCLUDE}
                 AND ${subTypSql}
                 AND ${unitSql}
@@ -438,9 +471,20 @@ export async function queryDefectWareKilnsForWare(
                 UPPER(RTRIM(LTRIM(m_cp))),
                 RTRIM(LTRIM(m_user))
             HAVING SUM(sub_qty) > 0
-        `);
+        `,
+        {
+            sources,
+            category,
+            bind: (req) => {
+                bindQueryDateRange(req, queryStart, queryEnd)
+                    .input('rsnDesc', sql.NVarChar, rsnDesc)
+                    .input('ptDesc1', sql.NVarChar, ptDesc1);
+                if (ptDesc2Trimmed) req.input('ptDesc2', sql.NVarChar, ptDesc2Trimmed);
+            },
+        },
+    );
 
-    return (result.recordset as { kiln: string; m_cp: string; m_user: string; qty: number }[]).map((row) => ({
+    return mergeSumByKeys(result.recordset, ['kiln', 'm_cp', 'm_user'], ['qty']).map((row) => ({
         month,
         pt_desc1: ptDesc1,
         pt_desc2: ptDesc2Trimmed,
@@ -459,10 +503,8 @@ export async function queryDefectJobMetrics(
     category: string,
     unitFilter: UnitFilter = 'ALL',
 ): Promise<DefectJobMetricRow[]> {
-    const pool = await getConnection();
-    const categorySql = buildCategoryPartSql(category);
     const unitSql = buildUnitFilterSql(unitFilter, category);
-    return queryMonthlyJobMetrics(pool, startDate, endDate, categorySql, unitSql);
+    return queryMonthlyJobMetrics(sourcesForCategory(category), startDate, endDate, category, unitSql);
 }
 
 export async function queryDefectTrendOnly(
@@ -473,15 +515,14 @@ export async function queryDefectTrendOnly(
     mode: DefectListMode,
     unitFilter: UnitFilter = 'ALL',
 ): Promise<Pick<DefectTrendChartPayload, 'trend'>> {
-    const pool = await getConnection();
-    const categorySql = buildCategoryPartSql(category);
+    const sources = sourcesForCategory(category);
     const subTypSql = buildSubTypSql(mode);
     const unitSql = buildUnitFilterSql(unitFilter, category);
     const trend = await queryDefectTrendRecords(
-        pool,
+        sources,
         startDate,
         endDate,
-        categorySql,
+        category,
         subTypSql,
         unitSql,
         rsnDesc,
@@ -513,18 +554,17 @@ export async function queryDefectBreakdownForMonth(
     unitFilter: UnitFilter,
     month: string,
 ): Promise<DefectBreakdownPayload> {
-    const pool = await getConnection();
-    const categorySql = buildCategoryPartSql(category);
+    const sources = sourcesForCategory(category);
     const subTypSql = buildSubTypSql(mode);
     const unitSql = buildUnitFilterSql(unitFilter, category);
     const bench = process.env.NODE_ENV === 'development';
 
     const t0 = bench ? performance.now() : 0;
     const productsBase = await queryDefectProductBreakdown(
-        pool,
+        sources,
         startDate,
         endDate,
-        categorySql,
+        category,
         subTypSql,
         unitSql,
         rsnDesc,
@@ -533,10 +573,10 @@ export async function queryDefectBreakdownForMonth(
     const t1 = bench ? performance.now() : 0;
 
     const qtyprocByKey = await queryBulkWareQtyproc(
-        pool,
+        sources,
         startDate,
         endDate,
-        categorySql,
+        category,
         unitSql,
         productsBase,
         month,
@@ -566,26 +606,25 @@ export async function queryDefectBreakdownPayload(
     mode: DefectListMode,
     unitFilter: UnitFilter = 'ALL',
 ): Promise<DefectBreakdownPayload> {
-    const pool = await getConnection();
-    const categorySql = buildCategoryPartSql(category);
+    const sources = sourcesForCategory(category);
     const subTypSql = buildSubTypSql(mode);
     const unitSql = buildUnitFilterSql(unitFilter, category);
 
     const productsBase = await queryDefectProductBreakdown(
-        pool,
+        sources,
         startDate,
         endDate,
-        categorySql,
+        category,
         subTypSql,
         unitSql,
         rsnDesc,
     );
 
     const qtyprocByKey = await queryBulkWareQtyproc(
-        pool,
+        sources,
         startDate,
         endDate,
-        categorySql,
+        category,
         unitSql,
         productsBase,
     );

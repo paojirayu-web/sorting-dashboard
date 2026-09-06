@@ -15,10 +15,10 @@ interface ResponsiveReasonLogProps {
 
 export function ResponsiveReasonLog({ rows, theme, currentTheme, isReject, label, subtitle }: ResponsiveReasonLogProps) {
     const totalColor = isReject ? 'text-yellow-500' : 'text-red-500';
-    const defectColor = 'text-blue-500';
+    const defectColor = 'skin-accent-text';
     const totalLabel = isReject ? 'Reject' : 'Scrap';
     const headBg = currentTheme === 'dark' ? 'bg-white/[0.03]' : 'bg-gray-50';
-    const labelColor = label === 'Production' ? 'text-blue-400' : 'text-yellow-400';
+    const labelColor = label === 'Production' ? 'skin-accent-text' : 'text-yellow-400';
 
     if (rows.length === 0) return null;
 
