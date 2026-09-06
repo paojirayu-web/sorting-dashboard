@@ -1473,7 +1473,8 @@ export default function Dashboard() {
                     qtyProcScope={qtyProcScope}
                     setQtyProcScope={(next) => {
                         setQtyProcScope(next);
-                        if (next === 'ff' && pRoundOf(qtyProcCp)) setQtyProcCp('all');
+                        if (next === 'ff' && (pRoundOf(qtyProcCp) || qtyProcCp === 'CUSTOM')) setQtyProcCp('all');
+                        if (next === 'all' && (qtyProcCp === 'FRIT' || qtyProcCp === 'BOM')) setQtyProcCp('C1');
                     }}
                     qtyProcShape={qtyProcShape}
                     setQtyProcShape={setQtyProcShape}

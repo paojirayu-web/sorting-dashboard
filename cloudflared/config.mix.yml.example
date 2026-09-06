@@ -1,0 +1,22 @@
+# Cloudflare Tunnel — Production Mix only
+# 1. cloudflared tunnel login
+# 2. cloudflared tunnel create sorting-mix
+# 3. cloudflared tunnel route dns sorting-mix mix.yourdomain.com
+# 4. ใส่ tunnel id + credentials path ด้านล่าง แล้วรัน:
+#    cloudflared tunnel --config cloudflared/config.mix.yml run
+#
+# ใน Cloudflare Zero Trust → Access → Applications:
+#   Application: mix.yourdomain.com (Self-hosted)
+#   Policy: อีเมลที่อนุญาต / One-time PIN
+#
+# ใน .env ของ sorting-dashboard:
+#   MIX_PUBLIC_HOST=mix.yourdomain.com
+#   MIX_PUBLIC_REQUIRE_ACCESS=true
+
+tunnel: TUNNEL_ID
+credentials-file: /path/to/TUNNEL_ID.json
+
+ingress:
+  - hostname: mix.yourdomain.com
+    service: http://127.0.0.1:8021
+  - service: http_status:404

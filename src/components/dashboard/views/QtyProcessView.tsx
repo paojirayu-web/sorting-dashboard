@@ -36,6 +36,7 @@ import {
     type QtyProcCpFilter,
     type QtyProcLineFilter,
     type QtyProcPayload,
+    type QtyProcReasonRow,
     type QtyProcScope,
     type QtyProcTrendView,
     type QtyProcYearFilter,
@@ -51,6 +52,10 @@ const FRIT_COLOR = '#eab308';
 const BOM_COLOR = '#c45c32';
 const CUSTOM_COLOR = '#eab308';
 const CUSTOM_C_COLOR = '#6366f1';
+/** All mode: first fire FRIT+BOM combined. */
+const LABEL_CUSTOM_FIRST = 'Custom (C)' as const;
+/** All mode: later C fire of FRIT+BOM items. */
+const LABEL_CUSTOM_AGAIN = 'Custom' as const;
 const P_COLOR = '#14b8a6';
 const P_ROUND_COLOR: Record<string, string> = {
     P1: '#14b8a6',
@@ -63,12 +68,11 @@ const WHITE_COLOR = '#94a3b8';
 const BLACK_COLOR = '#1e293b';
 const CUSTOMER_PIE_TOP = 3;
 const MIX_BAR_TOP = 3;
+const QUALITY_TOP_N = 5;
 const CUSTOMER_COLOR = ['#0ea5e9', '#c45c32', '#22c55e', '#8b5cf6', '#eab308', '#ec4899', '#14b8a6', '#f97316'];
 const MIDDOT = '\u00B7';
 const NDASH = '\u2013';
 const ELLIPSIS = '\u2026';
-const QUALITY_NOTE =
-    'FRIT / BOM complete = qtycomp \u0E23\u0E2D\u0E1A\u0E41\u0E23\u0E01 + \u0E40\u0E2B\u0E15\u0E38 \u0E1E\u0E48\u0E19\u0E1F\u0E23\u0E34\u0E15 / \u0E27\u0E32\u0E07\u0E1A\u0E2D\u0E21 (\u0E22\u0E49\u0E32\u0E22\u0E08\u0E32\u0E01 reject)';
 
 interface QtyProcessViewProps {
     theme: Theme;
@@ -176,8 +180,8 @@ const SERIES_COLOR: Record<string, string> = {
     'Standard (C)': PROCESS_COLOR,
     FRIT: FRIT_COLOR,
     BOM: BOM_COLOR,
-    Custom: CUSTOM_COLOR,
-    'Custom (C)': CUSTOM_C_COLOR,
+    Custom: CUSTOM_C_COLOR,
+    'Custom (C)': CUSTOM_COLOR,
     P: P_COLOR,
     P1: P_ROUND_COLOR.P1,
     P2: P_ROUND_COLOR.P2,
@@ -236,8 +240,8 @@ function QtyProcTooltip({
         Other: 5,
         Standard: 1,
         'Standard (C)': 1,
-        Custom: 2,
-        'Custom (C)': 3,
+        Custom: 3,
+        'Custom (C)': 2,
         FRIT: 2,
         BOM: 2,
         P: 4,
@@ -372,8 +376,8 @@ function firingMixItems(totals: {
     const rows: { name: string; qty: number; color: string }[] = totals.combineCustom
         ? [
             { name: 'Standard (C)', qty: totals.standard, color: C_COLOR },
-            { name: 'Custom', qty: totals.frit + totals.bom, color: CUSTOM_COLOR },
-            { name: 'Custom (C)', qty: totals.customC, color: CUSTOM_C_COLOR },
+            { name: LABEL_CUSTOM_FIRST, qty: totals.frit + totals.bom, color: CUSTOM_COLOR },
+            { name: LABEL_CUSTOM_AGAIN, qty: totals.customC, color: CUSTOM_C_COLOR },
             ...pRows,
         ]
         : [
@@ -381,6 +385,13 @@ function firingMixItems(totals: {
             { name: 'FRIT', qty: totals.frit, color: FRIT_COLOR },
             { name: 'BOM', qty: totals.bom, color: BOM_COLOR },
         ];
+    if (totals.combineCustom) {
+        return rows.filter((row) => (
+            row.name === LABEL_CUSTOM_FIRST
+            || row.name === LABEL_CUSTOM_AGAIN
+            || row.qty > 0
+        ));
+    }
     return rows.filter((row) => row.qty > 0);
 }
 
@@ -393,7 +404,11 @@ function MixProgress({
     total: number;
     theme: Theme;
 }) {
-    const rows = items.filter((i) => i.qty > 0);
+    const rows = items.filter((i) => (
+        i.qty > 0
+        || i.name === LABEL_CUSTOM_FIRST
+        || i.name === LABEL_CUSTOM_AGAIN
+    ));
     const denom = total > 0 ? total : rows.reduce((s, i) => s + i.qty, 0);
     return (
         <div className="mt-2 space-y-3">
@@ -475,9 +490,103 @@ function QtyPctLegend({
     );
 }
 
-function firingPart(cp: string): 'Standard' | 'FRIT' | 'BOM' | 'P' {
+function QualityTopList({
+    items,
+    color,
+    theme,
+}: {
+    items: { label: string; qty: number; pct: number }[];
+    color: string;
+    theme: Theme;
+}) {
+    const head = `text-[10px] font-bold uppercase tracking-wide ${theme.textMuted}`;
+    if (items.length === 0) {
+        return <p className={`text-[11px] ${theme.textMuted}`}>No data</p>;
+    }
+    return (
+        <div className="grid grid-cols-[1.25rem_minmax(0,1fr)_minmax(3.25rem,auto)_2.5rem] gap-x-2 gap-y-1.5 items-start">
+            <span className={head}>#</span>
+            <span className={head}>Reason</span>
+            <span className={`${head} text-right`}>Qty</span>
+            <span className={`${head} text-right`}>%</span>
+            {items.map((item, i) => (
+                <div key={item.label} className="contents">
+                    <span className={`tabular-nums text-xs font-bold ${theme.textMuted} pt-0.5`}>{i + 1}</span>
+                    <span className={`text-xs font-bold leading-snug whitespace-normal break-words ${theme.textSecondary}`}>
+                        {item.label}
+                    </span>
+                    <span className="tabular-nums text-right text-xs font-semibold pt-0.5" style={{ color }}>
+                        {fmt(item.qty)}
+                    </span>
+                    <span className={`tabular-nums text-right text-xs ${theme.textMuted} pt-0.5`}>
+                        {item.pct.toFixed(1)}
+                    </span>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+function QualityTopByPeriod({
+    periods,
+    scrapColor,
+    rejectColor,
+    theme,
+}: {
+    periods: { name: string; scrap: { label: string; qty: number; pct: number }[]; reject: { label: string; qty: number; pct: number }[] }[];
+    scrapColor: string;
+    rejectColor: string;
+    theme: Theme;
+}) {
+    if (periods.length === 0) {
+        return <p className={`text-[11px] ${theme.textMuted}`}>No data in this filter</p>;
+    }
+    return (
+        <div className="min-w-0 max-h-[36rem] xl:max-h-[42rem] overflow-y-auto pr-1">
+            <div className={`sticky top-0 z-10 -mx-1 px-1 pb-2 mb-1 grid grid-cols-2 gap-3 ${theme.cardBg}`}>
+                <h4 className="text-sm font-bold" style={{ color: scrapColor }}>Top 5 Scrap</h4>
+                <h4 className="text-sm font-bold" style={{ color: rejectColor }}>Top 5 Reject</h4>
+            </div>
+            <div className="space-y-4">
+                {periods.map((period) => (
+                    <section key={period.name} className={`min-w-0 pb-4 border-b ${theme.borderColor} last:border-0 last:pb-0`}>
+                        <p className={`text-[10px] font-bold uppercase tracking-wider ${theme.textMuted} mb-2`}>{period.name}</p>
+                        <div className="grid grid-cols-2 gap-3">
+                            <QualityTopList items={period.scrap} color={scrapColor} theme={theme} />
+                            <QualityTopList items={period.reject} color={rejectColor} theme={theme} />
+                        </div>
+                    </section>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function topQualityReasons(
+    rows: QtyProcReasonRow[],
+    process: number,
+    n = QUALITY_TOP_N,
+): { label: string; qty: number; pct: number }[] {
+    const byReason = new Map<string, number>();
+    for (const row of rows) {
+        const label = (row.rsn_desc || '').trim();
+        if (!label || row.qty <= 0) continue;
+        byReason.set(label, (byReason.get(label) || 0) + row.qty);
+    }
+    return [...byReason.entries()]
+        .map(([label, qty]) => ({
+            label,
+            qty,
+            pct: process ? (qty / process) * 100 : 0,
+        }))
+        .sort((a, b) => b.qty - a.qty || a.label.localeCompare(b.label))
+        .slice(0, n);
+}
+
+function firingPart(cp: string): 'Standard' | 'FRIT' | 'BOM' | 'P' | 'Custom' {
     if (pRoundOf(cp)) return 'P';
     const kind = String(cp || '');
+    if (kind === 'CUSTOM_C') return 'Custom';
     if (kind === 'BOM' || kind === 'C1') return 'BOM';
     if (kind === 'FRIT') return 'FRIT';
     return 'Standard';
@@ -616,6 +725,7 @@ export function QtyProcessView({
         if (cp === 'FRIT') return { c: 0, frit, bom: 0, c1: frit, customC: 0, ...emptyP() };
         if (cp === 'BOM') return { c: 0, frit: 0, bom, c1: bom, customC: 0, ...emptyP() };
         if (cp === 'C1') return { c: 0, frit, bom, c1: frit + bom, customC: 0, ...emptyP() };
+        if (cp === 'CUSTOM') return { c: 0, frit: 0, bom: 0, c1: 0, customC, ...emptyP() };
         if (scope !== 'all') return { c, frit, bom, c1: frit + bom, customC: 0, ...emptyP() };
         const pSel = pRoundOf(cp);
         if (pSel) {
@@ -673,6 +783,7 @@ export function QtyProcessView({
         customC: totalCustomC,
         byP: totalByP,
         combineCustom,
+        combineP: false,
     });
     const firingPie = firingMixItems({
         standard: totalC,
@@ -681,9 +792,9 @@ export function QtyProcessView({
         customC: totalCustomC,
         byP: totalByP,
         combineCustom,
-        combineP: combineCustom,
+        combineP: true,
     });
-    const compareAsBars = cp === 'C' || cp === 'FRIT' || cp === 'BOM' || cp === 'C1' || !!pFilter;
+    const compareAsBars = cp === 'C' || cp === 'FRIT' || cp === 'BOM' || cp === 'C1' || cp === 'CUSTOM' || !!pFilter;
     const compareSeries = cp === 'C'
         ? [{ key: 'Standard (C)' as const, color: C_COLOR, pctKey: 'standardPct' as const }]
         : cp === 'FRIT'
@@ -692,18 +803,20 @@ export function QtyProcessView({
                 ? [{ key: 'BOM' as const, color: BOM_COLOR, pctKey: 'bomPct' as const }]
                 : cp === 'C1'
                     ? combineCustom
-                        ? [{ key: 'Custom' as const, color: CUSTOM_COLOR, pctKey: 'customMixPct' as const }]
+                        ? [{ key: LABEL_CUSTOM_FIRST, color: CUSTOM_COLOR, pctKey: 'customMixPct' as const }]
                         : [
                             { key: 'FRIT' as const, color: FRIT_COLOR, pctKey: 'fritPct' as const },
                             { key: 'BOM' as const, color: BOM_COLOR, pctKey: 'bomPct' as const },
                         ]
+                    : cp === 'CUSTOM'
+                        ? [{ key: LABEL_CUSTOM_AGAIN, color: CUSTOM_C_COLOR, pctKey: 'customCPct' as const }]
                     : pFilter
                         ? [{ key: pFilter, color: P_ROUND_COLOR[pFilter], pctKey: 'pPct' as const }]
                         : combineCustom
                             ? [
                                 { key: 'Standard (C)' as const, color: C_COLOR, pctKey: 'standardPct' as const },
-                                { key: 'Custom' as const, color: CUSTOM_COLOR, pctKey: 'customMixPct' as const },
-                                ...(totalCustomC > 0 ? [{ key: 'Custom (C)' as const, color: CUSTOM_C_COLOR, pctKey: 'customCPct' as const }] : []),
+                                { key: LABEL_CUSTOM_FIRST, color: CUSTOM_COLOR, pctKey: 'customMixPct' as const },
+                                { key: LABEL_CUSTOM_AGAIN, color: CUSTOM_C_COLOR, pctKey: 'customCPct' as const },
                                 ...QTYPROC_P_ROUNDS.filter((round) => totalByP(round) > 0).map((round) => ({
                                     key: round,
                                     color: P_ROUND_COLOR[round],
@@ -740,8 +853,8 @@ export function QtyProcessView({
         return {
             name,
             'Standard (C)': s.c,
-            Custom: custom,
-            'Custom (C)': s.customC || 0,
+            [LABEL_CUSTOM_FIRST]: custom,
+            [LABEL_CUSTOM_AGAIN]: s.customC || 0,
             FRIT: s.frit,
             BOM: s.bom,
             P: pSum,
@@ -917,6 +1030,22 @@ export function QtyProcessView({
         : QTYPROC_DISPLAY_BE_YEARS.map((y) => qualityRow(String(y), y));
     const qualityHasOther = qualityYears.some((row) => row.Other > 0);
 
+    const qualityReasonRows = (payload?.reasons || []).filter((r) => (
+        yearsSel.includes(r.y)
+        && firingRowOk(r)
+        && qtyProcRowMatches(cp, r.cp, scope)
+    ));
+    const topByPeriod = qualityYears.map((row, i) => {
+        const y = isMonthly ? selectedYear : QTYPROC_DISPLAY_BE_YEARS[i];
+        const m = isMonthly ? i + 1 : null;
+        const rows = qualityReasonRows.filter((r) => r.y === y && (m == null || Number(r.m) === m));
+        return {
+            name: row.name,
+            scrap: topQualityReasons(rows.filter((r) => r.kind === 'scrap'), row.Process),
+            reject: topQualityReasons(rows.filter((r) => r.kind === 'reject'), row.Process),
+        };
+    }).filter((period) => period.scrap.length > 0 || period.reject.length > 0);
+
     const cpPie = firingPie;
 
     const tonePie = donutItems([
@@ -995,7 +1124,7 @@ export function QtyProcessView({
                 <Card theme={theme}>
                     <h3 className={`text-sm font-bold ${theme.textWhite} mb-2`}>
                         {combineCustom
-                            ? ['Standard (C)', 'Custom', totalCustomC > 0 ? 'Custom (C)' : null, totalP > 0 ? 'P' : null].filter(Boolean).join(' / ')
+                            ? ['Standard (C)', LABEL_CUSTOM_FIRST, LABEL_CUSTOM_AGAIN, totalP > 0 ? 'P' : null].filter(Boolean).join(' / ')
                             : 'Standard (C) / FRIT / BOM'}
                     </h3>
                     <DonutWithLegend items={cpPie} theme={theme} isDark={isDark} />
@@ -1077,10 +1206,8 @@ export function QtyProcessView({
                                     <Bar yAxisId="left" dataKey="Standard (C)" fill={C_COLOR} maxBarSize={40} radius={[4, 4, 0, 0]} />
                                     {combineCustom ? (
                                         <>
-                                            <Bar yAxisId="left" dataKey="Custom" fill={CUSTOM_COLOR} maxBarSize={40} radius={[4, 4, 0, 0]} />
-                                            {totalCustomC > 0 && (
-                                                <Bar yAxisId="left" dataKey="Custom (C)" fill={CUSTOM_C_COLOR} maxBarSize={40} radius={[4, 4, 0, 0]} />
-                                            )}
+                                            <Bar yAxisId="left" dataKey={LABEL_CUSTOM_FIRST} fill={CUSTOM_COLOR} maxBarSize={40} radius={[4, 4, 0, 0]} />
+                                            <Bar yAxisId="left" dataKey={LABEL_CUSTOM_AGAIN} fill={CUSTOM_C_COLOR} maxBarSize={40} radius={[4, 4, 0, 0]} />
                                             {QTYPROC_P_ROUNDS.filter((round) => totalByP(round) > 0).map((round) => (
                                                 <Line
                                                     key={round}
@@ -1281,71 +1408,81 @@ export function QtyProcessView({
             </div>
 
             <Card theme={theme}>
-                <h3 className={`text-sm font-bold ${theme.textWhite}`}>Process vs Complete / Scrap / Reject</h3>
-                <p className={`text-[11px] ${theme.textMuted} mt-1 mb-3`}>
-                    {QUALITY_NOTE}
-                </p>
-                <div className="h-72 sm:h-80">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={qualityYears} margin={{ top: 12, right: 16, left: 8, bottom: 8 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
-                            <XAxis dataKey="name" tick={{ fill: tickFill, fontSize: 11 }} interval={isMonthly ? 0 : undefined} />
-                            <YAxis
-                                tick={{ fill: tickFill, fontSize: 11 }}
-                                tickFormatter={(v) => `${Math.round(Number(v))}%`}
-                                domain={[0, 100]}
-                                width={40}
-                            />
-                            <Tooltip content={<QtyProcTooltip isDark={isDark} kind="quality" />} />
-                            <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: 12 }} />
-                            <Bar dataKey="CompleteBar" name="Complete" stackId="process" fill={completeColor} maxBarSize={48}>
-                                <LabelList dataKey="completePct" content={QualityPctLabel} />
-                            </Bar>
-                            <Bar dataKey="RejectBar" name="Reject" stackId="process" fill={rejectColor} maxBarSize={48}>
-                                <LabelList dataKey="rejectPct" content={QualityPctLabel} />
-                            </Bar>
-                            <Bar
-                                dataKey="ScrapBar"
-                                name="Scrap"
-                                stackId="process"
-                                fill={scrapColor}
-                                maxBarSize={48}
-                                radius={qualityHasOther ? [0, 0, 0, 0] : [4, 4, 0, 0]}
-                            >
-                                <LabelList dataKey="scrapPct" content={QualityPctLabel} />
-                            </Bar>
-                            {qualityHasOther && (
-                                <Bar dataKey="OtherBar" name="Other" stackId="process" fill={otherColor} maxBarSize={48} radius={[4, 4, 0, 0]}>
-                                    <LabelList dataKey="otherPct" content={QualityPctLabel} />
-                                </Bar>
-                            )}
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
-                <div className="mt-3 overflow-x-auto">
-                    <div className="grid grid-cols-[3.5rem_minmax(4.5rem,1fr)_minmax(4.5rem,1fr)_3rem_minmax(4.5rem,1fr)_3rem_minmax(4.5rem,1fr)_3rem] gap-x-3 gap-y-1 text-[11px] min-w-[32rem]">
-                        <span className={`font-bold uppercase tracking-wide ${theme.textMuted}`}>
-                            {isMonthly ? 'Month' : 'Year'}
-                        </span>
-                        <span className="font-bold uppercase tracking-wide text-right" style={{ color: PROCESS_COLOR }}>Process</span>
-                        <span className="font-bold uppercase tracking-wide text-right" style={{ color: completeColor }}>Complete</span>
-                        <span className={`font-bold uppercase tracking-wide text-right ${theme.textMuted}`}>%</span>
-                        <span className="font-bold uppercase tracking-wide text-right" style={{ color: rejectColor }}>Reject</span>
-                        <span className={`font-bold uppercase tracking-wide text-right ${theme.textMuted}`}>%</span>
-                        <span className="font-bold uppercase tracking-wide text-right" style={{ color: scrapColor }}>Scrap</span>
-                        <span className={`font-bold uppercase tracking-wide text-right ${theme.textMuted}`}>%</span>
-                        {qualityYears.map((row) => (
-                            <div key={row.name} className="contents">
-                                <span className={theme.textSecondary}>{row.name}</span>
-                                <span className="tabular-nums text-right font-semibold" style={{ color: PROCESS_COLOR }}>{fmt(row.Process)}</span>
-                                <span className="tabular-nums text-right font-semibold" style={{ color: completeColor }}>{fmt(row.Complete)}</span>
-                                <span className={`tabular-nums text-right ${theme.textMuted}`}>{row.completePct.toFixed(1)}</span>
-                                <span className="tabular-nums text-right font-semibold" style={{ color: rejectColor }}>{fmt(row.Reject)}</span>
-                                <span className={`tabular-nums text-right ${theme.textMuted}`}>{row.rejectPct.toFixed(1)}</span>
-                                <span className="tabular-nums text-right font-semibold" style={{ color: scrapColor }}>{fmt(row.Scrap)}</span>
-                                <span className={`tabular-nums text-right ${theme.textMuted}`}>{row.scrapPct.toFixed(1)}</span>
-                            </div>
-                        ))}
+                <h3 className={`text-sm font-bold ${theme.textWhite} mb-3`}>Process vs Complete / Scrap / Reject</h3>
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 xl:gap-6 items-start">
+                    <div className="min-w-0 space-y-3">
+                        <div className="h-72 sm:h-80 min-w-0">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={qualityYears} margin={{ top: 12, right: 16, left: 8, bottom: 8 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
+                                    <XAxis dataKey="name" tick={{ fill: tickFill, fontSize: 11 }} interval={isMonthly ? 0 : undefined} />
+                                    <YAxis
+                                        tick={{ fill: tickFill, fontSize: 11 }}
+                                        tickFormatter={(v) => `${Math.round(Number(v))}%`}
+                                        domain={[0, 100]}
+                                        width={40}
+                                    />
+                                    <Tooltip content={<QtyProcTooltip isDark={isDark} kind="quality" />} />
+                                    <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: 12 }} />
+                                    <Bar dataKey="CompleteBar" name="Complete" stackId="process" fill={completeColor} maxBarSize={48}>
+                                        <LabelList dataKey="completePct" content={QualityPctLabel} />
+                                    </Bar>
+                                    <Bar dataKey="RejectBar" name="Reject" stackId="process" fill={rejectColor} maxBarSize={48}>
+                                        <LabelList dataKey="rejectPct" content={QualityPctLabel} />
+                                    </Bar>
+                                    <Bar
+                                        dataKey="ScrapBar"
+                                        name="Scrap"
+                                        stackId="process"
+                                        fill={scrapColor}
+                                        maxBarSize={48}
+                                        radius={qualityHasOther ? [0, 0, 0, 0] : [4, 4, 0, 0]}
+                                    >
+                                        <LabelList dataKey="scrapPct" content={QualityPctLabel} />
+                                    </Bar>
+                                    {qualityHasOther && (
+                                        <Bar dataKey="OtherBar" name="Other" stackId="process" fill={otherColor} maxBarSize={48} radius={[4, 4, 0, 0]}>
+                                            <LabelList dataKey="otherPct" content={QualityPctLabel} />
+                                        </Bar>
+                                    )}
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                        <div className="grid grid-cols-[2.75rem_minmax(0,1fr)_minmax(0,1.15fr)_minmax(0,1.15fr)_minmax(0,1.15fr)] gap-x-2 gap-y-1 text-[11px]">
+                            <span className={`font-bold uppercase tracking-wide ${theme.textMuted}`}>
+                                {isMonthly ? 'Mo' : 'Year'}
+                            </span>
+                            <span className="font-bold uppercase tracking-wide text-right" style={{ color: PROCESS_COLOR }}>Process</span>
+                            <span className="font-bold uppercase tracking-wide text-right" style={{ color: completeColor }}>Complete</span>
+                            <span className="font-bold uppercase tracking-wide text-right" style={{ color: rejectColor }}>Reject</span>
+                            <span className="font-bold uppercase tracking-wide text-right" style={{ color: scrapColor }}>Scrap</span>
+                            {qualityYears.map((row) => (
+                                <div key={row.name} className="contents">
+                                    <span className={theme.textSecondary}>{row.name}</span>
+                                    <span className="tabular-nums text-right font-semibold" style={{ color: PROCESS_COLOR }}>{fmt(row.Process)}</span>
+                                    <span className="tabular-nums text-right font-semibold" style={{ color: completeColor }}>
+                                        {fmt(row.Complete)}
+                                        <span className={`ml-1 font-medium ${theme.textMuted}`}>{row.completePct.toFixed(1)}</span>
+                                    </span>
+                                    <span className="tabular-nums text-right font-semibold" style={{ color: rejectColor }}>
+                                        {fmt(row.Reject)}
+                                        <span className={`ml-1 font-medium ${theme.textMuted}`}>{row.rejectPct.toFixed(1)}</span>
+                                    </span>
+                                    <span className="tabular-nums text-right font-semibold" style={{ color: scrapColor }}>
+                                        {fmt(row.Scrap)}
+                                        <span className={`ml-1 font-medium ${theme.textMuted}`}>{row.scrapPct.toFixed(1)}</span>
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="min-w-0">
+                        <QualityTopByPeriod
+                            periods={topByPeriod}
+                            scrapColor={scrapColor}
+                            rejectColor={rejectColor}
+                            theme={theme}
+                        />
                     </div>
                 </div>
             </Card>

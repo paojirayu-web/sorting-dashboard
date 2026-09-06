@@ -53,7 +53,7 @@ export async function querySortSources<T extends Record<string, unknown>>(
     const errors: string[] = [];
     settled.forEach((item, index) => {
         if (item.status === 'fulfilled') {
-            rows.push(...item.value);
+            for (const row of item.value) rows.push(row);
             return;
         }
         const source = sources[index];

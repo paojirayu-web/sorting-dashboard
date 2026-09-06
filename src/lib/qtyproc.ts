@@ -54,7 +54,7 @@ export const QTYPROC_SCOPE_OPTIONS: { value: QtyProcScope; label: string }[] = [
     { value: 'ff', label: 'FF' },
     { value: 'all', label: 'All' },
 ];
-export type QtyProcCpFilter = 'all' | 'C' | 'C1' | 'FRIT' | 'BOM' | QtyProcPRound;
+export type QtyProcCpFilter = 'all' | 'C' | 'C1' | 'CUSTOM' | 'FRIT' | 'BOM' | QtyProcPRound;
 export type QtyProcCp = 'C' | 'FRIT' | 'BOM' | 'CUSTOM_C' | QtyProcPRound;
 export type QtyProcLineFilter = 'all' | 'WHITE' | 'BLACK';
 export type QtyProcTrendView = 'shape' | 'forming';
@@ -103,6 +103,7 @@ export function specialKind(desc1: string | null | undefined, desc2: string | nu
 }
 
 export function qtyProcCpMatches(filter: QtyProcCpFilter, rowCp: string): boolean {
+    if (filter === 'CUSTOM') return rowCp === 'CUSTOM_C';
     if (rowCp === 'CUSTOM_C') return false;
     if (filter === 'all') return true;
     if (filter === 'C') return rowCp === 'C';
@@ -237,6 +238,36 @@ export type QtyProcMixRow = {
     qtyrjct: number;
 };
 
+export type QtyProcReasonKind = 'scrap' | 'reject';
+
+export type QtyProcReasonJobRow = {
+    ce_year: number;
+    mo: number;
+    m_cp: string;
+    is_round1: number;
+    pt_desc1: string | null;
+    pt_desc2?: string | null;
+    tone: string;
+    rsn_desc: string;
+    kind: QtyProcReasonKind;
+    qty: number;
+};
+
+/** Period rsn_desc rows for Top 5 scrap / reject. CUSTOM_C is omitted. */
+export type QtyProcReasonRow = {
+    y: number;
+    m: number;
+    rsn_desc: string;
+    kind: QtyProcReasonKind;
+    shape: string;
+    forming: string;
+    cp: QtyProcCp;
+    tone: string;
+    customer: string;
+    glaze: string;
+    qty: number;
+};
+
 export type QtyProcPayload = {
     loaded: boolean;
     generatedAt: string;
@@ -246,6 +277,7 @@ export type QtyProcPayload = {
     byYear: Record<string, QtyProcYearBlock>;
     months: { y: number; m: number; qtyproc: number; qtycomp: number; qtyscrp: number; qtyrjct: number; c: number; c1: number; frit: number; bom: number; p1: number; p2: number; p3: number; p4: number; p5: number; customC: number }[];
     mix: QtyProcMixRow[];
+    reasons: QtyProcReasonRow[];
 };
 
 function extractModelCode(desc: string | null | undefined): string | null {
@@ -354,10 +386,30 @@ function addQtyProcMix(mix: Map<string, QtyProcMixRow>, row: QtyProcMixRow) {
     mix.set(key, { ...row });
 }
 
+function addQtyProcReason(reasons: Map<string, QtyProcReasonRow>, row: QtyProcReasonRow) {
+    const key = `${row.y}|${row.m}|${row.kind}|${row.rsn_desc}|${row.shape}|${row.forming}|${row.cp}|${row.tone}|${row.customer}|${row.glaze}`;
+    const existing = reasons.get(key);
+    if (existing) {
+        existing.qty += row.qty;
+        return;
+    }
+    reasons.set(key, { ...row });
+}
+
+function reasonCpOf(row: QtyProcReasonJobRow): QtyProcCp | null {
+    const displayed = displayCp(row.m_cp, row.is_round1);
+    const p = pRoundOf(displayed);
+    if (p) return p;
+    if (displayed === 'C1') return specialKind(row.pt_desc1, row.pt_desc2, 'C1');
+    if (displayed === 'C') return 'C';
+    return null;
+}
+
 export function buildQtyProcPayload(
     jobRows: QtyProcJobRow[],
     dateRange: { min: string; max: string },
     scope: string,
+    reasonJobs: QtyProcReasonJobRow[] = [],
 ): QtyProcPayload {
     const productYear = new Map<string, {
         ce: number;
@@ -444,6 +496,7 @@ export function buildQtyProcPayload(
         byYear[String(y + BE_OFFSET)] = emptyYear();
     }
     const mix = new Map<string, QtyProcMixRow>();
+    const reasons = new Map<string, QtyProcReasonRow>();
 
     for (const { ce, tone, desc1, desc2, jobs } of productYear.values()) {
         const be = String(ce + BE_OFFSET);
@@ -599,6 +652,32 @@ export function buildQtyProcPayload(
         });
     }
 
+    for (const row of reasonJobs) {
+        const ce = Number(row.ce_year);
+        if (ce < 2023 || ce > 2026) continue;
+        const rsn = (row.rsn_desc || '').trim();
+        const qty = num(row.qty);
+        if (!rsn || qty <= 0) continue;
+        const cp = reasonCpOf(row);
+        if (!cp) continue;
+        const mo = Number(row.mo) || 0;
+        if (mo < 1 || mo > 12) continue;
+        const { shape, forming } = classifyProduct(row.pt_desc1, row.pt_desc2);
+        addQtyProcReason(reasons, {
+            y: ce + BE_OFFSET,
+            m: mo,
+            rsn_desc: rsn,
+            kind: row.kind === 'reject' ? 'reject' : 'scrap',
+            shape,
+            forming,
+            cp,
+            tone: row.tone || 'NA',
+            customer: qtyProcCustomer(row.pt_desc2),
+            glaze: classifyGlaze(row.pt_desc1, row.pt_desc2),
+            qty,
+        });
+    }
+
     const months: QtyProcPayload['months'] = [];
     for (const [be, year] of Object.entries(byYear)) {
         year.qtyproc = Math.round(year.qtyproc);
@@ -657,6 +736,11 @@ export function buildQtyProcPayload(
         .filter((r) => r.qtyproc > 0)
         .sort((a, b) => b.qtyproc - a.qtyproc);
 
+    const reasonRows = [...reasons.values()]
+        .map((r) => ({ ...r, qty: Math.round(r.qty) }))
+        .filter((r) => r.qty > 0)
+        .sort((a, b) => b.qty - a.qty || a.rsn_desc.localeCompare(b.rsn_desc));
+
     return {
         loaded: true,
         generatedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
@@ -666,5 +750,6 @@ export function buildQtyProcPayload(
         byYear,
         months,
         mix: mixRows,
+        reasons: reasonRows,
     };
 }

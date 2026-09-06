@@ -69,6 +69,50 @@ export function SettingsView({ theme, currentTheme, setCurrentTheme }: SettingsV
                     theme={theme}
                 >
                 <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.68 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-06</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Added</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Production Mix:</strong> Public <code className={`${theme.inputBg} px-1 rounded`}>/mix</code> page (no sidebar). Cloudflare host in <code className={`${theme.inputBg} px-1 rounded`}>MIX_PUBLIC_HOST</code> can only reach <code className={`${theme.inputBg} px-1 rounded`}>/mix</code> and <code className={`${theme.inputBg} px-1 rounded`}>/api/qtyproc</code>. LAN dashboard is unchanged.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.67 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-06</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Production Mix:</strong> Removed the FRIT / BOM complete note. Top 5 scrap / reject is per year when Year is All, and per month when a year is selected. Monthly tops now use the actual month from the job date.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.66 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-06</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Production Mix:</strong> In All, FRIT+BOM first fire is <strong>Custom (C)</strong> and the later C fire is <strong>Custom</strong>. Both always show in the mix, pie, year comparison, and firing filter. FF still shows FRIT and BOM separately. Production Qty splits <strong>P1–P5</strong>; the donut still combines them as <strong>P</strong>.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.65 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-06</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Added</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Production Mix:</strong> Process vs Complete / Scrap / Reject now shows Top 5 scrap and Top 5 reject by <code className={`${theme.inputBg} px-1 rounded`}>rsn_desc</code> for the current filters.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
                     <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.64 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-02</span></h3>
                     <div className="space-y-4">
                         <div>

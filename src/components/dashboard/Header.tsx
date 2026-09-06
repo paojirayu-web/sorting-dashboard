@@ -562,9 +562,16 @@ function QtyProcessFilters({
                 >
                     <option value="all" className={optionClass}>All</option>
                     <option value="C" className={optionClass}>Standard (C)</option>
-                    <option value="FRIT" className={optionClass}>FRIT</option>
-                    <option value="BOM" className={optionClass}>BOM</option>
-                    <option value="C1" className={optionClass}>Custom (FRIT+BOM)</option>
+                    {scope !== 'all' && (
+                        <>
+                            <option value="FRIT" className={optionClass}>FRIT</option>
+                            <option value="BOM" className={optionClass}>BOM</option>
+                        </>
+                    )}
+                    <option value="C1" className={optionClass}>Custom (C)</option>
+                    {scope === 'all' && (
+                        <option value="CUSTOM" className={optionClass}>Custom</option>
+                    )}
                     {includeP && QTYPROC_P_ROUNDS.map((round) => (
                         <option key={round} value={round} className={optionClass}>{round}</option>
                     ))}
@@ -862,6 +869,156 @@ export function Header(props: HeaderProps) {
                     <DefectSearch {...props} />
                 </div>
             )}
+        </header>
+    );
+}
+
+export function MixHeader({
+    theme,
+    currentTheme,
+    setCurrentTheme,
+    refreshing,
+    onRefresh,
+    year,
+    setYear,
+    line,
+    setLine,
+    cp,
+    setCp,
+    scope,
+    setScope,
+    shape,
+    setShape,
+    forming,
+    setForming,
+    customer,
+    setCustomer,
+    glaze,
+    setGlaze,
+    shapeKeys,
+    formingKeys,
+    customerKeys,
+}: {
+    theme: Theme;
+    currentTheme: ThemeName;
+    setCurrentTheme: (t: ThemeName) => void;
+    refreshing: boolean;
+    onRefresh: () => void;
+    year: QtyProcYearFilter;
+    setYear: (v: QtyProcYearFilter) => void;
+    line: QtyProcLineFilter;
+    setLine: (v: QtyProcLineFilter) => void;
+    cp: QtyProcCpFilter;
+    setCp: (v: QtyProcCpFilter) => void;
+    scope: QtyProcScope;
+    setScope: (v: QtyProcScope) => void;
+    shape: string;
+    setShape: (v: string) => void;
+    forming: string;
+    setForming: (v: string) => void;
+    customer: string;
+    setCustomer: (v: string) => void;
+    glaze: string;
+    setGlaze: (v: string) => void;
+    shapeKeys: string[];
+    formingKeys: string[];
+    customerKeys: string[];
+}) {
+    const iconBtn = `p-2 sm:p-2.5 rounded-xl ${theme.inputBg} ${theme.textSecondary} hover:${theme.textWhite} transition-all shrink-0 touch-manipulation`;
+    return (
+        <header className={`sticky top-0 z-40 ${theme.headerBg} backdrop-blur-xl border-b ${theme.borderColor}`}>
+            <div className="flex items-center justify-between gap-2 px-3 sm:px-4 md:px-6 min-h-14 md:min-h-16 py-2 min-w-0">
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                    <h1 className={`text-sm sm:text-base md:text-lg font-bold ${theme.textWhite} tracking-tight truncate flex items-center gap-2 min-w-0`}>
+                        <span className="truncate">{QTYPROC_PAGE_TITLE}</span>
+                        {refreshing && (
+                            <span className="inline-flex h-2 w-2 rounded-full bg-green-500 animate-pulse shrink-0" />
+                        )}
+                    </h1>
+                    <SegmentedPills
+                        theme={theme}
+                        value={qtyProcToneValue(line)}
+                        onChange={(v) => setLine(qtyProcLineFromTone(v))}
+                        options={WW_TONE_OPTIONS}
+                        className="hidden lg:flex"
+                    />
+                </div>
+                <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                    <QtyProcScopeSwitch theme={theme} value={scope} onChange={setScope} />
+                    <button
+                        onClick={onRefresh}
+                        disabled={refreshing}
+                        className={`${iconBtn} ${refreshing ? 'animate-spin' : ''}`}
+                        title="Refresh Data"
+                        aria-label="Refresh data"
+                    >
+                        <RefreshCw size={18} className={refreshing ? 'skin-accent-text' : ''} />
+                    </button>
+                    <button
+                        onClick={() => setCurrentTheme(currentTheme === 'dark' ? 'light' : 'dark')}
+                        className={iconBtn}
+                        title="Toggle Theme"
+                        aria-label="Toggle theme"
+                    >
+                        {currentTheme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+                    </button>
+                </div>
+            </div>
+            <div className={`hidden lg:flex items-center w-full min-w-0 px-3 sm:px-4 md:px-6 py-2 border-t ${theme.borderColor}`}>
+                <QtyProcessFilters
+                    theme={theme}
+                    currentTheme={currentTheme}
+                    year={year}
+                    setYear={setYear}
+                    cp={cp}
+                    setCp={setCp}
+                    scope={scope}
+                    shape={shape}
+                    setShape={setShape}
+                    forming={forming}
+                    setForming={setForming}
+                    customer={customer}
+                    setCustomer={setCustomer}
+                    glaze={glaze}
+                    setGlaze={setGlaze}
+                    shapeKeys={shapeKeys}
+                    formingKeys={formingKeys}
+                    customerKeys={customerKeys}
+                />
+            </div>
+            <div className={`lg:hidden border-t ${theme.borderColor} px-3 sm:px-4 pt-2 pb-2`}>
+                <SegmentedPills
+                    theme={theme}
+                    value={qtyProcToneValue(line)}
+                    onChange={(v) => setLine(qtyProcLineFromTone(v))}
+                    options={WW_TONE_OPTIONS}
+                    className="w-full"
+                />
+            </div>
+            <div className={`lg:hidden border-t ${theme.borderColor} px-3 sm:px-4 pb-3 pt-2`}>
+                <div className="flex items-center w-full min-w-0">
+                    <QtyProcessFilters
+                        theme={theme}
+                        currentTheme={currentTheme}
+                        year={year}
+                        setYear={setYear}
+                        cp={cp}
+                        setCp={setCp}
+                        scope={scope}
+                        shape={shape}
+                        setShape={setShape}
+                        forming={forming}
+                        setForming={setForming}
+                        customer={customer}
+                        setCustomer={setCustomer}
+                        glaze={glaze}
+                        setGlaze={setGlaze}
+                        shapeKeys={shapeKeys}
+                        formingKeys={formingKeys}
+                        customerKeys={customerKeys}
+                    />
+                </div>
+            </div>
         </header>
     );
 }

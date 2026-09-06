@@ -2,6 +2,34 @@
 
 All notable changes to the **Sorting Dashboard** project will be documented in this file.
 
+## [1.6.68] - 2026-09-06
+
+### Added
+- **Production Mix:** Public `/mix` page (no sidebar). Cloudflare host in `MIX_PUBLIC_HOST` can only reach `/mix` and `/api/qtyproc`. LAN dashboard is unchanged.
+
+---
+
+## [1.6.67] - 2026-09-06
+
+### Changed
+- **Production Mix:** Removed the FRIT / BOM complete note. Top 5 scrap / reject is per year when Year is All, and per month when a year is selected. Monthly tops now use the actual month from the job date.
+
+---
+
+## [1.6.66] - 2026-09-06
+
+### Changed
+- **Production Mix:** In All, FRIT+BOM first fire is **Custom (C)** and the later C fire is **Custom**. Both always show in the mix, pie, year comparison, and firing filter. FF still shows FRIT and BOM separately. Production Qty splits **P1–P5**; the donut still combines them as **P**.
+
+---
+
+## [1.6.65] - 2026-09-06
+
+### Added
+- **Production Mix:** Process vs Complete / Scrap / Reject now shows Top 5 scrap and Top 5 reject by `rsn_desc` for the current filters.
+
+---
+
 ## [1.6.64] - 2026-09-02
 
 ### Changed

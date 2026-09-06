@@ -1,9 +1,10 @@
-import { getConnection } from '../lib/db';
 import * as dotenv from 'dotenv';
 import path from 'path';
 
-// Load .env.local
+// Load .env.local before db module reads env
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
+
+import { getConnection } from '../lib/db';
 
 async function checkData() {
     console.log('Connecting to database...');

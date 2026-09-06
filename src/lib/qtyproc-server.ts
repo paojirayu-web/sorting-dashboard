@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from 'fs/promises';
 import path from 'path';
 import { C1_SPECIAL_REASON_SQL } from '@/lib/c1-special-reason';
 import { getAppDataDir } from '@/lib/daily-report-automation-settings';
-import { CATEGORY_SQL_TOKEN } from '@/lib/defect-category-sql';
+import { CATEGORY_SQL_TOKEN, C1_SPECIAL_REASON_SQL_EXCLUDE } from '@/lib/defect-category-sql';
 import {
     buildQtyProcPayload,
     qtyProcToneFromUnit,
@@ -12,9 +12,10 @@ import {
     QTYPROC_START,
     type QtyProcJobRow,
     type QtyProcPayload,
+    type QtyProcReasonJobRow,
 } from '@/lib/qtyproc';
 import { querySortSources } from '@/lib/sort-query';
-import { getCategoryLabel, SORT_VIEW_TOKEN } from '@/lib/sort-source';
+import { getCategoryLabel, SORT_VIEW_TOKEN, type SortSourceId } from '@/lib/sort-source';
 import { toFiniteNumber } from '@/lib/utils';
 
 export type QtyProcApiPayload = QtyProcPayload & {
@@ -26,7 +27,7 @@ type CacheEntry = { at: number; key?: string; payload: QtyProcPayload };
 
 const memCache = new Map<string, CacheEntry>();
 const FRESH_MS = 30 * 60 * 1000;
-const CACHE_KEY = 'WW|ALL|v16';
+const CACHE_KEY = 'WW|ALL|v20';
 
 let rebuildInflight: Promise<CacheEntry> | null = null;
 
@@ -75,6 +76,11 @@ function payloadHasMixGlaze(payload: QtyProcPayload): boolean {
 
 function payloadHasCustomC(payload: QtyProcPayload): boolean {
     return Object.values(payload.byYear || {}).some((block) => typeof block.customC === 'number');
+}
+
+function payloadHasReasons(payload: QtyProcPayload): boolean {
+    const rows = payload.reasons;
+    return Array.isArray(rows) && (rows.length === 0 || typeof rows[0]?.m === 'number');
 }
 
 function jobsSql(start: string, endExcl: string) {
@@ -132,6 +138,54 @@ function jobsSql(start: string, endExcl: string) {
     `;
 }
 
+function reasonsSql(start: string, endExcl: string) {
+    return `
+        SELECT
+            YEAR(m_date) AS ce_year,
+            MONTH(m_date) AS mo,
+            m_cp,
+            CASE WHEN LOWER(RTRIM(LTRIM(m_user))) LIKE 'somboon%' THEN 1 ELSE 0 END AS is_round1,
+            RTRIM(LTRIM(pt_desc1)) AS pt_desc1,
+            RTRIM(LTRIM(ISNULL(pt_desc2, ''))) AS pt_desc2,
+            RTRIM(LTRIM(ISNULL(unit, ''))) AS unit,
+            RTRIM(LTRIM(rsn_desc)) AS rsn_desc,
+            CASE
+                WHEN UPPER(RTRIM(LTRIM(sub_typ))) IN ('C', 'D', 'B') THEN 'scrap'
+                ELSE 'reject'
+            END AS kind,
+            SUM(ISNULL(sub_qty, 0)) AS qty
+        FROM ${SORT_VIEW_TOKEN} WITH (NOLOCK)
+        WHERE m_date >= '${start}' AND m_date < '${endExcl}'
+          AND ${CATEGORY_SQL_TOKEN}
+          AND (
+                m_cp IN ('C', 'C1', 'CS', 'C(FRIT&BOM)', 'P1', 'P2', 'P3', 'P4', 'P5')
+                OR UPPER(RTRIM(LTRIM(m_cp))) LIKE 'P[1-5]%'
+          )
+          AND rsn_desc IS NOT NULL
+          AND RTRIM(LTRIM(rsn_desc)) != ''
+          AND ${C1_SPECIAL_REASON_SQL_EXCLUDE}
+          AND (
+                UPPER(RTRIM(LTRIM(sub_typ))) IN ('C', 'D', 'B')
+                OR UPPER(RTRIM(LTRIM(sub_typ))) = 'P'
+                OR RTRIM(LTRIM(sub_typ)) = N'เจียร์'
+          )
+        GROUP BY
+            YEAR(m_date),
+            MONTH(m_date),
+            m_cp,
+            CASE WHEN LOWER(RTRIM(LTRIM(m_user))) LIKE 'somboon%' THEN 1 ELSE 0 END,
+            RTRIM(LTRIM(pt_desc1)),
+            RTRIM(LTRIM(ISNULL(pt_desc2, ''))),
+            RTRIM(LTRIM(ISNULL(unit, ''))),
+            RTRIM(LTRIM(rsn_desc)),
+            CASE
+                WHEN UPPER(RTRIM(LTRIM(sub_typ))) IN ('C', 'D', 'B') THEN 'scrap'
+                ELSE 'reject'
+            END
+        HAVING SUM(ISNULL(sub_qty, 0)) > 0
+    `;
+}
+
 function mapJobRows(recordset: Record<string, unknown>[]): QtyProcJobRow[] {
     return recordset.map((row) => {
         const adj = pickNum(row, ['c1_adj']);
@@ -154,18 +208,35 @@ function mapJobRows(recordset: Record<string, unknown>[]): QtyProcJobRow[] {
     });
 }
 
+function mapReasonRows(recordset: Record<string, unknown>[]): QtyProcReasonJobRow[] {
+    return recordset.map((row) => ({
+        ce_year: pickNum(row, ['ce_year']),
+        mo: pickNum(row, ['mo']),
+        m_cp: pickStr(row, ['m_cp']),
+        is_round1: pickNum(row, ['is_round1']),
+        pt_desc1: pickStr(row, ['pt_desc1']),
+        pt_desc2: pickStr(row, ['pt_desc2']),
+        tone: qtyProcToneFromUnit(pickStr(row, ['unit'])) || pickStr(row, ['tone'], 'NA') || 'NA',
+        rsn_desc: pickStr(row, ['rsn_desc']),
+        kind: pickStr(row, ['kind']).toLowerCase() === 'reject' ? 'reject' : 'scrap',
+        qty: pickNum(row, ['qty']),
+    }));
+}
+
 async function queryKiln(): Promise<QtyProcPayload> {
     const t0 = Date.now();
-    const yearResults = await Promise.all(
-        QTYPROC_CE_YEARS.map((ce) =>
-            querySortSources<Record<string, unknown>>(jobsSql(`${ce}-01-01`, `${ce + 1}-01-01`), {
-                sources: ['kilndb'],
-                required: true,
-                category: 'WW',
-            }),
-        ),
-    );
-    const jobRows = mapJobRows(yearResults.flatMap((part) => part.recordset));
+    const yearQueries = QTYPROC_CE_YEARS.map((ce) => {
+        const start = `${ce}-01-01`;
+        const endExcl = `${ce + 1}-01-01`;
+        const opts = { sources: ['kilndb'] as SortSourceId[], required: true, category: 'WW' };
+        return Promise.all([
+            querySortSources<Record<string, unknown>>(jobsSql(start, endExcl), opts),
+            querySortSources<Record<string, unknown>>(reasonsSql(start, endExcl), opts),
+        ]);
+    });
+    const yearParts = await Promise.all(yearQueries);
+    const jobRows = mapJobRows(yearParts.flatMap(([jobs]) => jobs.recordset));
+    const reasonRows = mapReasonRows(yearParts.flatMap(([, reasons]) => reasons.recordset));
     const payload = buildQtyProcPayload(
         jobRows,
         {
@@ -173,10 +244,11 @@ async function queryKiln(): Promise<QtyProcPayload> {
             max: new Date().toISOString().slice(0, 10),
         },
         `${getCategoryLabel('WW')} · Standard / FRIT / BOM / P1–P5 · ปี ${QTYPROC_DISPLAY_BE_YEARS[0]}–${QTYPROC_DISPLAY_BE_YEARS[QTYPROC_DISPLAY_BE_YEARS.length - 1]}`,
+        reasonRows,
     );
     const y2567 = payload.byYear['2567'];
     console.info(
-        `[qtyproc] ${Date.now() - t0}ms category=WW rows=${jobRows.length} ` +
+        `[qtyproc] ${Date.now() - t0}ms category=WW rows=${jobRows.length} reasons=${reasonRows.length} ` +
         `comp=${y2567?.qtycomp || 0} scrap=${y2567?.qtyscrp || 0} reject=${y2567?.qtyrjct || 0} frit=${y2567?.frit || 0} bom=${y2567?.bom || 0} ` +
         `p1=${y2567?.p1 || 0} p2=${y2567?.p2 || 0} p3=${y2567?.p3 || 0} p4=${y2567?.p4 || 0} p5=${y2567?.p5 || 0}`,
     );
@@ -233,13 +305,13 @@ export async function getQtyProcResponse(forceRefresh = false): Promise<QtyProcA
     }
 
     const mem = memCache.get(CACHE_KEY);
-    if (mem && payloadHasMixTone(mem.payload) && payloadHasMixCustomer(mem.payload) && payloadHasMixGlaze(mem.payload) && payloadHasCustomC(mem.payload)) {
+    if (mem && payloadHasMixTone(mem.payload) && payloadHasMixCustomer(mem.payload) && payloadHasMixGlaze(mem.payload) && payloadHasCustomC(mem.payload) && payloadHasReasons(mem.payload)) {
         if (Date.now() - mem.at > FRESH_MS) void rebuildCache();
         return withMeta(mem, true);
     }
 
     const disk = await readDiskCache();
-    if (disk && payloadHasMixTone(disk.payload) && payloadHasMixCustomer(disk.payload) && payloadHasMixGlaze(disk.payload) && payloadHasCustomC(disk.payload)) {
+    if (disk && payloadHasMixTone(disk.payload) && payloadHasMixCustomer(disk.payload) && payloadHasMixGlaze(disk.payload) && payloadHasCustomC(disk.payload) && payloadHasReasons(disk.payload)) {
         remember(disk);
         if (Date.now() - disk.at > FRESH_MS) void rebuildCache();
         return withMeta(disk, true);
