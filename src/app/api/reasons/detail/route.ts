@@ -13,6 +13,8 @@ export async function GET(request: Request) {
             rsn: searchParams.get('rsn'),
             year: searchParams.get('year'),
             kind: searchParams.get('kind'),
+            family: searchParams.get('family'),
+            tone: searchParams.get('tone'),
             unit: searchParams.get('unit'),
             shape: searchParams.get('shape'),
             forming: searchParams.get('forming'),

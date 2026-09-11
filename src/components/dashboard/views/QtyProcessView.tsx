@@ -512,12 +512,16 @@ function QualityTopList({
     theme,
     year,
     kind,
+    family,
+    tone,
 }: {
     items: { label: string; qty: number; pct: number }[];
     color: string;
     theme: Theme;
     year: number;
     kind: 'scrap' | 'reject';
+    family?: 'ww' | 'dw' | 'all';
+    tone?: 'white' | 'black' | 'all' | 'inglaze' | 'onglaze';
 }) {
     if (items.length === 0) {
         return <p className={`text-[11px] ${theme.textMuted}`}>No data</p>;
@@ -527,7 +531,7 @@ function QualityTopList({
             {items.map((item, i) => (
                 <Link
                     key={item.label}
-                    href={reasonsFocusHref({ rsn: item.label, year, kind })}
+                    href={reasonsFocusHref({ rsn: item.label, year, kind, family, tone })}
                     className={`contents ${theme.tableRowHover}`}
                     title={`Open Reasons Focus · ${item.label}`}
                 >
@@ -552,11 +556,13 @@ function QualityTopByPeriod({
     scrapColor,
     rejectColor,
     theme,
+    line,
 }: {
     periods: { name: string; year: number; scrap: { label: string; qty: number; pct: number }[]; reject: { label: string; qty: number; pct: number }[] }[];
     scrapColor: string;
     rejectColor: string;
     theme: Theme;
+    line: QtyProcLineFilter;
 }) {
     const [kind, setKind] = useState<'scrap' | 'reject'>('scrap');
     const headRef = useRef<HTMLDivElement>(null);
@@ -617,6 +623,8 @@ function QualityTopByPeriod({
                             theme={theme}
                             year={period.year}
                             kind={kind}
+                            family="ww"
+                            tone={line === 'WHITE' ? 'white' : line === 'BLACK' ? 'black' : 'all'}
                         />
                     </section>
                 ))}
@@ -1562,6 +1570,7 @@ export function QtyProcessView({
                                 scrapColor={scrapColor}
                                 rejectColor={rejectColor}
                                 theme={theme}
+                                line={line}
                             />
                         </div>
                     </div>

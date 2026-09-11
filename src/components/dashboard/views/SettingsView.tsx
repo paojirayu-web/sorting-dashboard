@@ -69,6 +69,17 @@ export function SettingsView({ theme, currentTheme, setCurrentTheme }: SettingsV
                     theme={theme}
                 >
                 <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.71 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-11</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Added</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Reasons Enrich Focus:</strong> Focus adds Scrap/Reject, All/WW/DW, and tone sub-toggles. Single-tone: qty, % of kind, rank, Δ, Qty/% trend (average + peak), Top 15 codeware + Other, family share donut. All family: 2×2 on a shared % scale (not raw qty) plus comparison table; click a card for that tone. One read-only <code className={`${theme.inputBg} px-1 rounded`}>GET /api/reasons/detail</code> — All is not four round-trips. Rank/%/Δ reuse the year×kind cache.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
                     <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.70 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-11</span></h3>
                     <div className="space-y-4">
                         <div>

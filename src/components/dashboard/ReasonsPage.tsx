@@ -23,28 +23,43 @@ import { themes, type Theme, type ThemeName } from '@/lib/themes';
 import {
     REASONS_DEFAULT_PAGE_SIZE,
     REASONS_MAX_PAGE_SIZE,
+    defaultToneForFamily,
+    familyForFocusTone,
     latestReasonsYear,
     parseReasonsDir,
+    parseReasonsFamily,
     parseReasonsKind,
     parseReasonsPage,
     parseReasonsPageSize,
     parseReasonsSort,
+    parseReasonsTone,
     parseReasonsYear,
     reasonsYearOptions,
     type ReasonsDetailResponse,
     type ReasonsDir,
+    type ReasonsFamily,
+    type ReasonsFocusTone,
     type ReasonsItem,
     type ReasonsKind,
     type ReasonsListResponse,
     type ReasonsMeta,
     type ReasonsSort,
+    type ReasonsToneParam,
 } from '@/lib/reasons';
+import { getDashboardSkin, type DwKind, type LineFamily, type WwTone } from '@/lib/sort-source';
 
 const SEARCH_DEBOUNCE_MS = 300;
 const SCRAP_COLOR = '#ef4444';
 const REJECT_COLOR = '#f97316';
 const SKELETON_ROWS = 8;
 const PAGE_SIZE_OPTIONS = [25, 50, 100] as const;
+
+function reasonsSkin(family: ReasonsFamily, tone: ReasonsToneParam): string {
+    const lineFamily: LineFamily = family === 'ww' ? 'WW' : family === 'dw' ? 'DW' : 'ALL';
+    const wwTone: WwTone = tone === 'white' ? 'WW_WHITE' : tone === 'black' ? 'WW_BLACK' : 'ALL';
+    const dwKind: DwKind = tone === 'onglaze' ? 'ONGLAZE' : tone === 'inglaze' ? 'INGLAZE' : 'ALL';
+    return getDashboardSkin(lineFamily, wwTone, dwKind);
+}
 
 function fmtQty(n: number): string {
     return Math.round(n).toLocaleString();
@@ -165,6 +180,8 @@ export function ReasonsPage() {
 
     const year = parseReasonsYear(searchParams.get('year'));
     const kind = parseReasonsKind(searchParams.get('kind'));
+    const family = parseReasonsFamily(searchParams.get('family'));
+    const tone = parseReasonsTone(family, searchParams.get('tone'));
     const q = (searchParams.get('q') || '').trim();
     const page = parseReasonsPage(searchParams.get('page'));
     const pageSize = parseReasonsPageSize(searchParams.get('pageSize'));
@@ -277,6 +294,8 @@ export function ReasonsPage() {
             rsn,
             year: String(year),
             kind,
+            family,
+            tone,
         });
         if (detailRetryNonce > 0) params.set('refresh', '1');
 
@@ -301,7 +320,7 @@ export function ReasonsPage() {
             });
 
         return () => controller.abort();
-    }, [isFocus, rsn, year, kind, detailRetryNonce]);
+    }, [isFocus, rsn, year, kind, family, tone, detailRetryNonce]);
 
     const onSort = (nextSort: ReasonsSort) => {
         if (sort === nextSort) {
@@ -318,7 +337,7 @@ export function ReasonsPage() {
     return (
         <div
             className={`dash-skin flex h-screen ${theme.pageBg} ${theme.textPrimary} font-sans overflow-hidden transition-colors duration-300`}
-            data-skin="all"
+            data-skin={isFocus ? reasonsSkin(family, tone) : 'all'}
             data-ui-theme={currentTheme}
             data-mode={isFocus ? 'focus' : 'overview'}
         >
@@ -371,6 +390,7 @@ export function ReasonsPage() {
                             </button>
                         </div>
                     </div>
+                    {!isFocus && (
                     <div className={`flex flex-wrap items-center gap-2 px-3 sm:px-4 md:px-6 py-2 border-t ${theme.borderColor}`}>
                         <label className={`flex items-center gap-1.5 px-2.5 py-1.5 ${theme.inputBg} rounded-xl border ${theme.borderColor}`}>
                             <span className={`text-[10px] font-bold ${theme.textMuted}`}>Year</span>
@@ -404,6 +424,7 @@ export function ReasonsPage() {
                             />
                         </div>
                     </div>
+                    )}
                 </header>
 
                 {isFocus ? (
@@ -414,11 +435,25 @@ export function ReasonsPage() {
                         rsn={rsn}
                         kind={kind}
                         year={year}
+                        family={family}
+                        tone={tone}
                         loading={detailLoading}
                         error={detailError}
                         payload={detail}
                         onBack={() => replaceQuery({ rsn: null })}
                         onRetry={() => setDetailRetryNonce((n) => n + 1)}
+                        onKindChange={(next) => replaceQuery({ kind: next === 'scrap' ? null : next })}
+                        onFamilyChange={(next) => replaceQuery({
+                            family: next === 'all' ? null : next,
+                            tone: null,
+                        })}
+                        onToneChange={(next) => replaceQuery({
+                            tone: next === defaultToneForFamily(family) ? null : next,
+                        })}
+                        onOpenTone={(next: ReasonsFocusTone) => replaceQuery({
+                            family: familyForFocusTone(next),
+                            tone: next,
+                        })}
                     />
                 ) : (
                 <div className="flex-1 overflow-y-auto min-h-0 p-3 sm:p-4 md:p-6">
