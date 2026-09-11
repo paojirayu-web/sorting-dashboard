@@ -68,7 +68,7 @@ const WHITE_COLOR = '#94a3b8';
 const BLACK_COLOR = '#1e293b';
 const CUSTOMER_PIE_TOP = 3;
 const MIX_BAR_TOP = 3;
-const QUALITY_TOP_N = 5;
+const QUALITY_TOP_N = 10;
 const CUSTOMER_COLOR = ['#0ea5e9', '#c45c32', '#22c55e', '#8b5cf6', '#eab308', '#ec4899', '#14b8a6', '#f97316'];
 const MIDDOT = '\u00B7';
 const NDASH = '\u2013';
@@ -504,7 +504,7 @@ function QualityTopList({
         return <p className={`text-[11px] ${theme.textMuted}`}>No data</p>;
     }
     return (
-        <div className="grid grid-cols-[1.25rem_minmax(0,1fr)_minmax(3.25rem,auto)_2.5rem] gap-x-2 gap-y-1.5 items-start">
+        <div className="grid grid-cols-[1.25rem_minmax(0,1fr)_minmax(3.25rem,auto)_2.5rem] gap-x-2 gap-y-1 items-start">
             <span className={head}>#</span>
             <span className={head}>Reason</span>
             <span className={`${head} text-right`}>Qty</span>
@@ -542,12 +542,12 @@ function QualityTopByPeriod({
         return <p className={`text-[11px] ${theme.textMuted}`}>No data in this filter</p>;
     }
     return (
-        <div className="min-w-0 max-h-[36rem] xl:max-h-[42rem] overflow-y-auto pr-1">
+        <div className="min-w-0 max-h-[44rem] xl:max-h-[52rem] overflow-y-auto pr-1">
             <div className={`sticky top-0 z-10 -mx-1 px-1 pb-2 mb-1 grid grid-cols-2 gap-3 ${theme.cardBg}`}>
-                <h4 className="text-sm font-bold" style={{ color: scrapColor }}>Top 5 Scrap</h4>
-                <h4 className="text-sm font-bold" style={{ color: rejectColor }}>Top 5 Reject</h4>
+                <h4 className="text-sm font-bold" style={{ color: scrapColor }}>Top {QUALITY_TOP_N} Scrap</h4>
+                <h4 className="text-sm font-bold" style={{ color: rejectColor }}>Top {QUALITY_TOP_N} Reject</h4>
             </div>
-            <div className="space-y-4">
+            <div className="space-y-3">
                 {periods.map((period) => (
                     <section key={period.name} className={`min-w-0 pb-4 border-b ${theme.borderColor} last:border-0 last:pb-0`}>
                         <p className={`text-[10px] font-bold uppercase tracking-wider ${theme.textMuted} mb-2`}>{period.name}</p>
