@@ -135,17 +135,19 @@ function SortHead({
     );
 }
 
+const LIST_COLS = 'grid grid-cols-[1.25rem_minmax(0,1fr)_minmax(3rem,auto)_2.25rem_4.5rem] gap-x-2 items-center';
+
 function SkeletonRows({ theme }: { theme: Theme }) {
     return (
         <>
             {Array.from({ length: SKELETON_ROWS }, (_, i) => (
-                <tr key={i} className={`border-b ${theme.borderColor}`}>
-                    <td className="px-3 py-3"><div className={`h-3 w-6 rounded ${theme.inputBg} animate-pulse`} /></td>
-                    <td className="px-3 py-3"><div className={`h-3 w-40 max-w-full rounded ${theme.inputBg} animate-pulse`} /></td>
-                    <td className="px-3 py-3"><div className={`h-3 w-12 ml-auto rounded ${theme.inputBg} animate-pulse`} /></td>
-                    <td className="px-3 py-3"><div className={`h-3 w-10 ml-auto rounded ${theme.inputBg} animate-pulse`} /></td>
-                    <td className="px-3 py-3"><div className={`h-4 w-[72px] ml-auto rounded ${theme.inputBg} animate-pulse`} /></td>
-                </tr>
+                <div key={i} className={`${LIST_COLS} px-3 py-2.5 border-b ${theme.borderColor}`}>
+                    <div className={`h-3 w-5 rounded ${theme.inputBg} animate-pulse`} />
+                    <div className={`h-3 w-full max-w-[12rem] rounded ${theme.inputBg} animate-pulse`} />
+                    <div className={`h-3 w-10 justify-self-end rounded ${theme.inputBg} animate-pulse`} />
+                    <div className={`h-3 w-7 justify-self-end rounded ${theme.inputBg} animate-pulse`} />
+                    <div className={`h-4 w-[72px] justify-self-end rounded ${theme.inputBg} animate-pulse`} />
+                </div>
             ))}
         </>
     );
@@ -339,7 +341,7 @@ export function ReasonsPage() {
                             kind={kind}
                             onChange={(next) => replaceQuery({ kind: next === 'scrap' ? null : next }, true)}
                         />
-                        <div className={`flex items-center gap-2 px-3 py-1.5 ${theme.inputBg} rounded-xl border ${theme.borderColor} min-w-0 flex-1`}>
+                        <div className={`flex items-center gap-2 px-3 py-1.5 ${theme.inputBg} rounded-xl border ${theme.borderColor} min-w-0 flex-1 basis-full sm:basis-auto`}>
                             <Search size={14} className={`${theme.textMuted} shrink-0`} />
                             <input
                                 type="search"
@@ -354,81 +356,68 @@ export function ReasonsPage() {
 
                 <div className="flex-1 overflow-y-auto min-h-0 p-3 sm:p-4 md:p-6">
                     <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl shadow-sm overflow-hidden`}>
-                        <div className="table-scroll-x">
-                            <table className="w-full min-w-[640px] text-sm">
-                                <thead className={`sticky top-0 ${theme.cardBg}`}>
-                                    <tr className={`border-b ${theme.borderColor}`}>
-                                        <th className={`px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wide ${theme.textMuted} w-10`}>#</th>
-                                        <th className={`px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wide ${theme.textMuted}`}>Reason</th>
-                                        <th className="px-3 py-2.5 text-right w-24">
-                                            <SortHead label="Qty" active={sort === 'qty'} dir={dir} onClick={() => onSort('qty')} theme={theme} />
-                                        </th>
-                                        <th className="px-3 py-2.5 text-right w-20">
-                                            <SortHead label="%" active={sort === 'pct'} dir={dir} onClick={() => onSort('pct')} theme={theme} />
-                                        </th>
-                                        <th className={`px-3 py-2.5 text-right text-[10px] font-bold uppercase tracking-wide ${theme.textMuted} w-24`}>
-                                            Spark
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {loading && <SkeletonRows theme={theme} />}
-                                    {!loading && error && (
-                                        <tr>
-                                            <td colSpan={5} className="px-4 py-12 text-center">
-                                                <p className={`text-sm font-semibold ${theme.textWhite} mb-1`}>Could not load reasons</p>
-                                                <p className={`text-xs ${theme.textMuted} mb-4`}>{error}</p>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setRetryNonce((n) => n + 1)}
-                                                    className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-white"
-                                                    style={{ background: accent }}
-                                                >
-                                                    <RefreshCw size={14} />
-                                                    Retry
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    )}
-                                    {!loading && !error && items.length === 0 && (
-                                        <tr>
-                                            <td colSpan={5} className={`px-4 py-12 text-center text-sm ${theme.textMuted}`}>
-                                                No reasons for this year and type.
-                                            </td>
-                                        </tr>
-                                    )}
-                                    {!loading && !error && items.map((item, i) => {
-                                        const highlighted = Boolean(selectedRsn) && item.rsn === selectedRsn;
-                                        const rank = showingFrom + i;
-                                        return (
-                                            <tr
-                                                key={item.rsn}
-                                                onClick={() => replaceQuery({ rsn: highlighted ? null : item.rsn })}
-                                                className={`border-b ${theme.borderColor} ${theme.tableRowHover} cursor-pointer ${
-                                                    highlighted ? 'bg-amber-500/15 ring-1 ring-inset ring-amber-400/40' : ''
-                                                }`}
-                                            >
-                                                <td className={`px-3 py-2.5 tabular-nums text-xs font-bold ${theme.textMuted}`}>{rank}</td>
-                                                <td className={`px-3 py-2.5 text-xs sm:text-sm font-bold leading-snug ${theme.textSecondary}`}>
-                                                    {item.rsn}
-                                                </td>
-                                                <td className="px-3 py-2.5 tabular-nums text-right text-xs font-semibold" style={{ color: accent }}>
-                                                    {fmtQty(item.qty)}
-                                                </td>
-                                                <td className={`px-3 py-2.5 tabular-nums text-right text-xs ${theme.textMuted}`}>
-                                                    {item.pct.toFixed(1)}
-                                                </td>
-                                                <td className="px-3 py-2.5">
-                                                    <div className="flex justify-end">
-                                                        <SparkBars values={item.spark} color={accent} />
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
+                        <div className={`${LIST_COLS} px-3 py-2.5 border-b ${theme.borderColor} sticky top-0 z-10 ${theme.cardBg}`}>
+                            <span className={`text-[10px] font-bold uppercase tracking-wide ${theme.textMuted}`}>#</span>
+                            <span className={`text-[10px] font-bold uppercase tracking-wide ${theme.textMuted}`}>Reason</span>
+                            <div className="justify-self-end">
+                                <SortHead label="Qty" active={sort === 'qty'} dir={dir} onClick={() => onSort('qty')} theme={theme} />
+                            </div>
+                            <div className="justify-self-end">
+                                <SortHead label="%" active={sort === 'pct'} dir={dir} onClick={() => onSort('pct')} theme={theme} />
+                            </div>
+                            <span className={`justify-self-end text-[10px] font-bold uppercase tracking-wide ${theme.textMuted}`}>
+                                Spark
+                            </span>
                         </div>
+                        {loading && <SkeletonRows theme={theme} />}
+                        {!loading && error && (
+                            <div className="px-4 py-12 text-center">
+                                <p className={`text-sm font-semibold ${theme.textWhite} mb-1`}>Could not load reasons</p>
+                                <p className={`text-xs ${theme.textMuted} mb-4`}>{error}</p>
+                                <button
+                                    type="button"
+                                    onClick={() => setRetryNonce((n) => n + 1)}
+                                    className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-white"
+                                    style={{ background: accent }}
+                                >
+                                    <RefreshCw size={14} />
+                                    Retry
+                                </button>
+                            </div>
+                        )}
+                        {!loading && !error && items.length === 0 && (
+                            <p className={`px-4 py-12 text-center text-sm ${theme.textMuted}`}>
+                                No reasons for this year and type.
+                            </p>
+                        )}
+                        {!loading && !error && items.map((item, i) => {
+                            const highlighted = Boolean(selectedRsn) && item.rsn === selectedRsn;
+                            const rank = showingFrom + i;
+                            return (
+                                <button
+                                    key={item.rsn}
+                                    type="button"
+                                    onClick={() => replaceQuery({ rsn: highlighted ? null : item.rsn })}
+                                    className={`${LIST_COLS} w-full text-left px-3 py-2.5 border-b ${theme.borderColor} ${theme.tableRowHover} ${
+                                        highlighted ? 'bg-amber-500/15 ring-1 ring-inset ring-amber-400/40' : ''
+                                    }`}
+                                >
+                                    <span className={`tabular-nums text-xs font-bold ${theme.textMuted}`}>{rank}</span>
+                                    <span className={`text-xs sm:text-sm font-bold leading-snug whitespace-normal break-words ${theme.textSecondary}`}>
+                                        {item.rsn}
+                                    </span>
+                                    <span className="tabular-nums text-right text-xs font-semibold" style={{ color: accent }}>
+                                        {fmtQty(item.qty)}
+                                    </span>
+                                    <span className={`tabular-nums text-right text-xs ${theme.textMuted}`}>
+                                        {item.pct.toFixed(1)}
+                                    </span>
+                                    <span className="justify-self-end">
+                                        <SparkBars values={item.spark} color={accent} />
+                                    </span>
+                                </button>
+                            );
+                        })}
                         <div className={`flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 border-t ${theme.borderColor}`}>
                             <p className={`text-[11px] ${theme.textMuted}`}>
                                 {meta
