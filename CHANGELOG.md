@@ -2,7 +2,12 @@
 
 All notable changes to the **Sorting Dashboard** project will be documented in this file.
 
-## [1.6.70] - 2026-09-11
+## [1.6.71] - 2026-09-11
+
+### Added
+- **Reasons Enrich Focus:** Focus on `/reasons` now has Scrap|Reject, All|WW|DW, and tone sub-toggles (WW White|Black|All, DW Inglaze|Onglaze|All). Single-tone mode shows qty / % of kind / rank / Δ, Qty|% trend with average + peak, Top 15 codeware + Other, and a family share donut. Family=All is a 2×2 % comparison (shared scale, never raw qty across lines) plus a tone table; clicking a card opens that tone. One `GET /api/reasons/detail?rsn&year&kind&family&tone` per Focus open (abort on change); All is one request, not four. Rank/%/Δ come from the year×kind aggregate cache. Read-only SELECT/GROUP BY; no raw logs, no database writes.
+
+---
 
 ### Added
 - **Reasons Overview → Focus:** `/reasons` now has two modes. **Overview** (menu default) is the existing top-defects list from `GET /api/reasons` only (year + Scrap|Reject + search; columns #, reason, Qty, %, Trend). Click a row — or deep-link from Mix Top 10 with `?rsn=` — to enter **Focus**. Focus loads `GET /api/reasons/detail?rsn=&year=&kind=` once: left ~60% monthly trend, right ~40% Top codeware (#, code, qty, %). Back returns to Overview. Read-only SELECT/aggregates; no Mix filter bar, no raw logs, no database writes.
