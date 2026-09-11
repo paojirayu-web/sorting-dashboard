@@ -253,7 +253,7 @@ export type QtyProcReasonJobRow = {
     qty: number;
 };
 
-/** Period rsn_desc rows for Top 5 scrap / reject. CUSTOM_C is omitted. */
+/** Period rsn_desc rows for Top 10 scrap / reject. CUSTOM_C is omitted. */
 export type QtyProcReasonRow = {
     y: number;
     m: number;
