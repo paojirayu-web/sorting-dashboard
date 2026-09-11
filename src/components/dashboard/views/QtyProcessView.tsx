@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useMemo, useState, type ReactElement, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import {
     Bar,
     BarChart,
@@ -490,6 +490,20 @@ function QtyPctLegend({
     );
 }
 
+const QUALITY_LIST_COLS = 'grid-cols-[1.25rem_minmax(0,1fr)_minmax(3.25rem,auto)_2.5rem]';
+
+function QualityColHead({ theme }: { theme: Theme }) {
+    const head = `text-[10px] font-bold uppercase tracking-wide ${theme.textMuted}`;
+    return (
+        <div className={`grid ${QUALITY_LIST_COLS} gap-x-2`}>
+            <span className={head}>#</span>
+            <span className={head}>Reason</span>
+            <span className={`${head} text-right`}>Qty</span>
+            <span className={`${head} text-right`}>%</span>
+        </div>
+    );
+}
+
 function QualityTopList({
     items,
     color,
@@ -499,16 +513,11 @@ function QualityTopList({
     color: string;
     theme: Theme;
 }) {
-    const head = `text-[10px] font-bold uppercase tracking-wide ${theme.textMuted}`;
     if (items.length === 0) {
         return <p className={`text-[11px] ${theme.textMuted}`}>No data</p>;
     }
     return (
-        <div className="grid grid-cols-[1.25rem_minmax(0,1fr)_minmax(3.25rem,auto)_2.5rem] gap-x-2 gap-y-1 items-start">
-            <span className={head}>#</span>
-            <span className={head}>Reason</span>
-            <span className={`${head} text-right`}>Qty</span>
-            <span className={`${head} text-right`}>%</span>
+        <div className={`grid ${QUALITY_LIST_COLS} gap-x-2 gap-y-1 items-start`}>
             {items.map((item, i) => (
                 <div key={item.label} className="contents">
                     <span className={`tabular-nums text-xs font-bold ${theme.textMuted} pt-0.5`}>{i + 1}</span>
@@ -538,22 +547,72 @@ function QualityTopByPeriod({
     rejectColor: string;
     theme: Theme;
 }) {
+    const [mobileKind, setMobileKind] = useState<'scrap' | 'reject'>('scrap');
+    const headRef = useRef<HTMLDivElement>(null);
+    const [headH, setHeadH] = useState(52);
+    useEffect(() => {
+        const el = headRef.current;
+        if (!el) return;
+        const update = () => setHeadH(el.offsetHeight);
+        update();
+        const ro = new ResizeObserver(update);
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, [periods.length]);
     if (periods.length === 0) {
         return <p className={`text-[11px] ${theme.textMuted}`}>No data in this filter</p>;
     }
     return (
-        <div className="min-w-0 max-h-[44rem] xl:max-h-[52rem] overflow-y-auto pr-1">
-            <div className={`sticky top-0 z-10 -mx-1 px-1 pb-2 mb-1 grid grid-cols-2 gap-3 ${theme.cardBg}`}>
-                <h4 className="text-sm font-bold" style={{ color: scrapColor }}>Top {QUALITY_TOP_N} Scrap</h4>
-                <h4 className="text-sm font-bold" style={{ color: rejectColor }}>Top {QUALITY_TOP_N} Reject</h4>
+        <div className="h-full min-h-0 overflow-y-auto pr-1">
+            <div
+                ref={headRef}
+                className={`sticky top-0 z-10 -mx-1 px-1 pt-0 pb-2 ${theme.cardBg} border-b ${theme.borderColor}`}
+            >
+                <div className={`sm:hidden flex items-center ${theme.inputBg} rounded-xl p-1 border ${theme.borderColor} mb-2`}>
+                    {(['scrap', 'reject'] as const).map((kind) => (
+                        <button
+                            key={kind}
+                            type="button"
+                            onClick={() => setMobileKind(kind)}
+                            className={`flex-1 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                                mobileKind === kind ? `${theme.accentBg} text-white` : theme.textMuted
+                            }`}
+                        >
+                            {kind === 'scrap' ? `Top ${QUALITY_TOP_N} Scrap` : `Top ${QUALITY_TOP_N} Reject`}
+                        </button>
+                    ))}
+                </div>
+                <div className="hidden sm:grid grid-cols-2 gap-3">
+                    <h4 className="text-sm font-bold" style={{ color: scrapColor }}>Top {QUALITY_TOP_N} Scrap</h4>
+                    <h4 className="text-sm font-bold" style={{ color: rejectColor }}>Top {QUALITY_TOP_N} Reject</h4>
+                </div>
+                <div className="hidden sm:grid grid-cols-2 gap-3 mt-1">
+                    <QualityColHead theme={theme} />
+                    <QualityColHead theme={theme} />
+                </div>
+                <div className="sm:hidden mt-1">
+                    <QualityColHead theme={theme} />
+                </div>
             </div>
-            <div className="space-y-3">
+            <div className="space-y-3 pt-2">
                 {periods.map((period) => (
                     <section key={period.name} className={`min-w-0 pb-4 border-b ${theme.borderColor} last:border-0 last:pb-0`}>
-                        <p className={`text-[10px] font-bold uppercase tracking-wider ${theme.textMuted} mb-2`}>{period.name}</p>
-                        <div className="grid grid-cols-2 gap-3">
+                        <p
+                            className={`sticky z-[9] -mx-1 px-1 py-1 text-[10px] font-bold uppercase tracking-wider ${theme.textMuted} ${theme.cardBg} mb-2`}
+                            style={{ top: headH }}
+                        >
+                            {period.name}
+                        </p>
+                        <div className="hidden sm:grid grid-cols-2 gap-3">
                             <QualityTopList items={period.scrap} color={scrapColor} theme={theme} />
                             <QualityTopList items={period.reject} color={rejectColor} theme={theme} />
+                        </div>
+                        <div className="sm:hidden">
+                            <QualityTopList
+                                items={mobileKind === 'scrap' ? period.scrap : period.reject}
+                                color={mobileKind === 'scrap' ? scrapColor : rejectColor}
+                                theme={theme}
+                            />
                         </div>
                     </section>
                 ))}
@@ -646,6 +705,7 @@ export function QtyProcessView({
     glaze,
 }: QtyProcessViewProps) {
     const [trendView, setTrendView] = useState<QtyProcTrendView>('forming');
+    const [showQualityNumbers, setShowQualityNumbers] = useState(false);
 
     const isMonthly = year !== 'all';
     const selectedYear = year === 'all' ? QTYPROC_DISPLAY_BE_YEARS[0] : year;
@@ -1407,11 +1467,23 @@ export function QtyProcessView({
                 </Card>
             </div>
 
-            <Card theme={theme}>
-                <h3 className={`text-sm font-bold ${theme.textWhite} mb-3`}>Process vs Complete / Scrap / Reject</h3>
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 xl:gap-6 items-start">
-                    <div className="min-w-0 space-y-3">
-                        <div className="h-72 sm:h-80 min-w-0">
+            <Card theme={theme} className="xl:flex xl:flex-col">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                    <h3 className={`text-sm font-bold ${theme.textWhite}`}>Process vs Complete / Scrap / Reject</h3>
+                    <button
+                        type="button"
+                        aria-pressed={showQualityNumbers}
+                        onClick={() => setShowQualityNumbers((v) => !v)}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border ${theme.borderColor} transition-all ${
+                            showQualityNumbers ? `${theme.accentBg} text-white` : `${theme.inputBg} ${theme.textMuted}`
+                        }`}
+                    >
+                        {showQualityNumbers ? 'Hide numbers' : 'Show numbers'}
+                    </button>
+                </div>
+                <div className="grid grid-cols-1 xl:grid-cols-[3fr_2fr] gap-4 xl:gap-6 items-stretch xl:flex-1">
+                    <div className="min-w-0 flex flex-col gap-3">
+                        <div className={`min-w-0 ${showQualityNumbers ? 'h-72 sm:h-80' : 'h-72 sm:h-80 xl:h-[26rem]'}`}>
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={qualityYears} margin={{ top: 12, right: 16, left: 8, bottom: 8 }}>
                                     <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
@@ -1448,41 +1520,45 @@ export function QtyProcessView({
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
-                        <div className="grid grid-cols-[2.75rem_minmax(0,1fr)_minmax(0,1.15fr)_minmax(0,1.15fr)_minmax(0,1.15fr)] gap-x-2 gap-y-1 text-[11px]">
-                            <span className={`font-bold uppercase tracking-wide ${theme.textMuted}`}>
-                                {isMonthly ? 'Mo' : 'Year'}
-                            </span>
-                            <span className="font-bold uppercase tracking-wide text-right" style={{ color: PROCESS_COLOR }}>Process</span>
-                            <span className="font-bold uppercase tracking-wide text-right" style={{ color: completeColor }}>Complete</span>
-                            <span className="font-bold uppercase tracking-wide text-right" style={{ color: rejectColor }}>Reject</span>
-                            <span className="font-bold uppercase tracking-wide text-right" style={{ color: scrapColor }}>Scrap</span>
-                            {qualityYears.map((row) => (
-                                <div key={row.name} className="contents">
-                                    <span className={theme.textSecondary}>{row.name}</span>
-                                    <span className="tabular-nums text-right font-semibold" style={{ color: PROCESS_COLOR }}>{fmt(row.Process)}</span>
-                                    <span className="tabular-nums text-right font-semibold" style={{ color: completeColor }}>
-                                        {fmt(row.Complete)}
-                                        <span className={`ml-1 font-medium ${theme.textMuted}`}>{row.completePct.toFixed(1)}</span>
-                                    </span>
-                                    <span className="tabular-nums text-right font-semibold" style={{ color: rejectColor }}>
-                                        {fmt(row.Reject)}
-                                        <span className={`ml-1 font-medium ${theme.textMuted}`}>{row.rejectPct.toFixed(1)}</span>
-                                    </span>
-                                    <span className="tabular-nums text-right font-semibold" style={{ color: scrapColor }}>
-                                        {fmt(row.Scrap)}
-                                        <span className={`ml-1 font-medium ${theme.textMuted}`}>{row.scrapPct.toFixed(1)}</span>
-                                    </span>
-                                </div>
-                            ))}
-                        </div>
+                        {showQualityNumbers && (
+                            <div className="grid grid-cols-[2.75rem_minmax(0,1fr)_minmax(0,1.15fr)_minmax(0,1.15fr)_minmax(0,1.15fr)] gap-x-2 gap-y-1 text-[11px]">
+                                <span className={`font-bold uppercase tracking-wide ${theme.textMuted}`}>
+                                    {isMonthly ? 'Mo' : 'Year'}
+                                </span>
+                                <span className="font-bold uppercase tracking-wide text-right" style={{ color: PROCESS_COLOR }}>Process</span>
+                                <span className="font-bold uppercase tracking-wide text-right" style={{ color: completeColor }}>Complete</span>
+                                <span className="font-bold uppercase tracking-wide text-right" style={{ color: rejectColor }}>Reject</span>
+                                <span className="font-bold uppercase tracking-wide text-right" style={{ color: scrapColor }}>Scrap</span>
+                                {qualityYears.map((row) => (
+                                    <div key={row.name} className="contents">
+                                        <span className={theme.textSecondary}>{row.name}</span>
+                                        <span className="tabular-nums text-right font-semibold" style={{ color: PROCESS_COLOR }}>{fmt(row.Process)}</span>
+                                        <span className="tabular-nums text-right font-semibold" style={{ color: completeColor }}>
+                                            {fmt(row.Complete)}
+                                            <span className={`ml-1 font-medium ${theme.textMuted}`}>{row.completePct.toFixed(1)}</span>
+                                        </span>
+                                        <span className="tabular-nums text-right font-semibold" style={{ color: rejectColor }}>
+                                            {fmt(row.Reject)}
+                                            <span className={`ml-1 font-medium ${theme.textMuted}`}>{row.rejectPct.toFixed(1)}</span>
+                                        </span>
+                                        <span className="tabular-nums text-right font-semibold" style={{ color: scrapColor }}>
+                                            {fmt(row.Scrap)}
+                                            <span className={`ml-1 font-medium ${theme.textMuted}`}>{row.scrapPct.toFixed(1)}</span>
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
-                    <div className="min-w-0">
-                        <QualityTopByPeriod
-                            periods={topByPeriod}
-                            scrapColor={scrapColor}
-                            rejectColor={rejectColor}
-                            theme={theme}
-                        />
+                    <div className="relative min-w-0 h-[28rem] xl:h-auto xl:min-h-0">
+                        <div className="h-full xl:absolute xl:inset-0 overflow-hidden">
+                            <QualityTopByPeriod
+                                periods={topByPeriod}
+                                scrapColor={scrapColor}
+                                rejectColor={rejectColor}
+                                theme={theme}
+                            />
+                        </div>
                     </div>
                 </div>
             </Card>
