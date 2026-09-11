@@ -547,7 +547,7 @@ function QualityTopByPeriod({
     rejectColor: string;
     theme: Theme;
 }) {
-    const [mobileKind, setMobileKind] = useState<'scrap' | 'reject'>('scrap');
+    const [kind, setKind] = useState<'scrap' | 'reject'>('scrap');
     const headRef = useRef<HTMLDivElement>(null);
     const [headH, setHeadH] = useState(52);
     useEffect(() => {
@@ -562,35 +562,32 @@ function QualityTopByPeriod({
     if (periods.length === 0) {
         return <p className={`text-[11px] ${theme.textMuted}`}>No data in this filter</p>;
     }
+    const activeColor = kind === 'scrap' ? scrapColor : rejectColor;
     return (
         <div className="h-full min-h-0 overflow-y-auto pr-1">
             <div
                 ref={headRef}
                 className={`sticky top-0 z-10 -mx-1 px-1 pt-0 pb-2 ${theme.cardBg} border-b ${theme.borderColor}`}
             >
-                <div className={`sm:hidden flex items-center ${theme.inputBg} rounded-xl p-1 border ${theme.borderColor} mb-2`}>
-                    {(['scrap', 'reject'] as const).map((kind) => (
-                        <button
-                            key={kind}
-                            type="button"
-                            onClick={() => setMobileKind(kind)}
-                            className={`flex-1 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
-                                mobileKind === kind ? `${theme.accentBg} text-white` : theme.textMuted
-                            }`}
-                        >
-                            {kind === 'scrap' ? `Top ${QUALITY_TOP_N} Scrap` : `Top ${QUALITY_TOP_N} Reject`}
-                        </button>
-                    ))}
+                <div className={`flex items-center ${theme.inputBg} rounded-xl p-1 border ${theme.borderColor}`}>
+                    {(['scrap', 'reject'] as const).map((tab) => {
+                        const on = kind === tab;
+                        return (
+                            <button
+                                key={tab}
+                                type="button"
+                                onClick={() => setKind(tab)}
+                                className={`flex-1 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                                    on ? 'text-white' : theme.textMuted
+                                }`}
+                                style={on ? { background: tab === 'scrap' ? scrapColor : rejectColor } : undefined}
+                            >
+                                {tab === 'scrap' ? 'Scrap' : 'Reject'}
+                            </button>
+                        );
+                    })}
                 </div>
-                <div className="hidden sm:grid grid-cols-2 gap-3">
-                    <h4 className="text-sm font-bold" style={{ color: scrapColor }}>Top {QUALITY_TOP_N} Scrap</h4>
-                    <h4 className="text-sm font-bold" style={{ color: rejectColor }}>Top {QUALITY_TOP_N} Reject</h4>
-                </div>
-                <div className="hidden sm:grid grid-cols-2 gap-3 mt-1">
-                    <QualityColHead theme={theme} />
-                    <QualityColHead theme={theme} />
-                </div>
-                <div className="sm:hidden mt-1">
+                <div className="mt-2">
                     <QualityColHead theme={theme} />
                 </div>
             </div>
@@ -603,17 +600,11 @@ function QualityTopByPeriod({
                         >
                             {period.name}
                         </p>
-                        <div className="hidden sm:grid grid-cols-2 gap-3">
-                            <QualityTopList items={period.scrap} color={scrapColor} theme={theme} />
-                            <QualityTopList items={period.reject} color={rejectColor} theme={theme} />
-                        </div>
-                        <div className="sm:hidden">
-                            <QualityTopList
-                                items={mobileKind === 'scrap' ? period.scrap : period.reject}
-                                color={mobileKind === 'scrap' ? scrapColor : rejectColor}
-                                theme={theme}
-                            />
-                        </div>
+                        <QualityTopList
+                            items={kind === 'scrap' ? period.scrap : period.reject}
+                            color={activeColor}
+                            theme={theme}
+                        />
                     </section>
                 ))}
             </div>
@@ -1468,13 +1459,13 @@ export function QtyProcessView({
             </div>
 
             <Card theme={theme} className="xl:flex xl:flex-col">
-                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <div className="flex items-center gap-2 mb-3">
                     <h3 className={`text-sm font-bold ${theme.textWhite}`}>Process vs Complete / Scrap / Reject</h3>
                     <button
                         type="button"
                         aria-pressed={showQualityNumbers}
                         onClick={() => setShowQualityNumbers((v) => !v)}
-                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border ${theme.borderColor} transition-all ${
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border ${theme.borderColor} transition-all shrink-0 ${
                             showQualityNumbers ? `${theme.accentBg} text-white` : `${theme.inputBg} ${theme.textMuted}`
                         }`}
                     >
