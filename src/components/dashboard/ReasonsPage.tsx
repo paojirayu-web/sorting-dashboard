@@ -432,7 +432,11 @@ export function ReasonsPage() {
                         <div className={`flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 border-t ${theme.borderColor}`}>
                             <p className={`text-[11px] ${theme.textMuted}`}>
                                 {meta
-                                    ? `Showing ${showingFrom.toLocaleString()}–${showingTo.toLocaleString()} of ${meta.total.toLocaleString()} · ${meta.generatedAt}${meta.stale ? ' · stale' : ''}`
+                                    ? `${
+                                        meta.total > 0
+                                            ? `Showing ${showingFrom.toLocaleString()}–${showingTo.toLocaleString()} of ${meta.total.toLocaleString()}`
+                                            : 'Showing 0 of 0'
+                                    } · ${meta.generatedAt}${meta.stale ? ' · stale' : ''}`
                                     : loading
                                         ? 'Loading…'
                                         : '—'}
