@@ -18,6 +18,7 @@ import {
     XCircle,
 } from 'lucide-react';
 import { Sidebar } from '@/components/dashboard/Sidebar';
+import { ReasonsFocus } from '@/components/dashboard/ReasonsFocus';
 import { themes, type Theme, type ThemeName } from '@/lib/themes';
 import {
     REASONS_DEFAULT_PAGE_SIZE,
@@ -30,6 +31,7 @@ import {
     parseReasonsSort,
     parseReasonsYear,
     reasonsYearOptions,
+    type ReasonsDetailResponse,
     type ReasonsDir,
     type ReasonsItem,
     type ReasonsKind,
@@ -173,12 +175,17 @@ export function ReasonsPage() {
     const [searchDraft, setSearchDraft] = useState(q);
     const [items, setItems] = useState<ReasonsItem[]>([]);
     const [meta, setMeta] = useState<ReasonsMeta | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(() => !rsn);
     const [error, setError] = useState<string | null>(null);
+    const [detail, setDetail] = useState<ReasonsDetailResponse | null>(null);
+    const [detailLoading, setDetailLoading] = useState(() => Boolean(rsn));
+    const [detailError, setDetailError] = useState<string | null>(null);
     const skipDebounce = useRef(true);
-    const [retryNonce, setRetryNonce] = useState(0);
+    const [listRetryNonce, setListRetryNonce] = useState(0);
+    const [detailRetryNonce, setDetailRetryNonce] = useState(0);
     const yearOptions = useMemo(() => reasonsYearOptions(), []);
     const accent = kind === 'scrap' ? SCRAP_COLOR : REJECT_COLOR;
+    const isFocus = Boolean(rsn);
 
     useEffect(() => {
         setSearchDraft(q);
@@ -209,6 +216,14 @@ export function ReasonsPage() {
     }, [searchDraft, q, replaceQuery]);
 
     useEffect(() => {
+        document.title = isFocus ? `Reasons Focus · ${rsn}` : 'Reasons Overview · QC root-cause';
+    }, [isFocus, rsn]);
+
+    useEffect(() => {
+        if (isFocus) {
+            setLoading(false);
+            return;
+        }
         const controller = new AbortController();
         const params = new URLSearchParams({
             year: String(year),
@@ -219,8 +234,7 @@ export function ReasonsPage() {
             dir,
         });
         if (q) params.set('q', q);
-        if (rsn) params.set('rsn', rsn);
-        if (retryNonce > 0) params.set('refresh', '1');
+        if (listRetryNonce > 0) params.set('refresh', '1');
 
         setLoading(true);
         setError(null);
@@ -249,7 +263,45 @@ export function ReasonsPage() {
             });
 
         return () => controller.abort();
-    }, [year, kind, q, page, pageSize, sort, dir, rsn, retryNonce, replaceQuery]);
+    }, [isFocus, year, kind, q, page, pageSize, sort, dir, listRetryNonce, replaceQuery]);
+
+    useEffect(() => {
+        if (!isFocus) {
+            setDetail(null);
+            setDetailLoading(false);
+            setDetailError(null);
+            return;
+        }
+        const controller = new AbortController();
+        const params = new URLSearchParams({
+            rsn,
+            year: String(year),
+            kind,
+        });
+        if (detailRetryNonce > 0) params.set('refresh', '1');
+
+        setDetailLoading(true);
+        setDetailError(null);
+
+        fetch(`/api/reasons/detail?${params}`, { signal: controller.signal })
+            .then(async (res) => {
+                const body = await res.json();
+                if (!res.ok || body?.error) {
+                    throw new Error(String(body?.error || `Request failed (${res.status})`));
+                }
+                setDetail(body as ReasonsDetailResponse);
+            })
+            .catch((err: unknown) => {
+                if (controller.signal.aborted) return;
+                setDetail(null);
+                setDetailError(err instanceof Error ? err.message : 'Reasons detail failed');
+            })
+            .finally(() => {
+                if (!controller.signal.aborted) setDetailLoading(false);
+            });
+
+        return () => controller.abort();
+    }, [isFocus, rsn, year, kind, detailRetryNonce]);
 
     const onSort = (nextSort: ReasonsSort) => {
         if (sort === nextSort) {
@@ -262,13 +314,13 @@ export function ReasonsPage() {
     const showingFrom = meta && meta.total > 0 ? (meta.page - 1) * meta.pageSize + 1 : 0;
     const showingTo = meta ? Math.min(meta.page * meta.pageSize, meta.total) : 0;
     const maxPage = meta ? Math.max(1, Math.ceil(meta.total / meta.pageSize) || 1) : 1;
-    const selectedRsn = meta?.selectedRsn || rsn;
 
     return (
         <div
             className={`dash-skin flex h-screen ${theme.pageBg} ${theme.textPrimary} font-sans overflow-hidden transition-colors duration-300`}
             data-skin="all"
             data-ui-theme={currentTheme}
+            data-mode={isFocus ? 'focus' : 'overview'}
         >
             {sidebarOpen && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden" onClick={() => setSidebarOpen(false)} />
@@ -294,10 +346,10 @@ export function ReasonsPage() {
                             </button>
                             <div className="min-w-0">
                                 <h1 className={`text-sm sm:text-base md:text-lg font-bold ${theme.textWhite} tracking-tight truncate`}>
-                                    Reasons
+                                    {isFocus ? 'Reasons Focus' : 'Reasons Overview'}
                                 </h1>
                                 <p className={`text-[11px] ${theme.textMuted} hidden sm:block`}>
-                                    QC root-cause tracking · list only
+                                    QC root-cause tracking · not the main dashboard · not Production Mix
                                 </p>
                             </div>
                         </div>
@@ -354,6 +406,21 @@ export function ReasonsPage() {
                     </div>
                 </header>
 
+                {isFocus ? (
+                    <ReasonsFocus
+                        theme={theme}
+                        currentTheme={currentTheme}
+                        accent={accent}
+                        rsn={rsn}
+                        kind={kind}
+                        year={year}
+                        loading={detailLoading}
+                        error={detailError}
+                        payload={detail}
+                        onBack={() => replaceQuery({ rsn: null })}
+                        onRetry={() => setDetailRetryNonce((n) => n + 1)}
+                    />
+                ) : (
                 <div className="flex-1 overflow-y-auto min-h-0 p-3 sm:p-4 md:p-6">
                     <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl shadow-sm overflow-hidden`}>
                         <div className={`${LIST_COLS} px-3 py-2.5 border-b ${theme.borderColor} sticky top-0 z-10 ${theme.cardBg}`}>
@@ -376,7 +443,7 @@ export function ReasonsPage() {
                                 <p className={`text-xs ${theme.textMuted} mb-4`}>{error}</p>
                                 <button
                                     type="button"
-                                    onClick={() => setRetryNonce((n) => n + 1)}
+                                    onClick={() => setListRetryNonce((n) => n + 1)}
                                     className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-white"
                                     style={{ background: accent }}
                                 >
@@ -391,16 +458,14 @@ export function ReasonsPage() {
                             </p>
                         )}
                         {!loading && !error && items.map((item, i) => {
-                            const highlighted = Boolean(selectedRsn) && item.rsn === selectedRsn;
                             const rank = showingFrom + i;
                             return (
                                 <button
                                     key={item.rsn}
                                     type="button"
-                                    onClick={() => replaceQuery({ rsn: highlighted ? null : item.rsn })}
-                                    className={`${LIST_COLS} w-full text-left px-3 py-2.5 border-b ${theme.borderColor} ${theme.tableRowHover} ${
-                                        highlighted ? 'bg-amber-500/15 ring-1 ring-inset ring-amber-400/40' : ''
-                                    }`}
+                                    onClick={() => replaceQuery({ rsn: item.rsn })}
+                                    className={`${LIST_COLS} w-full text-left px-3 py-2.5 border-b ${theme.borderColor} ${theme.tableRowHover}`}
+                                    aria-label={`Focus ${item.rsn}`}
                                 >
                                     <span className={`tabular-nums text-xs font-bold ${theme.textMuted}`}>{rank}</span>
                                     <span className={`text-xs sm:text-sm font-bold leading-snug whitespace-normal break-words ${theme.textSecondary}`}>
@@ -463,6 +528,7 @@ export function ReasonsPage() {
                         </div>
                     </div>
                 </div>
+                )}
             </main>
         </div>
     );

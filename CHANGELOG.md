@@ -2,7 +2,12 @@
 
 All notable changes to the **Sorting Dashboard** project will be documented in this file.
 
-## [1.6.69] - 2026-09-11
+## [1.6.70] - 2026-09-11
+
+### Added
+- **Reasons Overview → Focus:** `/reasons` now has two modes. **Overview** (menu default) is the existing top-defects list from `GET /api/reasons` only (year + Scrap|Reject + search; columns #, reason, Qty, %, Trend). Click a row — or deep-link from Mix Top 10 with `?rsn=` — to enter **Focus**. Focus loads `GET /api/reasons/detail?rsn=&year=&kind=` once: left ~60% monthly trend, right ~40% Top codeware (#, code, qty, %). Back returns to Overview. Read-only SELECT/aggregates; no Mix filter bar, no raw logs, no database writes.
+
+---
 
 ### Added
 - **Reasons (slice 1):** New `/reasons` page and read-only `GET /api/reasons` list for QC root-cause tracking. Aggregates `rsn_desc` qty / % / monthly spark by year and scrap|reject. Search, pagination, Qty/% sort, and `?rsn=` row highlight only — no detail panel, no raw year dump, no database writes.

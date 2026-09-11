@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
+import Link from 'next/link';
 import {
     Bar,
     BarChart,
@@ -41,6 +42,7 @@ import {
     type QtyProcTrendView,
     type QtyProcYearFilter,
 } from '@/lib/qtyproc';
+import { reasonsFocusHref } from '@/lib/reasons';
 
 const PROCESS_COLOR = '#3b82f6';
 const COMP_COLOR = '#16a34a';
@@ -508,10 +510,14 @@ function QualityTopList({
     items,
     color,
     theme,
+    year,
+    kind,
 }: {
     items: { label: string; qty: number; pct: number }[];
     color: string;
     theme: Theme;
+    year: number;
+    kind: 'scrap' | 'reject';
 }) {
     if (items.length === 0) {
         return <p className={`text-[11px] ${theme.textMuted}`}>No data</p>;
@@ -519,9 +525,14 @@ function QualityTopList({
     return (
         <div className={`grid ${QUALITY_LIST_COLS} gap-x-2 gap-y-1 items-start`}>
             {items.map((item, i) => (
-                <div key={item.label} className="contents">
+                <Link
+                    key={item.label}
+                    href={reasonsFocusHref({ rsn: item.label, year, kind })}
+                    className={`contents ${theme.tableRowHover}`}
+                    title={`Open Reasons Focus · ${item.label}`}
+                >
                     <span className={`tabular-nums text-xs font-bold ${theme.textMuted} pt-0.5`}>{i + 1}</span>
-                    <span className={`text-xs font-bold leading-snug whitespace-normal break-words ${theme.textSecondary}`}>
+                    <span className={`text-xs font-bold leading-snug whitespace-normal break-words ${theme.textSecondary} hover:underline`}>
                         {item.label}
                     </span>
                     <span className="tabular-nums text-right text-xs font-semibold pt-0.5" style={{ color }}>
@@ -530,7 +541,7 @@ function QualityTopList({
                     <span className={`tabular-nums text-right text-xs ${theme.textMuted} pt-0.5`}>
                         {item.pct.toFixed(1)}
                     </span>
-                </div>
+                </Link>
             ))}
         </div>
     );
@@ -542,7 +553,7 @@ function QualityTopByPeriod({
     rejectColor,
     theme,
 }: {
-    periods: { name: string; scrap: { label: string; qty: number; pct: number }[]; reject: { label: string; qty: number; pct: number }[] }[];
+    periods: { name: string; year: number; scrap: { label: string; qty: number; pct: number }[]; reject: { label: string; qty: number; pct: number }[] }[];
     scrapColor: string;
     rejectColor: string;
     theme: Theme;
@@ -604,6 +615,8 @@ function QualityTopByPeriod({
                             items={kind === 'scrap' ? period.scrap : period.reject}
                             color={activeColor}
                             theme={theme}
+                            year={period.year}
+                            kind={kind}
                         />
                     </section>
                 ))}
@@ -1092,6 +1105,7 @@ export function QtyProcessView({
         const rows = qualityReasonRows.filter((r) => r.y === y && (m == null || Number(r.m) === m));
         return {
             name: row.name,
+            year: y,
             scrap: topQualityReasons(rows.filter((r) => r.kind === 'scrap'), row.Process),
             reject: topQualityReasons(rows.filter((r) => r.kind === 'reject'), row.Process),
         };

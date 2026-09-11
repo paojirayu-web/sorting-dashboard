@@ -88,7 +88,7 @@ export function Sidebar({ theme, view, isSidebarOpen, onSetView, onClose }: Side
                         if (window.innerWidth < 768) onClose();
                     }}
                     className={itemClass(onReasons)}
-                    title="Reasons"
+                    title="Reasons Overview"
                 >
                     <ListTree size={20} />
                     {isSidebarOpen && <span className={onReasons ? "font-semibold" : "font-medium"}>Reasons</span>}

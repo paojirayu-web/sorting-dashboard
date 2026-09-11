@@ -69,6 +69,17 @@ export function SettingsView({ theme, currentTheme, setCurrentTheme }: SettingsV
                     theme={theme}
                 >
                 <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.70 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-11</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Added</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Reasons Overview → Focus:</strong> <code className={`${theme.inputBg} px-1 rounded`}>/reasons</code> has two modes. Overview (menu default) uses existing <code className={`${theme.inputBg} px-1 rounded`}>GET /api/reasons</code> only — year + Scrap/Reject + search. Click a row or Mix Top 10 <code className={`${theme.inputBg} px-1 rounded`}>?rsn=</code> to open Focus, which then loads <code className={`${theme.inputBg} px-1 rounded`}>GET /api/reasons/detail</code> (trend + Top codeware). Not the main dashboard and not Production Mix. Database access is SELECT/aggregates only.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
                     <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.69 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-11</span></h3>
                     <div className="space-y-4">
                         <div>
