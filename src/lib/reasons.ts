@@ -1,9 +1,13 @@
-/** QC Reasons list contract (slice 1). Pure helpers — no I/O. */
+/** QC Reasons list + detail contract. Pure helpers — no I/O. */
 
 export const REASONS_MAX_PAGE_SIZE = 100;
 export const REASONS_DEFAULT_PAGE_SIZE = 50;
 export const REASONS_SPARK_MONTHS = 12;
 export const REASONS_MIN_CE_YEAR = 2020;
+export const REASONS_CODEWARE_TOP_N = 10;
+export const REASONS_MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
+/** Accepted on APIs for later slices — not shown in this PR's UI. */
+export const REASONS_FUTURE_FILTER_KEYS = ['unit', 'shape', 'forming', 'customer', 'glaze', 'cp'] as const;
 
 export type ReasonsKind = 'scrap' | 'reject';
 export type ReasonsSort = 'qty' | 'pct';
@@ -39,6 +43,64 @@ export type ReasonsQueryInput = {
     rsn?: string | null;
     sort?: string | null;
     dir?: string | null;
+};
+
+export type ReasonsTrendPoint = {
+    mo: number;
+    label: string;
+    qty: number;
+};
+
+export type ReasonsCodewareItem = {
+    code: string;
+    qty: number;
+    pct: number;
+};
+
+export type ReasonsDetailMeta = {
+    generatedAt: string;
+    stale: boolean;
+    rsn: string;
+    year: number;
+    kind: ReasonsKind;
+    qty: number;
+};
+
+export type ReasonsDetailResponse = {
+    trend: ReasonsTrendPoint[];
+    codeware: ReasonsCodewareItem[];
+    meta: ReasonsDetailMeta;
+};
+
+export type ReasonsDetailQueryInput = {
+    rsn?: string | null;
+    year?: string | null;
+    kind?: string | null;
+    unit?: string | null;
+    shape?: string | null;
+    forming?: string | null;
+    customer?: string | null;
+    glaze?: string | null;
+    cp?: string | null;
+};
+
+export type ReasonsDetailParams = {
+    rsn: string;
+    year: number;
+    kind: ReasonsKind;
+    /** Stored for a later filter slice; ignored by this PR's query. */
+    unit: string;
+    shape: string;
+    forming: string;
+    customer: string;
+    glaze: string;
+    cp: string;
+};
+
+export type ReasonsDetailRow = {
+    mo: number;
+    code: string;
+    qty: number;
 };
 
 export type ReasonsListParams = {
@@ -122,6 +184,47 @@ export function parseReasonsListParams(input: ReasonsQueryInput, now: Date = ban
         sort: parseReasonsSort(input.sort),
         dir: parseReasonsDir(input.dir),
     };
+}
+
+function optionalFilter(raw: string | null | undefined): string {
+    return String(raw || '').trim();
+}
+
+export function parseReasonsDetailParams(input: ReasonsDetailQueryInput, now: Date = bangkokNow()): ReasonsDetailParams {
+    return {
+        rsn: String(input.rsn || '').trim(),
+        year: parseReasonsYear(input.year, now),
+        kind: parseReasonsKind(input.kind),
+        unit: optionalFilter(input.unit),
+        shape: optionalFilter(input.shape),
+        forming: optionalFilter(input.forming),
+        customer: optionalFilter(input.customer),
+        glaze: optionalFilter(input.glaze),
+        cp: optionalFilter(input.cp),
+    };
+}
+
+/** Deep-link into Reasons Focus from Mix Top 10 (or any rsn row). */
+export function reasonsFocusHref(input: { rsn: string; year?: number | string | null; kind?: ReasonsKind | null }): string {
+    const params = new URLSearchParams();
+    params.set('rsn', input.rsn);
+    if (input.year != null && String(input.year) !== '') params.set('year', String(input.year));
+    if (input.kind) params.set('kind', input.kind);
+    return `/reasons?${params.toString()}`;
+}
+
+/** Ware label for Top codeware. DW 143 keeps desc2 when present. */
+export function formatReasonsCodewareLabel(input: {
+    pt_desc1?: string | null;
+    pt_desc2?: string | null;
+    m_part?: string | null;
+}): string {
+    const desc1 = String(input.pt_desc1 || '').trim();
+    const desc2 = String(input.pt_desc2 || '').trim();
+    const part = String(input.m_part || '').trim();
+    if (!desc1) return '';
+    if (part.startsWith('143') && desc2) return `${desc1} (${desc2})`;
+    return desc1;
 }
 
 export function yearBounds(year: number): { start: string; end: string } {
@@ -214,4 +317,52 @@ export function buildReasonsList(
     if (selectedRsn) meta.selectedRsn = selectedRsn;
 
     return { items, meta };
+}
+
+/** Build Focus trend + Top codeware from monthly×code aggregates. pct uses this defect's year total. */
+export function buildReasonsDetail(
+    rows: ReasonsDetailRow[],
+    params: Pick<ReasonsDetailParams, 'rsn' | 'year' | 'kind'>,
+    options?: { generatedAt?: string; stale?: boolean; topN?: number },
+): ReasonsDetailResponse {
+    const spark = emptySpark();
+    const byCode = new Map<string, number>();
+    for (const row of rows) {
+        const qty = Number(row.qty) || 0;
+        if (qty <= 0) continue;
+        const idx = monthIndex(Number(row.mo));
+        if (idx != null) spark[idx] += qty;
+        const code = String(row.code || '').trim();
+        if (code) byCode.set(code, (byCode.get(code) || 0) + qty);
+    }
+
+    const qty = spark.reduce((sum, value) => sum + value, 0);
+    const trend: ReasonsTrendPoint[] = spark.map((monthQty, i) => ({
+        mo: i + 1,
+        label: REASONS_MONTH_LABELS[i],
+        qty: monthQty,
+    }));
+
+    const topN = options?.topN ?? REASONS_CODEWARE_TOP_N;
+    const codeware: ReasonsCodewareItem[] = [...byCode.entries()]
+        .map(([code, codeQty]) => ({
+            code,
+            qty: codeQty,
+            pct: qty > 0 ? (codeQty / qty) * 100 : 0,
+        }))
+        .sort((a, b) => b.qty - a.qty || a.code.localeCompare(b.code, 'th'))
+        .slice(0, topN);
+
+    return {
+        trend,
+        codeware,
+        meta: {
+            generatedAt: options?.generatedAt || formatGeneratedAt(),
+            stale: Boolean(options?.stale),
+            rsn: params.rsn,
+            year: params.year,
+            kind: params.kind,
+            qty,
+        },
+    };
 }
