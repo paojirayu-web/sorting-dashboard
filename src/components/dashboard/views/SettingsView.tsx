@@ -69,6 +69,17 @@ export function SettingsView({ theme, currentTheme, setCurrentTheme }: SettingsV
                     theme={theme}
                 >
                 <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.69 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-11</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Added</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Reasons (slice 1):</strong> New <code className={`${theme.inputBg} px-1 rounded`}>/reasons</code> page and read-only <code className={`${theme.inputBg} px-1 rounded`}>GET /api/reasons</code> list for QC root-cause tracking. Year + Scrap/Reject, search, pagination, Qty/% sort, and <code className={`${theme.inputBg} px-1 rounded`}>?rsn=</code> highlight only. Database access is SELECT/aggregates only.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
                     <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.68 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-06</span></h3>
                     <div className="space-y-4">
                         <div>

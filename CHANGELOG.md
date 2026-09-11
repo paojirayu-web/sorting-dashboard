@@ -2,6 +2,13 @@
 
 All notable changes to the **Sorting Dashboard** project will be documented in this file.
 
+## [1.6.69] - 2026-09-11
+
+### Added
+- **Reasons (slice 1):** New `/reasons` page and read-only `GET /api/reasons` list for QC root-cause tracking. Aggregates `rsn_desc` qty / % / monthly spark by year and scrap|reject. Search, pagination, Qty/% sort, and `?rsn=` row highlight only — no detail panel, no raw year dump, no database writes.
+
+---
+
 ## [1.6.68] - 2026-09-06
 
 ### Added
