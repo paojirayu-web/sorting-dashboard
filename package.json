@@ -6,7 +6,8 @@
     "dev": "next dev -p 8021",
     "build": "next build",
     "start": "next start -p 8021",
-    "lint": "eslint"
+    "lint": "eslint",
+    "check:reasons": "tsx scripts/check-reasons-list.ts"
   },
   "dependencies": {
     "@napi-rs/canvas": "^1.0.0",

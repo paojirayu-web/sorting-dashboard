@@ -11,3 +11,4 @@ export { MonthlyAnalysisView } from './views/MonthlyAnalysisView';
 export { QtyProcessView } from './views/QtyProcessView';
 export { DefectAnalysisView } from './views/DefectAnalysisView';
 export { SettingsView } from './views/SettingsView';
+export { ReasonsPage } from './ReasonsPage';
