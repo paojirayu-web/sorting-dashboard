@@ -696,7 +696,7 @@ export function QtyProcessView({
     glaze,
 }: QtyProcessViewProps) {
     const [trendView, setTrendView] = useState<QtyProcTrendView>('forming');
-    const [showQualityNumbers, setShowQualityNumbers] = useState(false);
+    const [showQualityNumbers, setShowQualityNumbers] = useState(true);
 
     const isMonthly = year !== 'all';
     const selectedYear = year === 'all' ? QTYPROC_DISPLAY_BE_YEARS[0] : year;
