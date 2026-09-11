@@ -366,7 +366,7 @@ export function ReasonsPage() {
                                 <SortHead label="%" active={sort === 'pct'} dir={dir} onClick={() => onSort('pct')} theme={theme} />
                             </div>
                             <span className={`justify-self-end text-[10px] font-bold uppercase tracking-wide ${theme.textMuted}`}>
-                                Spark
+                                Trend
                             </span>
                         </div>
                         {loading && <SkeletonRows theme={theme} />}
