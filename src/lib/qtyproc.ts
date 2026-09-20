@@ -10,6 +10,7 @@ export const QTYPROC_DISPLAY_BE_YEARS = QTYPROC_BE_YEARS.filter((y) => y >= 2567
 export const QTYPROC_MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
 
 export const QTYPROC_HIDDEN_KEYS = new Set(['unknown', 'unclassified', '']);
+export const QTYPROC_UNCLASSIFIED_GROUP = 'unclassified';
 
 export const SHAPE_LABEL: Record<string, string> = {
     plate: 'Plate',
@@ -57,8 +58,90 @@ export const QTYPROC_SCOPE_OPTIONS: { value: QtyProcScope; label: string }[] = [
 export type QtyProcCpFilter = 'all' | 'C' | 'C1' | 'CUSTOM' | 'FRIT' | 'BOM' | QtyProcPRound;
 export type QtyProcCp = 'C' | 'FRIT' | 'BOM' | 'CUSTOM_C' | QtyProcPRound;
 export type QtyProcLineFilter = 'all' | 'WHITE' | 'BLACK';
-export type QtyProcTrendView = 'shape' | 'forming';
+export type QtyProcTrendView = 'group' | 'forming';
 export const QTYPROC_GLAZE_TYPES = ['T', 'G', 'A', 'SM', 'M'] as const;
+export type QtyProcGroupInfo = { code: string; name: string };
+
+const GROUP_FAMILY_COLOR: Record<string, string> = {
+    '0': '#71717a',
+    '1': '#c45c32',
+    '2': '#3b82f6',
+    '3': '#22c55e',
+    '4': '#a1a1aa',
+    '5': '#8b5cf6',
+    '6': '#0ea5e9',
+    '7': '#ec4899',
+    '8': '#eab308',
+};
+
+export function qtyProcGroupColor(code: string | null | undefined): string {
+    const family = String(code || '').trim()[0] || '0';
+    return GROUP_FAMILY_COLOR[family] || '#71717a';
+}
+
+export function qtyProcGroupLabels(
+    mix: { group?: string; groupLabel?: string }[] | undefined,
+): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const row of mix || []) {
+        const code = String(row.group || '').trim();
+        if (!code) continue;
+        out[code] = String(row.groupLabel || code).trim() || code;
+    }
+    return out;
+}
+
+/** Empty or `all` means every group. */
+export type QtyProcGroupFilter = string[];
+export type QtyProcQualityView = 'period' | 'group';
+
+export function qtyProcGroupIsAll(filter: string[] | string | null | undefined): boolean {
+    if (filter == null) return true;
+    const keys = Array.isArray(filter) ? filter : [filter];
+    return keys.length === 0 || keys.every((key) => !key || key === 'all');
+}
+
+export function qtyProcGroupsSelected(filter: string[] | string | null | undefined): string[] {
+    if (qtyProcGroupIsAll(filter)) return [];
+    const keys = Array.isArray(filter) ? filter : [filter];
+    return keys.filter((key): key is string => Boolean(key) && key !== 'all');
+}
+
+export function qtyProcGroupMatches(
+    filter: string[] | string | null | undefined,
+    rowGroup: string | null | undefined,
+): boolean {
+    const selected = qtyProcGroupsSelected(filter);
+    if (!selected.length) return true;
+    return selected.includes(String(rowGroup || ''));
+}
+
+export function qtyProcPruneGroups(selected: string[], keys: string[]): string[] {
+    if (qtyProcGroupIsAll(selected)) return selected.length === 0 ? selected : [];
+    const next = selected.filter((key) => keys.includes(key));
+    return next.length === selected.length ? selected : next;
+}
+
+/** MUG&CUP (S) / MUG&CUP EMB/DMB (XL) → MUG&CUP. PLATE (L) → PLATE. */
+export function qtyProcMajorGroup(label: string | null | undefined): string {
+    const name = String(label || '').trim();
+    if (!name) return 'Other';
+    const noSize = name.replace(/\s*\((?:S|M|L|XL|XXL)\)\s*$/i, '').trim() || name;
+    return noSize.split(/\s+/)[0] || noSize;
+}
+
+export function qtyProcResolveGroup(
+    mPart: string | null | undefined,
+    lookup?: Map<string, QtyProcGroupInfo>,
+): QtyProcGroupInfo {
+    const part = String(mPart || '').trim();
+    const hit = part ? lookup?.get(part) : undefined;
+    if (hit?.code) {
+        return { code: hit.code, name: hit.name || hit.code };
+    }
+    return { code: QTYPROC_UNCLASSIFIED_GROUP, name: 'Unclassified' };
+}
+
 export type QtyProcGlaze = (typeof QTYPROC_GLAZE_TYPES)[number];
 export const GLAZE_LABEL: Record<QtyProcGlaze, string> = {
     T: 'Transparent',
@@ -141,12 +224,16 @@ export function qtyProcCustomer(desc2: string | null | undefined): string {
 }
 
 export function qtyProcMixKeys(
-    mix: { shape: string; forming: string; customer?: string }[] | undefined,
-    field: 'shape' | 'forming' | 'customer',
+    mix: { shape: string; forming: string; customer?: string; group?: string }[] | undefined,
+    field: 'shape' | 'forming' | 'customer' | 'group',
 ): string[] {
     const keys = new Set<string>();
     for (const row of mix || []) {
-        const key = field === 'customer' ? (row.customer || '(blank)') : row[field];
+        const key = field === 'customer'
+            ? (row.customer || '(blank)')
+            : field === 'group'
+                ? (row.group || '')
+                : row[field];
         if (!key || (field !== 'customer' && QTYPROC_HIDDEN_KEYS.has(String(key).toLowerCase()))) continue;
         keys.add(key);
     }
@@ -154,6 +241,9 @@ export function qtyProcMixKeys(
     if (field === 'customer') {
         const named = list.filter((k) => k !== '(blank)').sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
         return keys.has('(blank)') ? [...named, '(blank)'] : named;
+    }
+    if (field === 'group') {
+        return list.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
     }
     return list.sort();
 }
@@ -190,6 +280,7 @@ export type QtyProcJobRow = {
     mo: number;
     m_cp: string;
     is_round1: number;
+    m_part?: string | null;
     pt_desc1: string | null;
     pt_desc2?: string | null;
     tone: string;
@@ -228,6 +319,8 @@ export type QtyProcMixRow = {
     m: number;
     shape: string;
     forming: string;
+    group: string;
+    groupLabel: string;
     cp: QtyProcCp;
     tone: string;
     customer: string;
@@ -245,6 +338,7 @@ export type QtyProcReasonJobRow = {
     mo: number;
     m_cp: string;
     is_round1: number;
+    m_part?: string | null;
     pt_desc1: string | null;
     pt_desc2?: string | null;
     tone: string;
@@ -261,6 +355,8 @@ export type QtyProcReasonRow = {
     kind: QtyProcReasonKind;
     shape: string;
     forming: string;
+    group: string;
+    groupLabel: string;
     cp: QtyProcCp;
     tone: string;
     customer: string;
@@ -374,7 +470,7 @@ function pQtyKey(p: QtyProcPRound): 'p1' | 'p2' | 'p3' | 'p4' | 'p5' {
 }
 
 function addQtyProcMix(mix: Map<string, QtyProcMixRow>, row: QtyProcMixRow) {
-    const key = `${row.y}|${row.m}|${row.shape}|${row.forming}|${row.cp}|${row.tone}|${row.customer}|${row.glaze}`;
+    const key = `${row.y}|${row.m}|${row.group}|${row.shape}|${row.forming}|${row.cp}|${row.tone}|${row.customer}|${row.glaze}`;
     const existing = mix.get(key);
     if (existing) {
         existing.qtyproc += row.qtyproc;
@@ -387,7 +483,7 @@ function addQtyProcMix(mix: Map<string, QtyProcMixRow>, row: QtyProcMixRow) {
 }
 
 function addQtyProcReason(reasons: Map<string, QtyProcReasonRow>, row: QtyProcReasonRow) {
-    const key = `${row.y}|${row.m}|${row.kind}|${row.rsn_desc}|${row.shape}|${row.forming}|${row.cp}|${row.tone}|${row.customer}|${row.glaze}`;
+    const key = `${row.y}|${row.m}|${row.kind}|${row.rsn_desc}|${row.group}|${row.shape}|${row.forming}|${row.cp}|${row.tone}|${row.customer}|${row.glaze}`;
     const existing = reasons.get(key);
     if (existing) {
         existing.qty += row.qty;
@@ -410,6 +506,7 @@ export function buildQtyProcPayload(
     dateRange: { min: string; max: string },
     scope: string,
     reasonJobs: QtyProcReasonJobRow[] = [],
+    groupByPart?: Map<string, QtyProcGroupInfo>,
 ): QtyProcPayload {
     const productYear = new Map<string, {
         ce: number;
@@ -421,6 +518,8 @@ export function buildQtyProcPayload(
             cp: 'C' | 'C1';
             shape: string;
             forming: string;
+            group: string;
+            groupLabel: string;
             qtyproc: number;
             qtycomp: number;
             qtyscrp: number;
@@ -434,6 +533,8 @@ export function buildQtyProcPayload(
         p: QtyProcPRound;
         shape: string;
         forming: string;
+        group: string;
+        groupLabel: string;
         tone: string;
         customer: string;
         glaze: string;
@@ -449,6 +550,7 @@ export function buildQtyProcPayload(
         if (ce < 2023 || ce > 2026) continue;
         const cp = displayCp(row.m_cp, row.is_round1);
         const { shape, forming } = classifyProduct(row.pt_desc1, row.pt_desc2);
+        const groupInfo = qtyProcResolveGroup(row.m_part, groupByPart);
         const desc1 = (row.pt_desc1 || '').trim();
         const desc2 = (row.pt_desc2 || '').trim();
         const tone = row.tone || 'NA';
@@ -460,6 +562,8 @@ export function buildQtyProcPayload(
                 p,
                 shape,
                 forming,
+                group: groupInfo.code,
+                groupLabel: groupInfo.name,
                 tone,
                 customer: qtyProcCustomer(desc2),
                 glaze: classifyGlaze(desc1, desc2),
@@ -483,6 +587,8 @@ export function buildQtyProcPayload(
             cp,
             shape,
             forming,
+            group: groupInfo.code,
+            groupLabel: groupInfo.name,
             qtyproc: num(row.qtyp),
             qtycomp: num(row.qtycomp),
             qtyscrp: num(row.qtyscrp),
@@ -536,6 +642,17 @@ export function buildQtyProcPayload(
         year.byForming[forming] = (year.byForming[forming] || 0) + qty;
 
         const monthQty = new Map<number, { qtyproc: number; qtycomp: number; qtyscrp: number; qtyrjct: number }>();
+        const monthGroupQty = new Map<string, {
+            m: number;
+            group: string;
+            groupLabel: string;
+            shape: string;
+            forming: string;
+            qtyproc: number;
+            qtycomp: number;
+            qtyscrp: number;
+            qtyrjct: number;
+        }>();
         for (const j of firstJobs) {
             const slot = monthQty.get(j.mo) || { qtyproc: 0, qtycomp: 0, qtyscrp: 0, qtyrjct: 0 };
             slot.qtyproc += j.qtyproc;
@@ -543,6 +660,23 @@ export function buildQtyProcPayload(
             slot.qtyscrp += j.qtyscrp;
             slot.qtyrjct += j.qtyrjct;
             monthQty.set(j.mo, slot);
+            const gKey = `${j.mo}|${j.group}|${j.shape}|${j.forming}`;
+            const gSlot = monthGroupQty.get(gKey) || {
+                m: j.mo,
+                group: j.group,
+                groupLabel: j.groupLabel,
+                shape: j.shape,
+                forming: j.forming,
+                qtyproc: 0,
+                qtycomp: 0,
+                qtyscrp: 0,
+                qtyrjct: 0,
+            };
+            gSlot.qtyproc += j.qtyproc;
+            gSlot.qtycomp += j.qtycomp;
+            gSlot.qtyscrp += j.qtyscrp;
+            gSlot.qtyrjct += j.qtyrjct;
+            monthGroupQty.set(gKey, gSlot);
         }
         for (const [m, q] of monthQty) {
             if (m < 1 || m > 12) continue;
@@ -560,12 +694,16 @@ export function buildQtyProcPayload(
             } else {
                 slot.c += q.qtyproc;
             }
-
+        }
+        for (const q of monthGroupQty.values()) {
+            if (q.m < 1 || q.m > 12) continue;
             addQtyProcMix(mix, {
                 y: Number(be),
-                m,
-                shape,
-                forming,
+                m: q.m,
+                shape: q.shape,
+                forming: q.forming,
+                group: q.group,
+                groupLabel: q.groupLabel,
                 cp: kind,
                 tone,
                 customer,
@@ -579,6 +717,17 @@ export function buildQtyProcPayload(
 
         if (hasC1) {
             const cByMonth = new Map<number, { qtyproc: number; qtycomp: number; qtyscrp: number; qtyrjct: number }>();
+            const cByMonthGroup = new Map<string, {
+                m: number;
+                group: string;
+                groupLabel: string;
+                shape: string;
+                forming: string;
+                qtyproc: number;
+                qtycomp: number;
+                qtyscrp: number;
+                qtyrjct: number;
+            }>();
             for (const j of jobs) {
                 if (j.cp !== 'C') continue;
                 const slot = cByMonth.get(j.mo) || { qtyproc: 0, qtycomp: 0, qtyscrp: 0, qtyrjct: 0 };
@@ -587,6 +736,23 @@ export function buildQtyProcPayload(
                 slot.qtyscrp += j.qtyscrp;
                 slot.qtyrjct += j.qtyrjct;
                 cByMonth.set(j.mo, slot);
+                const gKey = `${j.mo}|${j.group}|${j.shape}|${j.forming}`;
+                const gSlot = cByMonthGroup.get(gKey) || {
+                    m: j.mo,
+                    group: j.group,
+                    groupLabel: j.groupLabel,
+                    shape: j.shape,
+                    forming: j.forming,
+                    qtyproc: 0,
+                    qtycomp: 0,
+                    qtyscrp: 0,
+                    qtyrjct: 0,
+                };
+                gSlot.qtyproc += j.qtyproc;
+                gSlot.qtycomp += j.qtycomp;
+                gSlot.qtyscrp += j.qtyscrp;
+                gSlot.qtyrjct += j.qtyrjct;
+                cByMonthGroup.set(gKey, gSlot);
             }
             const cTotal = [...cByMonth.values()].reduce((s, q) => s + q.qtyproc, 0);
             const cap = Math.min(cTotal, qty);
@@ -596,11 +762,17 @@ export function buildQtyProcPayload(
                 if (m < 1 || m > 12 || customQty <= 0) continue;
                 year.customC += customQty;
                 year.months[m - 1].customC += customQty;
+            }
+            for (const q of cByMonthGroup.values()) {
+                const customQty = q.qtyproc * scale;
+                if (q.m < 1 || q.m > 12 || customQty <= 0) continue;
                 addQtyProcMix(mix, {
                     y: Number(be),
-                    m,
-                    shape,
-                    forming,
+                    m: q.m,
+                    shape: q.shape,
+                    forming: q.forming,
+                    group: q.group,
+                    groupLabel: q.groupLabel,
                     cp: 'CUSTOM_C',
                     tone,
                     customer,
@@ -641,6 +813,8 @@ export function buildQtyProcPayload(
             m: row.mo,
             shape: row.shape,
             forming: row.forming,
+            group: row.group,
+            groupLabel: row.groupLabel,
             cp: row.p,
             tone: row.tone,
             customer: row.customer,
@@ -663,6 +837,7 @@ export function buildQtyProcPayload(
         const mo = Number(row.mo) || 0;
         if (mo < 1 || mo > 12) continue;
         const { shape, forming } = classifyProduct(row.pt_desc1, row.pt_desc2);
+        const groupInfo = qtyProcResolveGroup(row.m_part, groupByPart);
         addQtyProcReason(reasons, {
             y: ce + BE_OFFSET,
             m: mo,
@@ -670,6 +845,8 @@ export function buildQtyProcPayload(
             kind: row.kind === 'reject' ? 'reject' : 'scrap',
             shape,
             forming,
+            group: groupInfo.code,
+            groupLabel: groupInfo.name,
             cp,
             tone: row.tone || 'NA',
             customer: qtyProcCustomer(row.pt_desc2),

@@ -38,6 +38,7 @@ next-env.d.ts
 
 # qty process disk cache
 /data/qtyproc-cache.json
+/data/reasons-cache-*.json
 
 # env (keep example only)
 .env

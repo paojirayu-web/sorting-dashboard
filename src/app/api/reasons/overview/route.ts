@@ -1,24 +1,23 @@
 import { NextResponse } from 'next/server';
-import { getReasonsListResponse } from '@/lib/reasons-query';
+import { getReasonsOverviewResponse } from '@/lib/reasons-query';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
 
-/** Read-only QC reasons list. GET only — no writes. */
+/** Read-only QC reasons Layer A overview. GET only — no writes. */
 export async function GET(request: Request) {
     try {
         const { searchParams } = new URL(request.url);
-        const payload = await getReasonsListResponse(
+        const payload = await getReasonsOverviewResponse(
             {
                 year: searchParams.get('year'),
                 kind: searchParams.get('kind'),
-                q: searchParams.get('q'),
-                page: searchParams.get('page'),
-                pageSize: searchParams.get('pageSize'),
-                rsn: searchParams.get('rsn'),
-                sort: searchParams.get('sort'),
-                dir: searchParams.get('dir'),
+                family: searchParams.get('family'),
+                tone: searchParams.get('tone'),
                 cp: searchParams.get('cp'),
+                group: searchParams.get('group'),
+                forming: searchParams.get('forming'),
+                glaze: searchParams.get('glaze'),
             },
             searchParams.get('refresh') === '1',
         );
@@ -26,8 +25,8 @@ export async function GET(request: Request) {
             headers: { 'Cache-Control': 'no-store' },
         });
     } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : 'Reasons query failed';
-        console.error('reasons API error:', error);
+        const message = error instanceof Error ? error.message : 'Reasons overview failed';
+        console.error('reasons overview API error:', error);
         return NextResponse.json({ error: message }, { status: 500 });
     }
 }

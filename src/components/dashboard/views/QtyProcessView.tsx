@@ -29,14 +29,18 @@ import {
     QTYPROC_MONTH_LABELS,
     QTYPROC_PAGE_TITLE,
     QTYPROC_P_ROUNDS,
-    SHAPE_COLOR,
-    SHAPE_LABEL,
+    qtyProcGroupColor,
+    qtyProcGroupLabels,
+    qtyProcGroupIsAll,
+    qtyProcGroupMatches,
+    qtyProcMajorGroup,
     pRoundOf,
     qtyProcLineMatches,
     qtyProcRowMatches,
     type QtyProcCpFilter,
     type QtyProcLineFilter,
     type QtyProcPayload,
+    type QtyProcQualityView,
     type QtyProcReasonRow,
     type QtyProcScope,
     type QtyProcTrendView,
@@ -87,7 +91,7 @@ interface QtyProcessViewProps {
     line: QtyProcLineFilter;
     cp: QtyProcCpFilter;
     scope: QtyProcScope;
-    shape: string;
+    group: string[];
     forming: string;
     customer: string;
     glaze: string;
@@ -169,6 +173,27 @@ function qualityBarPcts(actual: { complete: number; reject: number; scrap: numbe
     return out;
 }
 
+function qualityFromCounts(name: string, process: number, complete: number, scrap: number, reject: number) {
+    const other = Math.max(0, process - complete - scrap - reject);
+    const completePct = process ? (complete / process) * 100 : 0;
+    const scrapPct = process ? (scrap / process) * 100 : 0;
+    const rejectPct = process ? (reject / process) * 100 : 0;
+    const otherPct = process ? (other / process) * 100 : 0;
+    return {
+        name,
+        Process: process,
+        Complete: complete,
+        Scrap: scrap,
+        Reject: reject,
+        Other: other,
+        completePct,
+        scrapPct,
+        rejectPct,
+        otherPct,
+        ...qualityBarPcts({ complete: completePct, reject: rejectPct, scrap: scrapPct, other: otherPct }),
+    };
+}
+
 const SERIES_COLOR: Record<string, string> = {
     Process: PROCESS_COLOR,
     Complete: COMP_COLOR,
@@ -202,9 +227,6 @@ function seriesColor(name: string | undefined, fallback?: string, isDark?: boole
     if (name === 'Reject' || name === 'Reject %') return isDark ? '#fb923c' : '#c2410c';
     if (SERIES_COLOR[name]) return SERIES_COLOR[name];
     if (FORM_COLOR[name]) return FORM_COLOR[name];
-    if (SHAPE_COLOR[name]) return SHAPE_COLOR[name];
-    const shapeKey = Object.keys(SHAPE_LABEL).find((k) => SHAPE_LABEL[k] === name);
-    if (shapeKey && SHAPE_COLOR[shapeKey]) return SHAPE_COLOR[shapeKey];
     return fallback || '#71717a';
 }
 
@@ -533,7 +555,7 @@ function QualityTopList({
                     key={item.label}
                     href={reasonsFocusHref({ rsn: item.label, year, kind, family, tone })}
                     className={`contents ${theme.tableRowHover}`}
-                    title={`Open Reasons Focus · ${item.label}`}
+                    title={`Open Defects Focus · ${item.label}`}
                 >
                     <span className={`tabular-nums text-xs font-bold ${theme.textMuted} pt-0.5`}>{i + 1}</span>
                     <span className={`text-xs font-bold leading-snug whitespace-normal break-words ${theme.textSecondary} hover:underline`}>
@@ -711,12 +733,13 @@ export function QtyProcessView({
     line,
     cp,
     scope,
-    shape,
+    group,
     forming,
     customer,
     glaze,
 }: QtyProcessViewProps) {
     const [trendView, setTrendView] = useState<QtyProcTrendView>('forming');
+    const [qualityView, setQualityView] = useState<QtyProcQualityView>('period');
     const [showQualityNumbers, setShowQualityNumbers] = useState(true);
 
     const isMonthly = year !== 'all';
@@ -731,11 +754,11 @@ export function QtyProcessView({
     const rejectColor = isDark ? '#fb923c' : '#c2410c';
     const otherColor = isDark ? '#52525b' : '#cbd5e1';
 
-    const mixOk = (r: { shape: string; forming: string; tone?: string; customer?: string; glaze?: string }) => {
-        if (QTYPROC_HIDDEN_KEYS.has(String(r.shape).toLowerCase()) || QTYPROC_HIDDEN_KEYS.has(String(r.forming).toLowerCase())) {
+    const mixOk = (r: { group?: string; shape?: string; forming: string; tone?: string; customer?: string; glaze?: string }) => {
+        if (QTYPROC_HIDDEN_KEYS.has(String(r.group || '').toLowerCase()) || QTYPROC_HIDDEN_KEYS.has(String(r.forming).toLowerCase())) {
             return false;
         }
-        if (shape !== 'all' && r.shape !== shape) return false;
+        if (!qtyProcGroupMatches(group, r.group)) return false;
         if (forming !== 'all' && r.forming !== forming) return false;
         if (!qtyProcLineMatches(line, r.tone || '')) return false;
         if (customer !== 'all' && (r.customer || '(blank)') !== customer) return false;
@@ -743,9 +766,9 @@ export function QtyProcessView({
         return true;
     };
 
-    const firingRowOk = (r: { y: number; shape: string; forming: string; tone?: string; customer?: string }) => mixOk(r);
+    const firingRowOk = (r: { y: number; group?: string; shape?: string; forming: string; tone?: string; customer?: string }) => mixOk(r);
 
-    const useYearTotals = shape === 'all' && forming === 'all' && line === 'all' && customer === 'all' && glaze === 'all';
+    const useYearTotals = qtyProcGroupIsAll(group) && forming === 'all' && line === 'all' && customer === 'all' && glaze === 'all';
 
     const emptyP = () => ({ p1: 0, p2: 0, p3: 0, p4: 0, p5: 0 });
 
@@ -902,12 +925,13 @@ export function QtyProcessView({
                             ];
     const showComparePct = !compareAsBars || compareSeries.length > 1;
 
-    const shapeKeys = useMemo(() => {
+    const groupLabelMap = useMemo(() => qtyProcGroupLabels(payload?.mix), [payload]);
+    const groupKeys = useMemo(() => {
         const keys = new Set<string>();
         (payload?.mix || []).forEach((r) => {
-            if (!QTYPROC_HIDDEN_KEYS.has(String(r.shape).toLowerCase())) keys.add(r.shape);
+            if (!QTYPROC_HIDDEN_KEYS.has(String(r.group || '').toLowerCase())) keys.add(r.group);
         });
-        return [...keys].sort();
+        return [...keys].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
     }, [payload]);
 
     const formingKeys = useMemo(() => {
@@ -954,14 +978,14 @@ export function QtyProcessView({
         ? QTYPROC_MONTH_LABELS.map((label, i) => toCompareRow(label, splitAt(selectedYear, i + 1)))
         : QTYPROC_DISPLAY_BE_YEARS.map((y) => toCompareRow(String(y), splitAt(y)));
 
-    const catPeriodRows = (field: 'shape' | 'forming', keys: string[]) => {
+    const catPeriodRows = (field: 'group' | 'forming', keys: string[]) => {
         const periods = isMonthly
             ? QTYPROC_MONTH_LABELS.map((label, i) => ({ name: label, y: selectedYear, m: i + 1 as number | null }))
             : QTYPROC_DISPLAY_BE_YEARS.map((y) => ({ name: String(y), y, m: null as number | null }));
         return periods.map((p) => {
             const row: Record<string, string | number> = { name: p.name };
             keys.forEach((k) => {
-                const label = field === 'shape' ? (SHAPE_LABEL[k] || k) : k;
+                const label = field === 'group' ? (groupLabelMap[k] || k) : k;
                 let total = 0;
                 let standard = 0;
                 let frit = 0;
@@ -985,10 +1009,10 @@ export function QtyProcessView({
         });
     };
 
-    const shapeYearRows = catPeriodRows('shape', shapeKeys);
+    const groupYearRows = catPeriodRows('group', groupKeys);
     const formYearRows = catPeriodRows('forming', formingKeys);
 
-    const mixSplit = (field: 'shape' | 'forming', k: string) => {
+    const mixSplit = (field: 'group' | 'forming', k: string) => {
         let standard = 0;
         let frit = 0;
         let bom = 0;
@@ -1005,14 +1029,6 @@ export function QtyProcessView({
         });
         return { Standard: standard, FRIT: frit, BOM: bom, P: p, qty: standard + frit + bom + p };
     };
-
-    const shapePie = donutItems(
-        shapeKeys.map((k) => ({
-            name: SHAPE_LABEL[k] || k,
-            color: SHAPE_COLOR[k] || '#71717a',
-            ...mixSplit('shape', k),
-        })),
-    );
 
     const formPie = donutItems(
         formingKeys.map((k) => ({
@@ -1076,30 +1092,31 @@ export function QtyProcessView({
                 }
             }
         }
-        const other = Math.max(0, process - complete - scrap - reject);
-        const completePct = process ? (complete / process) * 100 : 0;
-        const scrapPct = process ? (scrap / process) * 100 : 0;
-        const rejectPct = process ? (reject / process) * 100 : 0;
-        const otherPct = process ? (other / process) * 100 : 0;
-        const bars = qualityBarPcts({ complete: completePct, reject: rejectPct, scrap: scrapPct, other: otherPct });
-        return {
-            name,
-            Process: process,
-            Complete: complete,
-            Scrap: scrap,
-            Reject: reject,
-            Other: other,
-            completePct,
-            scrapPct,
-            rejectPct,
-            otherPct,
-            ...bars,
-        };
+        return qualityFromCounts(name, process, complete, scrap, reject);
     };
 
-    const qualityYears = isMonthly
+    const qualityPeriodRows = isMonthly
         ? QTYPROC_MONTH_LABELS.map((label, i) => qualityRow(label, selectedYear, i + 1))
         : QTYPROC_DISPLAY_BE_YEARS.map((y) => qualityRow(String(y), y));
+    const majorOf = (r: { group?: string; groupLabel?: string }) =>
+        qtyProcMajorGroup(r.groupLabel || groupLabelMap[r.group || ''] || r.group);
+    const qualityGroupRows = (() => {
+        const map = new Map<string, { process: number; complete: number; scrap: number; reject: number }>();
+        (payload?.mix || []).forEach((r) => {
+            if (!yearsSel.includes(r.y) || !firingRowOk(r) || !qtyProcRowMatches(cp, r.cp, scope)) return;
+            const name = majorOf(r);
+            const cur = map.get(name) || { process: 0, complete: 0, scrap: 0, reject: 0 };
+            cur.process += r.qtyproc;
+            cur.complete += Number(r.qtycomp) || Number((r as { comp?: number }).comp) || 0;
+            cur.scrap += Number(r.qtyscrp) || Number((r as { scrap?: number }).scrap) || 0;
+            cur.reject += Number(r.qtyrjct) || Number((r as { reject?: number }).reject) || 0;
+            map.set(name, cur);
+        });
+        return [...map.entries()]
+            .sort((a, b) => b[1].process - a[1].process || a[0].localeCompare(b[0]))
+            .map(([name, q]) => qualityFromCounts(name, q.process, q.complete, q.scrap, q.reject));
+    })();
+    const qualityYears = qualityView === 'group' ? qualityGroupRows : qualityPeriodRows;
     const qualityHasOther = qualityYears.some((row) => row.Other > 0);
 
     const qualityReasonRows = (payload?.reasons || []).filter((r) => (
@@ -1110,7 +1127,9 @@ export function QtyProcessView({
     const topByPeriod = qualityYears.map((row, i) => {
         const y = isMonthly ? selectedYear : QTYPROC_DISPLAY_BE_YEARS[i];
         const m = isMonthly ? i + 1 : null;
-        const rows = qualityReasonRows.filter((r) => r.y === y && (m == null || Number(r.m) === m));
+        const rows = qualityView === 'group'
+            ? qualityReasonRows.filter((r) => majorOf(r) === row.name)
+            : qualityReasonRows.filter((r) => r.y === y && (m == null || Number(r.m) === m));
         return {
             name: row.name,
             year: y,
@@ -1126,13 +1145,13 @@ export function QtyProcessView({
         { name: 'Black', qty: totalBlack, color: isDark ? '#52525b' : BLACK_COLOR },
     ]);
 
-    const trendTitle = trendView === 'shape' ? 'Shape Mix' : 'Forming Mix';
-    const rawTrendData = trendView === 'shape' ? shapeYearRows : formYearRows;
+    const trendTitle = trendView === 'group' ? 'Group Mix' : 'Forming Mix';
+    const rawTrendData = trendView === 'group' ? groupYearRows : formYearRows;
     const trendKeysAll =
-        trendView === 'shape'
-            ? shapeKeys.map((k) => ({ key: SHAPE_LABEL[k] || k, color: SHAPE_COLOR[k] || '#71717a' }))
+        trendView === 'group'
+            ? groupKeys.map((k) => ({ key: groupLabelMap[k] || k, color: qtyProcGroupColor(k) }))
             : formingKeys.map((k) => ({ key: k, color: FORM_COLOR[k] || '#71717a' }));
-    const collapsed = trendView === 'shape'
+    const collapsed = trendView === 'group'
         ? collapseMixTopN(rawTrendData, trendKeysAll, MIX_BAR_TOP)
         : { rows: rawTrendData, keys: trendKeysAll };
     const trendKeys = collapsed.keys.filter((s) => collapsed.rows.some((row) => (Number(row[s.key]) || 0) > 0));
@@ -1162,7 +1181,7 @@ export function QtyProcessView({
 
     const chartMargin = { top: 12, right: 48, left: 8, bottom: 8 };
     const trendCaps: { id: QtyProcTrendView; label: string }[] = [
-        { id: 'shape', label: 'Shape' },
+        { id: 'group', label: 'Group' },
         { id: 'forming', label: 'Forming' },
     ];
     const mixTableCols = `3.25rem ${trendKeys.map(() => 'minmax(3.4rem,1fr) 2.15rem').join(' ')}`;
@@ -1480,9 +1499,26 @@ export function QtyProcessView({
                 </Card>
             </div>
 
-            <Card theme={theme} className="xl:flex xl:flex-col">
-                <div className="flex items-center gap-2 mb-3">
+            <Card theme={theme} className="md:flex md:flex-col">
+                <div className="flex items-center gap-2 mb-3 flex-wrap">
                     <h3 className={`text-sm font-bold ${theme.textWhite}`}>Process vs Complete / Scrap / Reject</h3>
+                    <div className={`flex items-center ${theme.inputBg} rounded-xl p-1 border ${theme.borderColor}`}>
+                        {([
+                            { id: 'period' as const, label: isMonthly ? 'Month' : 'Year' },
+                            { id: 'group' as const, label: 'Group' },
+                        ]).map((cap) => (
+                            <button
+                                key={cap.id}
+                                type="button"
+                                onClick={() => setQualityView(cap.id)}
+                                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                                    qualityView === cap.id ? `${theme.accentBg} text-white` : theme.textMuted
+                                }`}
+                            >
+                                {cap.label}
+                            </button>
+                        ))}
+                    </div>
                     <button
                         type="button"
                         aria-pressed={showQualityNumbers}
@@ -1494,13 +1530,20 @@ export function QtyProcessView({
                         {showQualityNumbers ? 'Hide numbers' : 'Show numbers'}
                     </button>
                 </div>
-                <div className="grid grid-cols-1 xl:grid-cols-[3fr_2fr] gap-4 xl:gap-6 items-stretch xl:flex-1">
+                <div className="grid grid-cols-1 md:grid-cols-[minmax(0,3fr)_minmax(16rem,2fr)] gap-4 md:gap-6 items-stretch md:flex-1">
                     <div className="min-w-0 flex flex-col gap-3">
-                        <div className={`min-w-0 ${showQualityNumbers ? 'h-72 sm:h-80' : 'h-72 sm:h-80 xl:h-[26rem]'}`}>
+                        <div className={`min-w-0 ${showQualityNumbers ? 'h-72 sm:h-80' : 'h-72 sm:h-80 md:h-[26rem]'}`}>
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={qualityYears} margin={{ top: 12, right: 16, left: 8, bottom: 8 }}>
+                                <BarChart data={qualityYears} margin={{ top: 12, right: 16, left: 8, bottom: qualityView === 'group' ? 28 : 8 }}>
                                     <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
-                                    <XAxis dataKey="name" tick={{ fill: tickFill, fontSize: 11 }} interval={isMonthly ? 0 : undefined} />
+                                    <XAxis
+                                        dataKey="name"
+                                        tick={{ fill: tickFill, fontSize: qualityView === 'group' ? 10 : 11 }}
+                                        interval={0}
+                                        angle={qualityView === 'group' ? -30 : 0}
+                                        textAnchor={qualityView === 'group' ? 'end' : 'middle'}
+                                        height={qualityView === 'group' ? 56 : 30}
+                                    />
                                     <YAxis
                                         tick={{ fill: tickFill, fontSize: 11 }}
                                         tickFormatter={(v) => `${Math.round(Number(v))}%`}
@@ -1536,7 +1579,7 @@ export function QtyProcessView({
                         {showQualityNumbers && (
                             <div className="grid grid-cols-[2.75rem_minmax(0,1fr)_minmax(0,1.15fr)_minmax(0,1.15fr)_minmax(0,1.15fr)] gap-x-2 gap-y-1 text-[11px]">
                                 <span className={`font-bold uppercase tracking-wide ${theme.textMuted}`}>
-                                    {isMonthly ? 'Mo' : 'Year'}
+                                    {qualityView === 'group' ? 'Group' : isMonthly ? 'Mo' : 'Year'}
                                 </span>
                                 <span className="font-bold uppercase tracking-wide text-right" style={{ color: PROCESS_COLOR }}>Process</span>
                                 <span className="font-bold uppercase tracking-wide text-right" style={{ color: completeColor }}>Complete</span>
@@ -1563,8 +1606,8 @@ export function QtyProcessView({
                             </div>
                         )}
                     </div>
-                    <div className="relative min-w-0 h-[28rem] xl:h-auto xl:min-h-0">
-                        <div className="h-full xl:absolute xl:inset-0 overflow-hidden">
+                    <div className="relative min-w-0 h-[28rem] md:h-auto md:min-h-0 md:self-stretch">
+                        <div className="h-full md:absolute md:inset-0 overflow-hidden">
                             <QualityTopByPeriod
                                 periods={topByPeriod}
                                 scrapColor={scrapColor}

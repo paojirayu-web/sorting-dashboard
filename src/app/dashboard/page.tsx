@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { Suspense, useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { themes, type ThemeName } from "@/lib/themes";
 import { formatDateShort, formatProductDescription, normalizeDataRows } from "@/lib/utils";
 import type { DataItem, ProductStats, MonthlyStats, SelectedReason, ViewType, GroupedRow, ReasonLogEntry, ReasonMonthlyEntry, ProductItem, DefectReasonItem, DefectListMode } from "@/types/dashboard";
@@ -36,6 +37,8 @@ import {
 import {
     qtyProcLineMatches,
     qtyProcMixKeys,
+    qtyProcGroupLabels,
+    qtyProcPruneGroups,
     qtyProcRowMatches,
     pRoundOf,
     type QtyProcCpFilter,
@@ -44,6 +47,7 @@ import {
     type QtyProcScope,
     type QtyProcYearFilter,
 } from "@/lib/qtyproc";
+import { dashboardViewHref, parseDashboardView } from "@/lib/dashboard-view";
 
 type DefectTrendCacheEntry = {
     trend?: DefectTrendPayload["trend"];
@@ -83,7 +87,7 @@ function isAbortError(error: unknown): boolean {
     );
 }
 
-export default function Dashboard() {
+function Dashboard() {
     const PRODUCT_STATS_TIMEOUT_MS = 120000;
     const REASON_LOG_TIMEOUT_MS = 120000;
     const MONTHLY_STATS_TIMEOUT_MS = 120000;
@@ -94,7 +98,13 @@ export default function Dashboard() {
     const [isSidebarOpen, setSidebarOpen] = useState(false);
     const [currentTheme, setCurrentTheme] = useState<ThemeName>("dark");
     const theme = themes[currentTheme];
-    const [view, setView] = useState<ViewType>("overview");
+    const searchParams = useSearchParams();
+    const router = useRouter();
+    const view = parseDashboardView(searchParams.get("view"));
+    const setView = useCallback((next: ViewType) => {
+        const href = dashboardViewHref(next === "defect-analysis" ? "qty-process" : next);
+        router.push(href, { scroll: false });
+    }, [router]);
 
     // ─── Overview State ──────────────────────────────────────
     const [data, setData] = useState<DataItem[]>([]);
@@ -156,7 +166,7 @@ export default function Dashboard() {
     const [qtyProcLine, setQtyProcLine] = useState<QtyProcLineFilter>('all');
     const [qtyProcCp, setQtyProcCp] = useState<QtyProcCpFilter>('all');
     const [qtyProcScope, setQtyProcScope] = useState<QtyProcScope>('ff');
-    const [qtyProcShape, setQtyProcShape] = useState('all');
+    const [qtyProcGroup, setQtyProcGroup] = useState<string[]>([]);
     const [qtyProcForming, setQtyProcForming] = useState('all');
     const [qtyProcCustomer, setQtyProcCustomer] = useState('all');
     const [qtyProcGlaze, setQtyProcGlaze] = useState('all');
@@ -208,7 +218,8 @@ export default function Dashboard() {
             : qtyProcLineMix.filter((r) => (r.customer || '(blank)') === qtyProcCustomer),
         [qtyProcLineMix, qtyProcCustomer],
     );
-    const qtyProcShapeKeys = useMemo(() => qtyProcMixKeys(qtyProcScopedMix, 'shape'), [qtyProcScopedMix]);
+    const qtyProcGroupKeys = useMemo(() => qtyProcMixKeys(qtyProcScopedMix, 'group'), [qtyProcScopedMix]);
+    const qtyProcGroupLabelMap = useMemo(() => qtyProcGroupLabels(qtyProcScopedMix), [qtyProcScopedMix]);
     const qtyProcFormingKeys = useMemo(() => qtyProcMixKeys(qtyProcScopedMix, 'forming'), [qtyProcScopedMix]);
     const [skinFadeOn, setSkinFadeOn] = useState(false);
 
@@ -219,10 +230,9 @@ export default function Dashboard() {
     }, [qtyProcCustomer, qtyProcCustomerKeys]);
 
     useEffect(() => {
-        if (qtyProcShape !== 'all' && !qtyProcShapeKeys.includes(qtyProcShape)) {
-            setQtyProcShape('all');
-        }
-    }, [qtyProcShape, qtyProcShapeKeys]);
+        const next = qtyProcPruneGroups(qtyProcGroup, qtyProcGroupKeys);
+        if (next !== qtyProcGroup) setQtyProcGroup(next);
+    }, [qtyProcGroup, qtyProcGroupKeys]);
 
     useEffect(() => {
         if (qtyProcForming !== 'all' && !qtyProcFormingKeys.includes(qtyProcForming)) {
@@ -356,7 +366,7 @@ export default function Dashboard() {
         setQtyProcYear('all');
         setQtyProcCp('all');
         setQtyProcScope('ff');
-        setQtyProcShape('all');
+        setQtyProcGroup([]);
         setQtyProcForming('all');
         setQtyProcGlaze('all');
     }, []);
@@ -1022,10 +1032,6 @@ export default function Dashboard() {
     }, [view, category, wwTone, fetchProductList]);
 
     useEffect(() => {
-        if (view === "defect-analysis") setView("qty-process");
-    }, [view]);
-
-    useEffect(() => {
         if (view !== "qty-process") return;
         void fetchQtyProc(false);
     }, [view, fetchQtyProc]);
@@ -1476,15 +1482,16 @@ export default function Dashboard() {
                         if (next === 'ff' && (pRoundOf(qtyProcCp) || qtyProcCp === 'CUSTOM')) setQtyProcCp('all');
                         if (next === 'all' && (qtyProcCp === 'FRIT' || qtyProcCp === 'BOM')) setQtyProcCp('C1');
                     }}
-                    qtyProcShape={qtyProcShape}
-                    setQtyProcShape={setQtyProcShape}
+                    qtyProcGroup={qtyProcGroup}
+                    setQtyProcGroup={setQtyProcGroup}
                     qtyProcForming={qtyProcForming}
                     setQtyProcForming={setQtyProcForming}
                     qtyProcCustomer={qtyProcCustomer}
                     setQtyProcCustomer={setQtyProcCustomer}
                     qtyProcGlaze={qtyProcGlaze}
                     setQtyProcGlaze={setQtyProcGlaze}
-                    qtyProcShapeKeys={qtyProcShapeKeys}
+                    qtyProcGroupKeys={qtyProcGroupKeys}
+                    qtyProcGroupLabels={qtyProcGroupLabelMap}
                     qtyProcFormingKeys={qtyProcFormingKeys}
                     qtyProcCustomerKeys={qtyProcCustomerKeys}
                 />
@@ -1586,7 +1593,7 @@ export default function Dashboard() {
                             line={qtyProcLine}
                             cp={qtyProcCp}
                             scope={qtyProcScope}
-                            shape={qtyProcShape}
+                            group={qtyProcGroup}
                             forming={qtyProcForming}
                             customer={qtyProcCustomer}
                             glaze={qtyProcGlaze}
@@ -1611,5 +1618,24 @@ export default function Dashboard() {
                 />
             )}
         </div>
+    );
+}
+
+function DashboardFallback() {
+    return (
+        <div className="flex h-screen items-center justify-center bg-zinc-950 text-zinc-400">
+            <div className="flex flex-col items-center gap-3">
+                <div className="h-10 w-10 rounded-full border-4 border-zinc-700 border-t-blue-500 animate-spin" />
+                <p className="text-sm font-medium">Loading dashboard...</p>
+            </div>
+        </div>
+    );
+}
+
+export default function DashboardPage() {
+    return (
+        <Suspense fallback={<DashboardFallback />}>
+            <Dashboard />
+        </Suspense>
     );
 }

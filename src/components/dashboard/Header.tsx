@@ -1,7 +1,8 @@
 "use client";
 
 import type { ReactNode } from 'react';
-import { Menu, Sun, Moon, Calendar, Search, RefreshCw, AlertCircle, XCircle, Flame, Shapes, Layers, Users, Droplet } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Menu, Sun, Moon, Calendar, Search, RefreshCw, AlertCircle, XCircle, Flame, Boxes, Layers, Users, Droplet, ChevronDown } from 'lucide-react';
 import type { Theme, ThemeName } from '@/lib/themes';
 import type { ViewType, ProductItem, DefectReasonItem, DefectListMode } from '@/types/dashboard';
 import {
@@ -19,7 +20,6 @@ import {
     QTYPROC_P_ROUNDS,
     QTYPROC_SCOPE_OPTIONS,
     GLAZE_LABEL,
-    SHAPE_LABEL,
     type QtyProcCpFilter,
     type QtyProcLineFilter,
     type QtyProcScope,
@@ -74,15 +74,16 @@ interface HeaderProps {
     setQtyProcCp: (v: QtyProcCpFilter) => void;
     qtyProcScope: QtyProcScope;
     setQtyProcScope: (v: QtyProcScope) => void;
-    qtyProcShape: string;
-    setQtyProcShape: (v: string) => void;
+    qtyProcGroup: string[];
+    setQtyProcGroup: (v: string[]) => void;
     qtyProcForming: string;
     setQtyProcForming: (v: string) => void;
     qtyProcCustomer: string;
     setQtyProcCustomer: (v: string) => void;
     qtyProcGlaze: string;
     setQtyProcGlaze: (v: string) => void;
-    qtyProcShapeKeys: string[];
+    qtyProcGroupKeys: string[];
+    qtyProcGroupLabels: Record<string, string>;
     qtyProcFormingKeys: string[];
     qtyProcCustomerKeys: string[];
 }
@@ -118,6 +119,101 @@ function FilterChip({
             {icon ? <span className={`${theme.textMuted} shrink-0`}>{icon}</span> : null}
             {label ? <span className={`text-[10px] sm:text-xs font-bold ${theme.textMuted} whitespace-nowrap shrink-0`}>{label}</span> : null}
             {children}
+        </div>
+    );
+}
+
+function FilterMultiSelect({
+    theme,
+    currentTheme,
+    values,
+    onChange,
+    options,
+    labels,
+    title,
+}: {
+    theme: Theme;
+    currentTheme: ThemeName;
+    values: string[];
+    onChange: (next: string[]) => void;
+    options: string[];
+    labels: Record<string, string>;
+    title?: string;
+}) {
+    const [open, setOpen] = useState(false);
+    const rootRef = useRef<HTMLDivElement>(null);
+    const isAll = values.length === 0;
+    const optionClass = currentTheme === 'dark' ? 'bg-[#141414]' : 'bg-white';
+    const summary = isAll
+        ? 'All'
+        : values.length === 1
+            ? (labels[values[0]] || values[0])
+            : `${values.length} groups`;
+
+    useEffect(() => {
+        if (!open) return;
+        const onDoc = (e: MouseEvent) => {
+            if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+        };
+        document.addEventListener('mousedown', onDoc);
+        return () => document.removeEventListener('mousedown', onDoc);
+    }, [open]);
+
+    const toggle = (value: string) => {
+        if (values.includes(value)) {
+            onChange(values.filter((v) => v !== value));
+            return;
+        }
+        onChange([...values, value]);
+    };
+
+    return (
+        <div ref={rootRef} className="relative min-w-0 w-full">
+            <button
+                type="button"
+                onClick={() => setOpen((v) => !v)}
+                className={`flex items-center gap-1 bg-transparent outline-none text-[10px] sm:text-xs font-bold ${theme.textWhite} cursor-pointer min-w-0 w-full`}
+                title={title || (isAll ? 'All groups' : values.map((v) => labels[v] || v).join(', '))}
+                aria-expanded={open}
+                aria-haspopup="listbox"
+            >
+                <span className="truncate text-left flex-1">{summary}</span>
+                <ChevronDown className={`w-3.5 h-3.5 shrink-0 opacity-70 transition-transform ${open ? 'rotate-180' : ''}`} />
+            </button>
+            {open && (
+                <div
+                    role="listbox"
+                    className={`absolute left-0 top-full z-[80] mt-2 min-w-[12rem] w-max max-w-[18rem] max-h-[min(20rem,50vh)] overflow-y-auto rounded-xl border ${theme.borderColor} ${optionClass} shadow-2xl py-1`}
+                >
+                    <label className={`flex items-center gap-2 px-3 py-2 cursor-pointer ${isAll ? theme.accentText : theme.textSecondary}`}>
+                        <input
+                            type="checkbox"
+                            checked={isAll}
+                            onChange={() => onChange([])}
+                            className="rounded border-gray-500 accent-blue-600"
+                        />
+                        <span className="text-xs font-bold">All</span>
+                    </label>
+                    <div className={`border-t ${theme.borderColor} my-0.5`} />
+                    {options.map((opt) => {
+                        const checked = values.includes(opt);
+                        return (
+                            <label
+                                key={opt}
+                                className={`flex items-center gap-2 px-3 py-2 cursor-pointer ${checked ? theme.accentText : theme.textSecondary}`}
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() => toggle(opt)}
+                                    className="rounded border-gray-500 accent-blue-600"
+                                />
+                                <span className="text-xs font-bold leading-snug">{labels[opt] || opt}</span>
+                            </label>
+                        );
+                    })}
+                </div>
+            )}
         </div>
     );
 }
@@ -504,15 +600,16 @@ function QtyProcessFilters({
     cp,
     setCp,
     scope,
-    shape,
-    setShape,
+    group,
+    setGroup,
     forming,
     setForming,
     customer,
     setCustomer,
     glaze,
     setGlaze,
-    shapeKeys,
+    groupKeys,
+    groupLabels,
     formingKeys,
     customerKeys,
 }: {
@@ -523,15 +620,16 @@ function QtyProcessFilters({
     cp: QtyProcCpFilter;
     setCp: (v: QtyProcCpFilter) => void;
     scope: QtyProcScope;
-    shape: string;
-    setShape: (v: string) => void;
+    group: string[];
+    setGroup: (v: string[]) => void;
     forming: string;
     setForming: (v: string) => void;
     customer: string;
     setCustomer: (v: string) => void;
     glaze: string;
     setGlaze: (v: string) => void;
-    shapeKeys: string[];
+    groupKeys: string[];
+    groupLabels: Record<string, string>;
     formingKeys: string[];
     customerKeys: string[];
 }) {
@@ -577,18 +675,16 @@ function QtyProcessFilters({
                     ))}
                 </select>
             </FilterChip>
-            <FilterChip fill theme={theme} label="Shape" icon={<Shapes size={14} />}>
-                <select
-                    value={shape}
-                    onChange={(e) => setShape(e.target.value)}
-                    className={selectClass}
-                    title="Shape"
-                >
-                    <option value="all" className={optionClass}>All</option>
-                    {shapeKeys.map((k) => (
-                        <option key={k} value={k} className={optionClass}>{SHAPE_LABEL[k] || k}</option>
-                    ))}
-                </select>
+            <FilterChip fill theme={theme} label="Group" icon={<Boxes size={14} />}>
+                <FilterMultiSelect
+                    theme={theme}
+                    currentTheme={currentTheme}
+                    values={group}
+                    onChange={setGroup}
+                    options={groupKeys}
+                    labels={groupLabels}
+                    title="Item group (Db_glaze pt_group). Multi-select."
+                />
             </FilterChip>
             <FilterChip fill theme={theme} label="Forming" icon={<Layers size={14} />}>
                 <select
@@ -659,7 +755,7 @@ export function Header(props: HeaderProps) {
     const iconBtn = `p-2 sm:p-2.5 rounded-xl ${theme.inputBg} ${theme.textSecondary} hover:${theme.textWhite} transition-all shrink-0 touch-manipulation`;
 
     return (
-        <header className={`sticky top-0 z-40 ${theme.headerBg} backdrop-blur-xl border-b ${theme.borderColor}`}>
+        <header className={`sticky top-0 z-50 ${theme.headerBg} backdrop-blur-xl border-b ${theme.borderColor}`}>
             <div className="flex items-center justify-between gap-2 px-3 sm:px-4 md:px-6 min-h-14 md:min-h-16 py-2 min-w-0">
                 <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
                     <button
@@ -767,15 +863,16 @@ export function Header(props: HeaderProps) {
                         cp={props.qtyProcCp}
                         setCp={props.setQtyProcCp}
                         scope={props.qtyProcScope}
-                        shape={props.qtyProcShape}
-                        setShape={props.setQtyProcShape}
+                        group={props.qtyProcGroup}
+                        setGroup={props.setQtyProcGroup}
                         forming={props.qtyProcForming}
                         setForming={props.setQtyProcForming}
                         customer={props.qtyProcCustomer}
                         setCustomer={props.setQtyProcCustomer}
                         glaze={props.qtyProcGlaze}
                         setGlaze={props.setQtyProcGlaze}
-                        shapeKeys={props.qtyProcShapeKeys}
+                        groupKeys={props.qtyProcGroupKeys}
+                        groupLabels={props.qtyProcGroupLabels}
                         formingKeys={props.qtyProcFormingKeys}
                         customerKeys={props.qtyProcCustomerKeys}
                     />
@@ -836,15 +933,16 @@ export function Header(props: HeaderProps) {
                             cp={props.qtyProcCp}
                             setCp={props.setQtyProcCp}
                             scope={props.qtyProcScope}
-                            shape={props.qtyProcShape}
-                            setShape={props.setQtyProcShape}
+                            group={props.qtyProcGroup}
+                            setGroup={props.setQtyProcGroup}
                             forming={props.qtyProcForming}
                             setForming={props.setQtyProcForming}
                             customer={props.qtyProcCustomer}
                             setCustomer={props.setQtyProcCustomer}
                             glaze={props.qtyProcGlaze}
                             setGlaze={props.setQtyProcGlaze}
-                            shapeKeys={props.qtyProcShapeKeys}
+                            groupKeys={props.qtyProcGroupKeys}
+                            groupLabels={props.qtyProcGroupLabels}
                             formingKeys={props.qtyProcFormingKeys}
                             customerKeys={props.qtyProcCustomerKeys}
                         />
@@ -887,15 +985,16 @@ export function MixHeader({
     setCp,
     scope,
     setScope,
-    shape,
-    setShape,
+    group,
+    setGroup,
     forming,
     setForming,
     customer,
     setCustomer,
     glaze,
     setGlaze,
-    shapeKeys,
+    groupKeys,
+    groupLabels,
     formingKeys,
     customerKeys,
 }: {
@@ -912,21 +1011,22 @@ export function MixHeader({
     setCp: (v: QtyProcCpFilter) => void;
     scope: QtyProcScope;
     setScope: (v: QtyProcScope) => void;
-    shape: string;
-    setShape: (v: string) => void;
+    group: string[];
+    setGroup: (v: string[]) => void;
     forming: string;
     setForming: (v: string) => void;
     customer: string;
     setCustomer: (v: string) => void;
     glaze: string;
     setGlaze: (v: string) => void;
-    shapeKeys: string[];
+    groupKeys: string[];
+    groupLabels: Record<string, string>;
     formingKeys: string[];
     customerKeys: string[];
 }) {
     const iconBtn = `p-2 sm:p-2.5 rounded-xl ${theme.inputBg} ${theme.textSecondary} hover:${theme.textWhite} transition-all shrink-0 touch-manipulation`;
     return (
-        <header className={`sticky top-0 z-40 ${theme.headerBg} backdrop-blur-xl border-b ${theme.borderColor}`}>
+        <header className={`sticky top-0 z-50 ${theme.headerBg} backdrop-blur-xl border-b ${theme.borderColor}`}>
             <div className="flex items-center justify-between gap-2 px-3 sm:px-4 md:px-6 min-h-14 md:min-h-16 py-2 min-w-0">
                 <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
                     <h1 className={`text-sm sm:text-base md:text-lg font-bold ${theme.textWhite} tracking-tight truncate flex items-center gap-2 min-w-0`}>
@@ -973,15 +1073,16 @@ export function MixHeader({
                     cp={cp}
                     setCp={setCp}
                     scope={scope}
-                    shape={shape}
-                    setShape={setShape}
+                    group={group}
+                    setGroup={setGroup}
                     forming={forming}
                     setForming={setForming}
                     customer={customer}
                     setCustomer={setCustomer}
                     glaze={glaze}
                     setGlaze={setGlaze}
-                    shapeKeys={shapeKeys}
+                    groupKeys={groupKeys}
+                    groupLabels={groupLabels}
                     formingKeys={formingKeys}
                     customerKeys={customerKeys}
                 />
@@ -1005,15 +1106,16 @@ export function MixHeader({
                         cp={cp}
                         setCp={setCp}
                         scope={scope}
-                        shape={shape}
-                        setShape={setShape}
+                        group={group}
+                        setGroup={setGroup}
                         forming={forming}
                         setForming={setForming}
                         customer={customer}
                         setCustomer={setCustomer}
                         glaze={glaze}
                         setGlaze={setGlaze}
-                        shapeKeys={shapeKeys}
+                        groupKeys={groupKeys}
+                        groupLabels={groupLabels}
                         formingKeys={formingKeys}
                         customerKeys={customerKeys}
                     />

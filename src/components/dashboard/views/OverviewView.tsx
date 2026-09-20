@@ -182,11 +182,11 @@ export function OverviewView({
 
             {/* Section 2: Trend Chart + Daily Activity Table */}
             <section>
-                <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-                    {/* Chart Column */}
-                    <div className="xl:col-span-5">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+                    {/* Chart Column — 5/12 */}
+                    <div className="lg:col-span-5 flex flex-col min-w-0">
                         <SectionHeader title="Weekly Performance Trend" subtitle="7-day breakdown (Good/Reject/Scrap)" theme={theme} />
-                        <div className={`${theme.cardBg} border ${theme.borderColor} p-4 sm:p-6 rounded-2xl sm:rounded-3xl shadow-xl h-[260px] sm:h-[320px] md:h-[400px]`}>
+                        <div className={`${theme.cardBg} border ${theme.borderColor} p-4 sm:p-6 rounded-2xl sm:rounded-3xl shadow-xl flex-1 min-h-[260px] sm:min-h-[320px] md:min-h-[400px]`}>
                             <ResponsiveContainer width="100%" height="100%">
                                 <AreaChart data={trendData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                                     <defs>
@@ -241,7 +241,7 @@ export function OverviewView({
                     {isDailyMonitorFullscreen && (
                         <div className="fixed inset-0 z-[90] bg-black/60 backdrop-blur-sm" onClick={() => setIsDailyMonitorFullscreen(false)} />
                     )}
-                    <div className={isDailyMonitorFullscreen ? `fixed inset-2 sm:inset-4 md:inset-8 z-[100] ${theme.pageBg} p-3 sm:p-4 md:p-6 border ${theme.borderColor} rounded-2xl sm:rounded-3xl shadow-2xl flex flex-col transition-all duration-300` : "xl:col-span-7 flex flex-col min-w-0"}>
+                    <div className={isDailyMonitorFullscreen ? `fixed inset-2 sm:inset-4 md:inset-8 z-[100] ${theme.pageBg} p-3 sm:p-4 md:p-6 border ${theme.borderColor} rounded-2xl sm:rounded-3xl shadow-2xl flex flex-col transition-all duration-300` : "lg:col-span-7 flex flex-col min-w-0"}>
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
                             <SectionHeader title="Daily Defects Monitor" subtitle={`Items on ${selectedDate}`} theme={theme} />
                             <div className="flex flex-wrap items-center gap-2">
@@ -280,7 +280,7 @@ export function OverviewView({
                                 </button>
                             </div>
                         </div>
-                        <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl sm:rounded-3xl overflow-hidden shadow-xl flex-1 min-h-0 ${isDailyMonitorFullscreen ? 'max-h-full' : 'max-h-[min(70vh,520px)]'} flex flex-col`}>
+                        <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl sm:rounded-3xl overflow-hidden shadow-xl flex-1 min-h-0 ${isDailyMonitorFullscreen ? 'max-h-full' : 'max-h-[min(70vh,520px)] lg:max-h-none'} flex flex-col`}>
                             <ResponsiveSortingLog
                                 rows={dailyActivityTable}
                                 theme={theme}

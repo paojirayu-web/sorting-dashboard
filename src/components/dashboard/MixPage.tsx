@@ -7,6 +7,8 @@ import { themes, type ThemeName } from '@/lib/themes';
 import {
     qtyProcLineMatches,
     qtyProcMixKeys,
+    qtyProcGroupLabels,
+    qtyProcPruneGroups,
     qtyProcRowMatches,
     pRoundOf,
     type QtyProcCpFilter,
@@ -36,7 +38,7 @@ export function MixPage() {
     const [line, setLine] = useState<QtyProcLineFilter>('all');
     const [cp, setCp] = useState<QtyProcCpFilter>('all');
     const [scope, setScope] = useState<QtyProcScope>('ff');
-    const [shape, setShape] = useState('all');
+    const [group, setGroup] = useState<string[]>([]);
     const [forming, setForming] = useState('all');
     const [customer, setCustomer] = useState('all');
     const [glaze, setGlaze] = useState('all');
@@ -55,15 +57,17 @@ export function MixPage() {
             : lineMix.filter((row) => (row.customer || '(blank)') === customer),
         [lineMix, customer],
     );
-    const shapeKeys = useMemo(() => qtyProcMixKeys(scopedMix, 'shape'), [scopedMix]);
+    const groupKeys = useMemo(() => qtyProcMixKeys(scopedMix, 'group'), [scopedMix]);
+    const groupLabelMap = useMemo(() => qtyProcGroupLabels(scopedMix), [scopedMix]);
     const formingKeys = useMemo(() => qtyProcMixKeys(scopedMix, 'forming'), [scopedMix]);
 
     useEffect(() => {
         if (customer !== 'all' && !customerKeys.includes(customer)) setCustomer('all');
     }, [customer, customerKeys]);
     useEffect(() => {
-        if (shape !== 'all' && !shapeKeys.includes(shape)) setShape('all');
-    }, [shape, shapeKeys]);
+        const next = qtyProcPruneGroups(group, groupKeys);
+        if (next !== group) setGroup(next);
+    }, [group, groupKeys]);
     useEffect(() => {
         if (forming !== 'all' && !formingKeys.includes(forming)) setForming('all');
     }, [forming, formingKeys]);
@@ -139,15 +143,16 @@ export function MixPage() {
                     setCp={setCp}
                     scope={scope}
                     setScope={handleScope}
-                    shape={shape}
-                    setShape={setShape}
+                    group={group}
+                    setGroup={setGroup}
                     forming={forming}
                     setForming={setForming}
                     customer={customer}
                     setCustomer={setCustomer}
                     glaze={glaze}
                     setGlaze={setGlaze}
-                    shapeKeys={shapeKeys}
+                    groupKeys={groupKeys}
+                    groupLabels={groupLabelMap}
                     formingKeys={formingKeys}
                     customerKeys={customerKeys}
                 />
@@ -163,7 +168,7 @@ export function MixPage() {
                         line={line}
                         cp={cp}
                         scope={scope}
-                        shape={shape}
+                        group={group}
                         forming={forming}
                         customer={customer}
                         glaze={glaze}

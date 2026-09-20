@@ -2,6 +2,133 @@
 
 All notable changes to the **Sorting Dashboard** project will be documented in this file.
 
+## [1.6.98] - 2026-09-19
+
+### Added
+- **Defects Overview:** Pareto can switch **All defects** and **Top 15 + Other**. Other stays grouped off the chart when it would be taller than the last named bar.
+
+---
+
+## [1.6.97] - 2026-09-19
+
+### Changed
+- **Defects Overview:** Fullscreen Pareto uses the leftover space under the names for taller bars and slightly larger labels.
+
+---
+
+## [1.6.96] - 2026-09-19
+
+### Changed
+- **Defects Overview:** In-card Pareto names stay diagonal. Fullscreen names stay upright.
+
+---
+
+## [1.6.95] - 2026-09-19
+
+### Changed
+- **Defects Overview:** Pareto bar names are diagonal again, with slightly larger type.
+
+---
+
+## [1.6.94] - 2026-09-19
+
+### Changed
+- **Defects Overview:** Pareto names sit at 90° like fullscreen. Top 10 + Other is removed. Year defaults to All (not a single latest year). The year dropdown no longer says “latest”. History Year compares with the previous year and shows % on each bar.
+
+---
+
+## [1.6.93] - 2026-09-19
+
+### Changed
+- **Defects Overview:** Pareto fullscreen shows full defect names, rotated upright, with larger type so labels stay readable.
+
+---
+
+## [1.6.92] - 2026-09-19
+
+### Changed
+- **Defects Overview:** Top 10 + Other stays at 10 named bars. Other is grouped in the caption; it is drawn on the chart only when that bucket is smaller than the last bar, so the view no longer looks like All defects.
+
+---
+
+## [1.6.91] - 2026-09-19
+
+### Changed
+- **Defects Overview:** Top + Other starts at 10 bars, then keeps adding named defects until the Other group is smaller than the last bar.
+
+---
+
+## [1.6.90] - 2026-09-19
+
+### Added
+- **Defects Overview:** Pareto fullscreen fits every bar on screen at once. No sideways scroll.
+
+---
+
+## [1.6.89] - 2026-09-19
+
+### Changed
+- **Defects Overview:** Pareto can switch **All defects** (full-width chart, Top 10 below) and **Top 10 + Other** (original 60/40 with the list beside the chart).
+
+---
+
+## [1.6.88] - 2026-09-19
+
+### Changed
+- **Defects Overview:** The Pareto chart lists every defect. Remaining types are no longer grouped as Other. Scroll sideways when there are many bars. The list beside it is still Top 10.
+
+---
+
+## [1.6.87] - 2026-09-19
+
+### Fixed
+- **Overview:** Weekly Performance Trend (left, 5/12) and Daily Defects Monitor (right, 7/12) stay on one row from the `lg` breakpoint, so the pair no longer stacks when the sidebar is open.
+
+---
+
+## [1.6.86] - 2026-09-19
+
+### Changed
+- **Defects Overview:** Trend and History sit above Pareto + Top 10. A defect search filter in the header opens Focus.
+
+---
+
+## [1.6.85] - 2026-09-19
+
+### Changed
+- **Defects Overview:** Pareto bars stay WW / DW when All is selected. Top scrap/reject lists show White / Black / Inglaze / Onglaze. Filtering WW or DW splits both Pareto and Top 10 into those tones.
+
+---
+
+## [1.6.84] - 2026-09-19
+
+### Changed
+- **Defects Overview:** Category pies are one mix chart on the KPI row, showing each category's scrap/reject rate. Two-year compare KPI cards label the previous year as (ปีก่อน).
+- **Defects Focus:** DW Top 10 shows description1 above description2 (Inglaze and Onglaze).
+
+---
+
+## [1.6.83] - 2026-09-19
+
+### Changed
+- **Defects Overview:** Default category is **All** again. Pareto bars show WW / DW (or WW+DW) for each reason.
+
+---
+
+## [1.6.82] - 2026-09-19
+
+### Changed
+- **Overview:** Default category is **WW → All**. Defects History **Month** now compares the same months with the previous year.
+
+---
+
+## [1.6.72] - 2026-09-18
+
+### Changed
+- **Production Mix:** The Shape filter is now **Group**. WW jobs join `m_part` to `Db_glaze.dbo.pt_mstr.pt_part` (same host as `Db_Sorting`) and use `pt_group` plus `itemgroup` names (Mug&Cup, Plate, Bowl, Accessories, RAMPRESS, ISO, HPC). The Shape Mix chart is Group Mix (Top 3 + Other). Forming is unchanged. Unmatched parts stay unclassified and stay out of the mix charts.
+
+---
+
 ## [1.6.71] - 2026-09-11
 
 ### Added

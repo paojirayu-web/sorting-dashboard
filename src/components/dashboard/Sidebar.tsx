@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { LayoutDashboard, BarChart3, Settings, TrendingUp, PieChart, ListTree, X, ChevronLeft } from 'lucide-react';
 import type { Theme } from '@/lib/themes';
 import type { ViewType } from '@/types/dashboard';
+import { dashboardViewHref } from '@/lib/dashboard-view';
 import { QTYPROC_PAGE_TITLE } from '@/lib/qtyproc';
 
 interface SidebarProps {
@@ -24,8 +25,13 @@ export function Sidebar({ theme, view, isSidebarOpen, onSetView, onClose }: Side
         if (window.innerWidth < 768) onClose();
     };
 
+    const dashLink = (targetView: ViewType) => ({
+        href: dashboardViewHref(targetView),
+        onClick: () => handleNav(targetView),
+    });
+
     const itemClass = (active: boolean) =>
-        `w-full flex items-center gap-3 sm:gap-4 px-3 sm:px-4 py-3 rounded-xl transition-all touch-manipulation ${
+        `w-full flex items-center gap-3 sm:gap-4 px-3 sm:px-4 py-3 rounded-xl transition-all touch-manipulation no-underline ${
             active ? `${theme.accentBg} text-white shadow-lg ${theme.accentShadow}` : `${theme.textSecondary} hover:${theme.tableRowHover}`
         }`;
 
@@ -50,60 +56,60 @@ export function Sidebar({ theme, view, isSidebarOpen, onSetView, onClose }: Side
             </div>
 
             <nav className="flex-1 px-4 mt-4 space-y-2">
-                <button
-                    onClick={() => handleNav("overview")}
+                <Link
+                    {...dashLink("overview")}
                     className={itemClass(!onReasons && view === "overview")}
                     title="Overview"
                 >
                     <LayoutDashboard size={20} />
                     {isSidebarOpen && <span className={!onReasons && view === "overview" ? "font-semibold" : "font-medium"}>Overview</span>}
-                </button>
-                <button
-                    onClick={() => handleNav("product-analysis")}
+                </Link>
+                <Link
+                    {...dashLink("product-analysis")}
                     className={itemClass(!onReasons && view === "product-analysis")}
                     title="Product Analysis"
                 >
                     <BarChart3 size={20} />
                     {isSidebarOpen && <span className={!onReasons && view === "product-analysis" ? "font-semibold" : "font-medium"}>Product Analysis</span>}
-                </button>
-                <button
-                    onClick={() => handleNav("monthly-analysis")}
+                </Link>
+                <Link
+                    {...dashLink("monthly-analysis")}
                     className={itemClass(!onReasons && view === "monthly-analysis")}
                     title="Monthly Analysis"
                 >
                     <TrendingUp size={20} />
                     {isSidebarOpen && <span className={!onReasons && view === "monthly-analysis" ? "font-semibold" : "font-medium"}>Monthly Analysis</span>}
-                </button>
-                <button
-                    onClick={() => handleNav("qty-process")}
+                </Link>
+                <Link
+                    {...dashLink("qty-process")}
                     className={itemClass(!onReasons && view === "qty-process")}
                     title={QTYPROC_PAGE_TITLE}
                 >
                     <PieChart size={20} />
                     {isSidebarOpen && <span className={!onReasons && view === "qty-process" ? "font-semibold" : "font-medium"}>{QTYPROC_PAGE_TITLE}</span>}
-                </button>
+                </Link>
                 <Link
                     href="/reasons"
                     onClick={() => {
                         if (window.innerWidth < 768) onClose();
                     }}
                     className={itemClass(onReasons)}
-                    title="Reasons Overview"
+                    title="Defects Overview"
                 >
                     <ListTree size={20} />
-                    {isSidebarOpen && <span className={onReasons ? "font-semibold" : "font-medium"}>Reasons</span>}
+                    {isSidebarOpen && <span className={onReasons ? "font-semibold" : "font-medium"}>Defects</span>}
                 </Link>
             </nav>
 
             <div className="p-4 border-t border-white/5 space-y-2 mt-auto">
-                <button
-                    onClick={() => handleNav("settings")}
+                <Link
+                    {...dashLink("settings")}
                     className={itemClass(!onReasons && view === "settings")}
                     title="Settings"
                 >
                     <Settings size={20} />
                     {isSidebarOpen && <span className={!onReasons && view === "settings" ? "font-semibold" : "font-medium"}>Settings</span>}
-                </button>
+                </Link>
 
                 {isSidebarOpen && (
                     <button

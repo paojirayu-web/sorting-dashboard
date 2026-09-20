@@ -3,6 +3,7 @@ import path from 'path';
 import { C1_SPECIAL_REASON_SQL } from '@/lib/c1-special-reason';
 import { getAppDataDir } from '@/lib/daily-report-automation-settings';
 import { CATEGORY_SQL_TOKEN, C1_SPECIAL_REASON_SQL_EXCLUDE } from '@/lib/defect-category-sql';
+import { loadGlazePtGroupMap } from '@/lib/glaze-pt-group';
 import {
     buildQtyProcPayload,
     qtyProcToneFromUnit,
@@ -27,7 +28,7 @@ type CacheEntry = { at: number; key?: string; payload: QtyProcPayload };
 
 const memCache = new Map<string, CacheEntry>();
 const FRESH_MS = 30 * 60 * 1000;
-const CACHE_KEY = 'WW|ALL|v20';
+const CACHE_KEY = 'WW|ALL|v21';
 
 let rebuildInflight: Promise<CacheEntry> | null = null;
 
@@ -78,6 +79,10 @@ function payloadHasCustomC(payload: QtyProcPayload): boolean {
     return Object.values(payload.byYear || {}).some((block) => typeof block.customC === 'number');
 }
 
+function payloadHasMixGroup(payload: QtyProcPayload): boolean {
+    return (payload.mix || []).some((row) => typeof row.group === 'string' && row.group !== '');
+}
+
 function payloadHasReasons(payload: QtyProcPayload): boolean {
     const rows = payload.reasons;
     return Array.isArray(rows) && (rows.length === 0 || typeof rows[0]?.m === 'number');
@@ -93,6 +98,7 @@ function jobsSql(start: string, endExcl: string) {
             pt_desc1,
             pt_desc2,
             unit,
+            m_part,
             SUM(qtyp) AS qtyp,
             SUM(qtycomp) AS qtycomp,
             SUM(qtyscrp) AS qtyscrp,
@@ -118,6 +124,7 @@ function jobsSql(start: string, endExcl: string) {
                 MAX(RTRIM(LTRIM(pt_desc1))) AS pt_desc1,
                 MAX(RTRIM(LTRIM(ISNULL(pt_desc2, '')))) AS pt_desc2,
                 MAX(RTRIM(LTRIM(ISNULL(unit, '')))) AS unit,
+                MAX(RTRIM(LTRIM(ISNULL(m_part, '')))) AS m_part,
                 1 AS jobs
             FROM ${SORT_VIEW_TOKEN} WITH (NOLOCK)
             WHERE m_date >= '${start}' AND m_date < '${endExcl}'
@@ -131,10 +138,11 @@ function jobsSql(start: string, endExcl: string) {
                 m_doc,
                 m_job,
                 m_kiln,
-                m_cp
+                m_cp,
+                RTRIM(LTRIM(ISNULL(m_part, '')))
         ) jobs
         GROUP BY
-            ce_year, mo, m_cp, is_round1, pt_desc1, pt_desc2, unit
+            ce_year, mo, m_cp, is_round1, pt_desc1, pt_desc2, unit, m_part
     `;
 }
 
@@ -148,6 +156,7 @@ function reasonsSql(start: string, endExcl: string) {
             RTRIM(LTRIM(pt_desc1)) AS pt_desc1,
             RTRIM(LTRIM(ISNULL(pt_desc2, ''))) AS pt_desc2,
             RTRIM(LTRIM(ISNULL(unit, ''))) AS unit,
+            RTRIM(LTRIM(ISNULL(m_part, ''))) AS m_part,
             RTRIM(LTRIM(rsn_desc)) AS rsn_desc,
             CASE
                 WHEN UPPER(RTRIM(LTRIM(sub_typ))) IN ('C', 'D', 'B') THEN 'scrap'
@@ -177,6 +186,7 @@ function reasonsSql(start: string, endExcl: string) {
             RTRIM(LTRIM(pt_desc1)),
             RTRIM(LTRIM(ISNULL(pt_desc2, ''))),
             RTRIM(LTRIM(ISNULL(unit, ''))),
+            RTRIM(LTRIM(ISNULL(m_part, ''))),
             RTRIM(LTRIM(rsn_desc)),
             CASE
                 WHEN UPPER(RTRIM(LTRIM(sub_typ))) IN ('C', 'D', 'B') THEN 'scrap'
@@ -196,6 +206,7 @@ function mapJobRows(recordset: Record<string, unknown>[]): QtyProcJobRow[] {
             mo: pickNum(row, ['mo']),
             m_cp: pickStr(row, ['m_cp']),
             is_round1: pickNum(row, ['is_round1']),
+            m_part: pickStr(row, ['m_part']),
             pt_desc1: pickStr(row, ['pt_desc1']),
             pt_desc2: pickStr(row, ['pt_desc2']),
             tone: qtyProcToneFromUnit(pickStr(row, ['unit'])) || pickStr(row, ['tone'], 'NA') || 'NA',
@@ -214,6 +225,7 @@ function mapReasonRows(recordset: Record<string, unknown>[]): QtyProcReasonJobRo
         mo: pickNum(row, ['mo']),
         m_cp: pickStr(row, ['m_cp']),
         is_round1: pickNum(row, ['is_round1']),
+        m_part: pickStr(row, ['m_part']),
         pt_desc1: pickStr(row, ['pt_desc1']),
         pt_desc2: pickStr(row, ['pt_desc2']),
         tone: qtyProcToneFromUnit(pickStr(row, ['unit'])) || pickStr(row, ['tone'], 'NA') || 'NA',
@@ -234,7 +246,14 @@ async function queryKiln(): Promise<QtyProcPayload> {
             querySortSources<Record<string, unknown>>(reasonsSql(start, endExcl), opts),
         ]);
     });
-    const yearParts = await Promise.all(yearQueries);
+    const [yearParts, groupByPart] = await Promise.all([
+        Promise.all(yearQueries),
+        loadGlazePtGroupMap().catch((err) => {
+            const message = err instanceof Error ? err.message : String(err);
+            console.warn(`[qtyproc] Db_glaze pt_group lookup failed: ${message}`);
+            return new Map();
+        }),
+    ]);
     const jobRows = mapJobRows(yearParts.flatMap(([jobs]) => jobs.recordset));
     const reasonRows = mapReasonRows(yearParts.flatMap(([, reasons]) => reasons.recordset));
     const payload = buildQtyProcPayload(
@@ -245,6 +264,7 @@ async function queryKiln(): Promise<QtyProcPayload> {
         },
         `${getCategoryLabel('WW')} · Standard / FRIT / BOM / P1–P5 · ปี ${QTYPROC_DISPLAY_BE_YEARS[0]}–${QTYPROC_DISPLAY_BE_YEARS[QTYPROC_DISPLAY_BE_YEARS.length - 1]}`,
         reasonRows,
+        groupByPart,
     );
     const y2567 = payload.byYear['2567'];
     console.info(
@@ -305,13 +325,13 @@ export async function getQtyProcResponse(forceRefresh = false): Promise<QtyProcA
     }
 
     const mem = memCache.get(CACHE_KEY);
-    if (mem && payloadHasMixTone(mem.payload) && payloadHasMixCustomer(mem.payload) && payloadHasMixGlaze(mem.payload) && payloadHasCustomC(mem.payload) && payloadHasReasons(mem.payload)) {
+    if (mem && payloadHasMixTone(mem.payload) && payloadHasMixCustomer(mem.payload) && payloadHasMixGlaze(mem.payload) && payloadHasMixGroup(mem.payload) && payloadHasCustomC(mem.payload) && payloadHasReasons(mem.payload)) {
         if (Date.now() - mem.at > FRESH_MS) void rebuildCache();
         return withMeta(mem, true);
     }
 
     const disk = await readDiskCache();
-    if (disk && payloadHasMixTone(disk.payload) && payloadHasMixCustomer(disk.payload) && payloadHasMixGlaze(disk.payload) && payloadHasCustomC(disk.payload) && payloadHasReasons(disk.payload)) {
+    if (disk && payloadHasMixTone(disk.payload) && payloadHasMixCustomer(disk.payload) && payloadHasMixGlaze(disk.payload) && payloadHasMixGroup(disk.payload) && payloadHasCustomC(disk.payload) && payloadHasReasons(disk.payload)) {
         remember(disk);
         if (Date.now() - disk.at > FRESH_MS) void rebuildCache();
         return withMeta(disk, true);

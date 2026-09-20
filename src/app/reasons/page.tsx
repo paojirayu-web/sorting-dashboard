@@ -2,7 +2,7 @@ import { Suspense } from 'react';
 import { ReasonsPage } from '@/components/dashboard/ReasonsPage';
 
 export const metadata = {
-    title: 'Reasons Overview · QC root-cause',
+    title: 'Defects Overview · QC root-cause',
     robots: { index: false, follow: false },
 };
 

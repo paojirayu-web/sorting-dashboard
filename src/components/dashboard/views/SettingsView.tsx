@@ -69,12 +69,311 @@ export function SettingsView({ theme, currentTheme, setCurrentTheme }: SettingsV
                     theme={theme}
                 >
                 <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.98 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-19</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Added</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Defects Overview:</strong> Pareto can switch <strong>All defects</strong> and <strong>Top 15 + Other</strong>. Other stays grouped off the chart when it would be taller than the last named bar.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.97 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-19</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Defects Overview:</strong> Fullscreen Pareto uses the leftover space under the names for taller bars and slightly larger labels.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.96 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-19</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Defects Overview:</strong> In-card Pareto names stay diagonal. Fullscreen names stay upright.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.95 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-19</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Defects Overview:</strong> Pareto bar names are diagonal again, with slightly larger type.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.94 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-19</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Defects Overview:</strong> Pareto names sit at 90° like fullscreen. Top 10 + Other is removed. Year defaults to All (not a single latest year). The year dropdown no longer says “latest”. History Year compares with the previous year and shows % on each bar.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.93 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-19</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Defects Overview:</strong> Pareto fullscreen shows full defect names, rotated upright, with larger type so labels stay readable.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.92 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-19</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Defects Overview:</strong> Top 10 + Other stays at 10 named bars. Other is grouped in the caption; it is drawn on the chart only when that bucket is smaller than the last bar, so the view no longer looks like All defects.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.91 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-19</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Defects Overview:</strong> Top + Other starts at 10 bars, then keeps adding named defects until the Other group is smaller than the last bar.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.90 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-19</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Added</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Defects Overview:</strong> Pareto fullscreen fits every bar on screen at once. No sideways scroll.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.89 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-19</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Defects Overview:</strong> Pareto can switch <strong>All defects</strong> (full-width chart, Top 10 below) and <strong>Top 10 + Other</strong> (original 60/40 with the list beside the chart).</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.88 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-19</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Defects Overview:</strong> The Pareto chart lists every defect. Remaining types are no longer grouped as Other. Scroll sideways when there are many bars. The list beside it is still Top 10.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.87 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-19</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Fixed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Overview:</strong> Weekly Performance Trend (left, 5/12) and Daily Defects Monitor (right, 7/12) stay on one row from the <code className={`${theme.inputBg} px-1 rounded`}>lg</code> breakpoint, so the pair no longer stacks when the sidebar is open.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.86 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-19</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Defects Overview:</strong> Trend and History sit above Pareto + Top 10. A defect search filter in the header opens Focus.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.85 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-19</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Defects Overview:</strong> Pareto bars stay WW / DW when All is selected. Top scrap/reject lists show White / Black / Inglaze / Onglaze. Filtering WW or DW splits both Pareto and Top 10 into those tones.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.84 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-19</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Defects Overview:</strong> Category pies are one mix chart on the KPI row, showing each category's scrap/reject rate. Two-year compare KPI cards label the previous year as (ปีก่อน).</li>
+                                <li><strong>Defects Focus:</strong> DW Top 10 shows description1 above description2 (Inglaze and Onglaze).</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.83 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-19</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Defects Overview:</strong> Default category is <strong>All</strong> again. Pareto bars show WW / DW (or WW+DW) for each reason.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.82 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-19</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Overview:</strong> Default category is <strong>WW → All</strong>. Defects History <strong>Month</strong> now compares the same months with the previous year.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.81 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-19</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Defects Overview:</strong> One combined Pareto + Top 10 (60/40). Trend sits beside a historical %scrap/%reject bar chart with Month/Year toggle (60/40). Category rates are their own pie cards, not inside the KPI rate card.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.80 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-19</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Defects Focus:</strong> Top nav shows Focus + back to Overview. The defect name and Year sit on one row below the filters. Switching to Reject from Focus returns to Overview. Tone sub-filters appear only for WW / DW, not All.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.79 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-19</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Defects Focus:</strong> Header highlights the defect name. The share pie sits beside the KPI cards. Rank is removed from the KPI row.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.78 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-19</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Defects Focus:</strong> Family All keeps the normal Focus layout (KPI, trend, Codeware). Other categories overlay on the same charts; empty categories are hidden.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.77 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-19</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Fixed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Defects Focus:</strong> Selecting a defect then filtering Group (or other Mix filters) no longer empties Codeware Top 10. Focus codeware rows now get the same Group stamp as overview, and the 300 qtyproc floor is relaxed when Mix filters are on.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.76 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-19</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Defects:</strong> Overview is 60/40 — left stacks Pareto by category (top 10 + Other, defect names under the bars); right is the trend with Top 10 lists per category below it.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.75 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-19</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Defects:</strong> KPI cards are compact on one row. Categories is removed. Rate vs qtyproc shows each category rate when All is selected. Category Pareto top 10 is a bar + cumulative line chart.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.74 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-19</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Defects:</strong> Shape filter is now <strong>Group</strong> multi-select (same glaze <code className={`${theme.inputBg} px-1 rounded`}>pt_mstr</code> map as Production Mix). Category cards show Pareto top 10 by qty. Overall trend is a line chart of %scrap / %reject vs qtyproc per category. Top 10 by rate is removed.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.73 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-19</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Sidebar:</strong> Production Mix (and other dashboard views) keep <code className={`${theme.inputBg} px-1 rounded`}>?view=</code> so a click from Defects or a refresh opens that page directly, not Overview first.</li>
+                                <li><strong>Production Mix:</strong> Process vs Complete / Scrap / Reject can switch to a <strong>Group</strong> view that rolls sizes together (MUG&CUP = all MUG&CUP). The Group filter is multi-select.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.72 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-18</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Production Mix:</strong> Shape filter is now <strong>Group</strong> from <code className={`${theme.inputBg} px-1 rounded`}>Db_glaze.dbo.pt_mstr</code> (<code className={`${theme.inputBg} px-1 rounded`}>m_part</code> = <code className={`${theme.inputBg} px-1 rounded`}>pt_part</code>, name from <code className={`${theme.inputBg} px-1 rounded`}>itemgroup</code>). Shape Mix is Group Mix (Top 3 + Other). Forming is unchanged.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
                     <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.71 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-11</span></h3>
                     <div className="space-y-4">
                         <div>
                             <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Added</h4>
                             <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
-                                <li><strong>Reasons Enrich Focus:</strong> Focus adds Scrap/Reject, All/WW/DW, and tone sub-toggles. Single-tone: qty, % of kind, rank, Δ, Qty/% trend (average + peak), Top 15 codeware + Other, family share donut. All family: 2×2 on a shared % scale (not raw qty) plus comparison table; click a card for that tone. One read-only <code className={`${theme.inputBg} px-1 rounded`}>GET /api/reasons/detail</code> — All is not four round-trips. Rank/%/Δ reuse the year×kind cache.</li>
+                                <li><strong>Reasons Enrich Focus:</strong> Focus adds Scrap/Reject, All/WW/DW, and tone sub-toggles. Single-tone: qty, % of kind, rank, Δ, Qty/% trend (average + peak), Top 10 codeware + Other, family share donut. All family: 2×2 on a shared % scale (not raw qty) plus comparison table; click a card for that tone. One read-only <code className={`${theme.inputBg} px-1 rounded`}>GET /api/reasons/detail</code> — All is not four round-trips. Rank/%/Δ reuse the year×kind cache.</li>
                             </ul>
                         </div>
                     </div>

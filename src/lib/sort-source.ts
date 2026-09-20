@@ -28,6 +28,8 @@ export const DW_KIND_OPTIONS: { value: DwKind; label: string }[] = [
 export const CATEGORY_VALUES: CategoryValue[] = ['ALL', 'WW', 'DW', 'DW_ONGLAZE', 'DW_ALL'];
 
 export const KILNDB_VIEW = 'dbo.v_rpt_sort_1';
+/** Remote WW/DW Inglaze view on Db_Sorting (same host as SDB, no linked-server hop). */
+export const KILNDB_DIRECT_VIEW = 'dbo.v_rpt_sort';
 export const SDB_VIEW = 'dbo.v_rpt_sort';
 export const SORT_VIEW_TOKEN = '{{SORT_VIEW}}';
 

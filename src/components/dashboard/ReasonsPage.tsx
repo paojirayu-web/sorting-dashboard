@@ -1,58 +1,56 @@
 "use client";
 
-import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
-    AlertCircle,
-    ArrowDown,
-    ArrowUp,
-    ChevronLeft,
-    ChevronRight,
-    LayoutDashboard,
+    ArrowLeft,
+    Boxes,
+    ChevronDown,
+    Droplet,
+    Layers,
     Menu,
     Moon,
     RefreshCw,
     Search,
     Sun,
-    XCircle,
 } from 'lucide-react';
 import { Sidebar } from '@/components/dashboard/Sidebar';
 import { ReasonsFocus } from '@/components/dashboard/ReasonsFocus';
+import { ReasonsOverview } from '@/components/dashboard/ReasonsOverview';
+import { dashboardViewHref } from '@/lib/dashboard-view';
 import { themes, type Theme, type ThemeName } from '@/lib/themes';
 import {
-    REASONS_DEFAULT_PAGE_SIZE,
-    REASONS_MAX_PAGE_SIZE,
-    defaultToneForFamily,
+    REASONS_CP_OPTIONS,
+    REASONS_DEFAULT_CP,
+    REASONS_FAMILY_OPTIONS,
+    REASONS_FORMING_OPTIONS,
+    REASONS_GLAZE_OPTIONS,
     familyForFocusTone,
-    latestReasonsYear,
-    parseReasonsDir,
+    nextToneForFamily,
+    toneOptionsForFamily,
+    parseReasonsCp,
     parseReasonsFamily,
+    parseReasonsForming,
+    parseReasonsGlaze,
+    parseReasonsGroups,
     parseReasonsKind,
-    parseReasonsPage,
-    parseReasonsPageSize,
-    parseReasonsSort,
     parseReasonsTone,
-    parseReasonsYear,
+    parseReasonsYearParam,
+    reasonsGroupsQuery,
     reasonsYearOptions,
     type ReasonsDetailResponse,
-    type ReasonsDir,
     type ReasonsFamily,
     type ReasonsFocusTone,
-    type ReasonsItem,
+    type ReasonsGroupOption,
     type ReasonsKind,
-    type ReasonsListResponse,
-    type ReasonsMeta,
-    type ReasonsSort,
+    type ReasonsOverviewResponse,
     type ReasonsToneParam,
+    type ReasonsYearParam,
 } from '@/lib/reasons';
 import { getDashboardSkin, type DwKind, type LineFamily, type WwTone } from '@/lib/sort-source';
 
-const SEARCH_DEBOUNCE_MS = 300;
 const SCRAP_COLOR = '#ef4444';
 const REJECT_COLOR = '#f97316';
-const SKELETON_ROWS = 8;
-const PAGE_SIZE_OPTIONS = [25, 50, 100] as const;
 
 function reasonsSkin(family: ReasonsFamily, tone: ReasonsToneParam): string {
     const lineFamily: LineFamily = family === 'ww' ? 'WW' : family === 'dw' ? 'DW' : 'ALL';
@@ -61,112 +59,409 @@ function reasonsSkin(family: ReasonsFamily, tone: ReasonsToneParam): string {
     return getDashboardSkin(lineFamily, wwTone, dwKind);
 }
 
-function fmtQty(n: number): string {
-    return Math.round(n).toLocaleString();
-}
-
-function SparkBars({ values, color }: { values: number[]; color: string }) {
-    const max = Math.max(...values, 0);
+function SegmentedPills<T extends string>({
+    theme,
+    value,
+    onChange,
+    options,
+    activeColor,
+    className = '',
+}: {
+    theme: Theme;
+    value: T;
+    onChange: (value: T) => void;
+    options: { value: T; label: string }[];
+    activeColor?: string;
+    className?: string;
+}) {
     return (
-        <div className="flex items-end gap-px h-6 w-[72px]" aria-hidden>
-            {values.map((value, i) => {
-                const h = max > 0 ? Math.max(value > 0 ? 12 : 8, Math.round((value / max) * 100)) : 8;
+        <div className={`flex items-center ${theme.inputBg} rounded-xl p-1 border ${theme.borderColor} shrink-0 min-w-0 ${className}`}>
+            {options.map((opt) => {
+                const active = value === opt.value;
                 return (
-                    <span
-                        key={i}
-                        className="flex-1 rounded-[1px]"
-                        style={{
-                            height: `${h}%`,
-                            background: color,
-                            opacity: value > 0 ? 0.9 : 0.18,
-                        }}
-                    />
+                    <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => onChange(opt.value)}
+                        className={`flex-1 px-1.5 sm:px-2.5 py-1.5 rounded-lg text-[10px] sm:text-xs font-bold leading-tight transition-colors whitespace-nowrap ${
+                            active ? 'text-white shadow-md' : `${theme.textMuted} hover:${theme.textWhite}`
+                        }`}
+                        style={active ? { background: activeColor || 'var(--skin-accent, #2563eb)' } : undefined}
+                    >
+                        {opt.label}
+                    </button>
                 );
             })}
         </div>
     );
 }
 
-function KindToggle({
+function FamilyToggle({
     theme,
-    kind,
-    onChange,
+    family,
+    tone,
+    toneOptions,
+    onFamily,
+    onTone,
+    className = '',
 }: {
     theme: Theme;
-    kind: ReasonsKind;
-    onChange: (kind: ReasonsKind) => void;
+    family: ReasonsFamily;
+    tone: ReasonsToneParam;
+    toneOptions: { value: ReasonsToneParam; label: string }[];
+    onFamily: (next: ReasonsFamily) => void;
+    onTone: (next: ReasonsToneParam) => void;
+    className?: string;
 }) {
     return (
-        <div className={`flex items-center ${theme.inputBg} rounded-xl p-1 border ${theme.borderColor} shrink-0`}>
-            <button
-                type="button"
-                onClick={() => onChange('scrap')}
-                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                    kind === 'scrap' ? 'text-white shadow-md' : `${theme.textMuted} hover:${theme.textWhite}`
-                }`}
-                style={kind === 'scrap' ? { background: SCRAP_COLOR } : undefined}
-            >
-                <AlertCircle size={14} />
-                Scrap
-            </button>
-            <button
-                type="button"
-                onClick={() => onChange('reject')}
-                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                    kind === 'reject' ? 'text-white shadow-md' : `${theme.textMuted} hover:${theme.textWhite}`
-                }`}
-                style={kind === 'reject' ? { background: REJECT_COLOR } : undefined}
-            >
-                <XCircle size={14} />
-                Reject
-            </button>
+        <div className={`flex flex-col lg:flex-row items-stretch lg:items-center gap-1 min-w-0 ${className}`}>
+            <SegmentedPills
+                theme={theme}
+                value={family}
+                onChange={onFamily}
+                options={REASONS_FAMILY_OPTIONS}
+            />
+            {toneOptions.length > 0 && (
+                <SegmentedPills
+                    theme={theme}
+                    value={tone}
+                    onChange={onTone}
+                    options={toneOptions}
+                    className="dash-subfade"
+                />
+            )}
         </div>
     );
 }
 
-function SortHead({
-    label,
-    active,
-    dir,
-    onClick,
+function DefectPicker({
     theme,
+    currentTheme,
+    options,
+    onSelect,
 }: {
-    label: string;
-    active: boolean;
-    dir: ReasonsDir;
-    onClick: () => void;
     theme: Theme;
+    currentTheme: ThemeName;
+    options: string[];
+    onSelect: (rsn: string) => void;
 }) {
-    const Icon = !active ? null : dir === 'asc' ? ArrowUp : ArrowDown;
+    const rootRef = useRef<HTMLDivElement>(null);
+    const [open, setOpen] = useState(false);
+    const [q, setQ] = useState('');
+    const filtered = useMemo(() => {
+        const needle = q.trim().toLowerCase();
+        const list = needle
+            ? options.filter((rsn) => rsn.toLowerCase().includes(needle))
+            : options;
+        return list.slice(0, 80);
+    }, [options, q]);
+
+    useEffect(() => {
+        const onDoc = (event: MouseEvent) => {
+            if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+        };
+        document.addEventListener('mousedown', onDoc);
+        return () => document.removeEventListener('mousedown', onDoc);
+    }, []);
+
+    const pick = (rsn: string) => {
+        onSelect(rsn);
+        setQ('');
+        setOpen(false);
+    };
+
     return (
-        <button
-            type="button"
-            onClick={onClick}
-            className={`inline-flex items-center justify-end gap-1 text-[10px] font-bold uppercase tracking-wide ${
-                active ? theme.textWhite : theme.textMuted
-            } hover:${theme.textWhite}`}
-        >
-            {label}
-            {Icon ? <Icon size={11} /> : null}
-        </button>
+        <div ref={rootRef} className="relative min-w-[11rem] max-w-[18rem] w-[14rem] shrink-0">
+            <label className={`flex items-center gap-1.5 px-2.5 py-1.5 ${theme.inputBg} rounded-xl border ${theme.borderColor}`}>
+                <Search size={14} className={`${theme.textMuted} shrink-0`} />
+                <input
+                    value={q}
+                    onChange={(e) => {
+                        setQ(e.target.value);
+                        setOpen(true);
+                    }}
+                    onFocus={() => setOpen(true)}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                            const next = filtered[0] || q.trim();
+                            if (!next) return;
+                            e.preventDefault();
+                            pick(next);
+                        }
+                        if (e.key === 'Escape') setOpen(false);
+                    }}
+                    placeholder="Select defect..."
+                    title="Select defect to open Focus"
+                    className={`bg-transparent text-xs font-bold ${theme.textWhite} outline-none w-full min-w-0`}
+                    style={{ colorScheme: currentTheme }}
+                />
+            </label>
+            {open && (
+                <div className={`absolute top-full left-0 right-0 mt-1 max-h-56 overflow-y-auto z-[60] ${theme.cardBg} border ${theme.borderColor} rounded-xl shadow-lg`}>
+                    {filtered.length === 0 ? (
+                        <p className={`px-3 py-2 text-[11px] ${theme.textMuted}`}>No matching defect</p>
+                    ) : filtered.map((rsn) => (
+                        <button
+                            key={rsn}
+                            type="button"
+                            onClick={() => pick(rsn)}
+                            className={`w-full text-left px-3 py-1.5 text-xs font-semibold ${theme.textWhite} ${theme.tableRowHover}`}
+                        >
+                            {rsn}
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
     );
 }
 
-const LIST_COLS = 'grid grid-cols-[1.25rem_minmax(0,1fr)_minmax(3rem,auto)_2.25rem_4.5rem] gap-x-2 items-center';
-
-function SkeletonRows({ theme }: { theme: Theme }) {
+function ExtraFilters({
+    theme,
+    currentTheme,
+    kind,
+    year,
+    yearOptions,
+    cp,
+    showYear = true,
+    rsnOptions,
+    onKind,
+    onYear,
+    onCp,
+    onSelectRsn,
+}: {
+    theme: Theme;
+    currentTheme: ThemeName;
+    kind: ReasonsKind;
+    year: ReasonsYearParam;
+    yearOptions: number[];
+    cp: string;
+    showYear?: boolean;
+    rsnOptions: string[];
+    onKind: (next: ReasonsKind) => void;
+    onYear: (next: string) => void;
+    onCp: (next: string) => void;
+    onSelectRsn: (rsn: string) => void;
+}) {
+    const optionClass = currentTheme === 'dark' ? 'bg-[#141414] text-white' : 'bg-white text-zinc-900';
+    const selectClass = `bg-transparent text-xs font-bold ${theme.textWhite} outline-none cursor-pointer`;
+    const cpOptions = REASONS_CP_OPTIONS.some((option) => option.value === cp)
+        ? REASONS_CP_OPTIONS
+        : [...REASONS_CP_OPTIONS, { value: cp, label: cp }];
     return (
         <>
-            {Array.from({ length: SKELETON_ROWS }, (_, i) => (
-                <div key={i} className={`${LIST_COLS} px-3 py-2.5 border-b ${theme.borderColor}`}>
-                    <div className={`h-3 w-5 rounded ${theme.inputBg} animate-pulse`} />
-                    <div className={`h-3 w-full max-w-[12rem] rounded ${theme.inputBg} animate-pulse`} />
-                    <div className={`h-3 w-10 justify-self-end rounded ${theme.inputBg} animate-pulse`} />
-                    <div className={`h-3 w-7 justify-self-end rounded ${theme.inputBg} animate-pulse`} />
-                    <div className={`h-4 w-[72px] justify-self-end rounded ${theme.inputBg} animate-pulse`} />
-                </div>
-            ))}
+            <SegmentedPills
+                theme={theme}
+                value={kind}
+                onChange={onKind}
+                options={[
+                    { value: 'scrap' as ReasonsKind, label: 'Scrap' },
+                    { value: 'reject' as ReasonsKind, label: 'Reject' },
+                ]}
+                activeColor={kind === 'scrap' ? SCRAP_COLOR : REJECT_COLOR}
+            />
+            <label className={`flex items-center gap-1.5 px-2.5 py-1.5 ${theme.inputBg} rounded-xl border ${theme.borderColor} shrink-0`}>
+                <span className={`text-[10px] font-bold ${theme.textMuted}`}>CP</span>
+                <select
+                    value={cp}
+                    onChange={(e) => onCp(e.target.value)}
+                    className={selectClass}
+                    title="Select m_cp"
+                    style={{ colorScheme: currentTheme }}
+                >
+                    {cpOptions.map((option) => (
+                        <option key={option.value} value={option.value} className={optionClass}>
+                            {option.label}
+                        </option>
+                    ))}
+                </select>
+            </label>
+            {showYear && (
+            <label className={`flex items-center gap-1.5 px-2.5 py-1.5 ${theme.inputBg} rounded-xl border ${theme.borderColor} shrink-0`}>
+                <span className={`text-[10px] font-bold ${theme.textMuted}`}>Year</span>
+                <select
+                    value={year === 'all' ? 'all' : String(year)}
+                    onChange={(e) => onYear(e.target.value)}
+                    className={selectClass}
+                    title="Select year"
+                    style={{ colorScheme: currentTheme }}
+                >
+                    <option value="all" className={optionClass}>All</option>
+                    {yearOptions.map((option) => (
+                        <option key={option} value={option} className={optionClass}>
+                            {option}
+                        </option>
+                    ))}
+                    {year !== 'all' && !yearOptions.includes(year) && (
+                        <option value={year} className={optionClass}>{year}</option>
+                    )}
+                </select>
+            </label>
+            )}
+            <DefectPicker
+                theme={theme}
+                currentTheme={currentTheme}
+                options={rsnOptions}
+                onSelect={onSelectRsn}
+            />
         </>
+    );
+}
+
+function MixFilters({
+    theme,
+    currentTheme,
+    group,
+    forming,
+    glaze,
+    groupOptions,
+    onGroup,
+    onForming,
+    onGlaze,
+}: {
+    theme: Theme;
+    currentTheme: ThemeName;
+    group: string[];
+    forming: string;
+    glaze: string;
+    groupOptions: ReasonsGroupOption[];
+    onGroup: (next: string[]) => void;
+    onForming: (next: string) => void;
+    onGlaze: (next: string) => void;
+}) {
+    const optionClass = currentTheme === 'dark' ? 'bg-[#141414] text-white' : 'bg-white text-zinc-900';
+    const selectClass = `bg-transparent text-[10px] sm:text-xs font-bold ${theme.textWhite} outline-none cursor-pointer min-w-0 w-full`;
+    const chip = `flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 ${theme.inputBg} rounded-xl border ${theme.borderColor} min-w-0 flex-1`;
+    const labels = Object.fromEntries(groupOptions.map((opt) => [opt.value, opt.label]));
+    return (
+        <div className="flex items-stretch gap-1.5 w-full min-w-0">
+            <div className={chip}>
+                <Boxes size={14} className={`${theme.textMuted} shrink-0`} />
+                <span className={`text-[10px] font-bold ${theme.textMuted} shrink-0`}>Group</span>
+                <GroupMultiSelect
+                    theme={theme}
+                    currentTheme={currentTheme}
+                    values={group}
+                    onChange={onGroup}
+                    options={groupOptions.map((opt) => opt.value)}
+                    labels={labels}
+                />
+            </div>
+            <label className={chip}>
+                <Layers size={14} className={`${theme.textMuted} shrink-0`} />
+                <span className={`text-[10px] font-bold ${theme.textMuted} shrink-0`}>Forming</span>
+                <select value={forming} onChange={(e) => onForming(e.target.value)} className={selectClass} title="Forming" style={{ colorScheme: currentTheme }}>
+                    {REASONS_FORMING_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value} className={optionClass}>{option.label}</option>
+                    ))}
+                </select>
+            </label>
+            <label className={chip}>
+                <Droplet size={14} className={`${theme.textMuted} shrink-0`} />
+                <span className={`text-[10px] font-bold ${theme.textMuted} shrink-0`}>Glaze</span>
+                <select value={glaze} onChange={(e) => onGlaze(e.target.value)} className={selectClass} title="Glaze" style={{ colorScheme: currentTheme }}>
+                    {REASONS_GLAZE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value} className={optionClass}>{option.label}</option>
+                    ))}
+                </select>
+            </label>
+        </div>
+    );
+}
+
+function GroupMultiSelect({
+    theme,
+    currentTheme,
+    values,
+    onChange,
+    options,
+    labels,
+}: {
+    theme: Theme;
+    currentTheme: ThemeName;
+    values: string[];
+    onChange: (next: string[]) => void;
+    options: string[];
+    labels: Record<string, string>;
+}) {
+    const [open, setOpen] = useState(false);
+    const rootRef = useRef<HTMLDivElement>(null);
+    const isAll = values.length === 0;
+    const panelBg = currentTheme === 'dark' ? 'bg-[#141414]' : 'bg-white';
+    const summary = isAll
+        ? 'All'
+        : values.length === 1
+            ? (labels[values[0]] || values[0])
+            : `${values.length} groups`;
+
+    useEffect(() => {
+        if (!open) return;
+        const onDoc = (e: MouseEvent) => {
+            if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+        };
+        document.addEventListener('mousedown', onDoc);
+        return () => document.removeEventListener('mousedown', onDoc);
+    }, [open]);
+
+    const toggle = (value: string) => {
+        if (values.includes(value)) {
+            onChange(values.filter((v) => v !== value));
+            return;
+        }
+        onChange([...values, value]);
+    };
+
+    return (
+        <div ref={rootRef} className="relative min-w-0 w-full">
+            <button
+                type="button"
+                onClick={() => setOpen((v) => !v)}
+                className={`flex items-center gap-1 bg-transparent outline-none text-[10px] sm:text-xs font-bold ${theme.textWhite} cursor-pointer min-w-0 w-full`}
+                title={isAll ? 'All groups' : values.map((v) => labels[v] || v).join(', ')}
+                aria-expanded={open}
+                aria-haspopup="listbox"
+            >
+                <span className="truncate text-left flex-1">{summary}</span>
+                <ChevronDown className={`w-3.5 h-3.5 shrink-0 opacity-70 transition-transform ${open ? 'rotate-180' : ''}`} />
+            </button>
+            {open && (
+                <div
+                    role="listbox"
+                    className={`absolute left-0 top-full z-[80] mt-2 min-w-[12rem] w-max max-w-[18rem] max-h-[min(20rem,50vh)] overflow-y-auto rounded-xl border ${theme.borderColor} ${panelBg} shadow-2xl py-1`}
+                >
+                    <label className={`flex items-center gap-2 px-3 py-2 cursor-pointer ${isAll ? theme.accentText : theme.textSecondary}`}>
+                        <input
+                            type="checkbox"
+                            checked={isAll}
+                            onChange={() => onChange([])}
+                            className="rounded border-gray-500 accent-blue-600"
+                        />
+                        <span className="text-xs font-bold">All</span>
+                    </label>
+                    <div className={`border-t ${theme.borderColor} my-0.5`} />
+                    {options.map((opt) => {
+                        const checked = values.includes(opt);
+                        return (
+                            <label
+                                key={opt}
+                                className={`flex items-center gap-2 px-3 py-2 cursor-pointer ${checked ? theme.accentText : theme.textSecondary}`}
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() => toggle(opt)}
+                                    className="rounded border-gray-500 accent-blue-600"
+                                />
+                                <span className="text-xs font-bold leading-snug">{labels[opt] || opt}</span>
+                            </label>
+                        );
+                    })}
+                    {options.length === 0 && (
+                        <p className={`px-3 py-2 text-[11px] ${theme.textMuted}`}>Loading groups…</p>
+                    )}
+                </div>
+            )}
+        </div>
     );
 }
 
@@ -178,112 +473,108 @@ export function ReasonsPage() {
     const theme = themes[currentTheme];
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
-    const year = parseReasonsYear(searchParams.get('year'));
+    const year = parseReasonsYearParam(searchParams.get('year'));
     const kind = parseReasonsKind(searchParams.get('kind'));
     const family = parseReasonsFamily(searchParams.get('family'));
     const tone = parseReasonsTone(family, searchParams.get('tone'));
-    const q = (searchParams.get('q') || '').trim();
-    const page = parseReasonsPage(searchParams.get('page'));
-    const pageSize = parseReasonsPageSize(searchParams.get('pageSize'));
+    const cp = parseReasonsCp(searchParams.get('cp'));
+    const group = parseReasonsGroups(searchParams.get('group'));
+    const groupKey = reasonsGroupsQuery(group) || '';
+    const forming = parseReasonsForming(searchParams.get('forming'));
+    const glaze = parseReasonsGlaze(searchParams.get('glaze'));
     const rsn = (searchParams.get('rsn') || '').trim();
-    const sort = parseReasonsSort(searchParams.get('sort'));
-    const dir = parseReasonsDir(searchParams.get('dir'));
+    const isFocus = Boolean(rsn);
+    const accent = kind === 'scrap' ? SCRAP_COLOR : REJECT_COLOR;
+    const yearOptions = useMemo(() => reasonsYearOptions(), []);
+    const toneOptions = toneOptionsForFamily(family);
 
-    const [searchDraft, setSearchDraft] = useState(q);
-    const [items, setItems] = useState<ReasonsItem[]>([]);
-    const [meta, setMeta] = useState<ReasonsMeta | null>(null);
-    const [loading, setLoading] = useState(() => !rsn);
-    const [error, setError] = useState<string | null>(null);
+    const [overview, setOverview] = useState<ReasonsOverviewResponse | null>(null);
+    const [overviewLoading, setOverviewLoading] = useState(() => !rsn);
+    const [overviewError, setOverviewError] = useState<string | null>(null);
+    const [overviewRetry, setOverviewRetry] = useState(0);
+
     const [detail, setDetail] = useState<ReasonsDetailResponse | null>(null);
     const [detailLoading, setDetailLoading] = useState(() => Boolean(rsn));
     const [detailError, setDetailError] = useState<string | null>(null);
-    const skipDebounce = useRef(true);
-    const [listRetryNonce, setListRetryNonce] = useState(0);
-    const [detailRetryNonce, setDetailRetryNonce] = useState(0);
-    const yearOptions = useMemo(() => reasonsYearOptions(), []);
-    const accent = kind === 'scrap' ? SCRAP_COLOR : REJECT_COLOR;
-    const isFocus = Boolean(rsn);
+    const [detailRetry, setDetailRetry] = useState(0);
 
-    useEffect(() => {
-        setSearchDraft(q);
-    }, [q]);
-
-    const replaceQuery = useCallback((patch: Record<string, string | number | null | undefined>, resetPage = false) => {
+    const replaceQuery = useCallback((patch: Record<string, string | number | null | undefined>) => {
         const next = new URLSearchParams(searchParams.toString());
         for (const [key, value] of Object.entries(patch)) {
             if (value == null || value === '') next.delete(key);
             else next.set(key, String(value));
         }
-        if (resetPage) next.delete('page');
+        // Drop leftover overview-list / Shape params
+        next.delete('view');
+        next.delete('q');
+        next.delete('page');
+        next.delete('pageSize');
+        next.delete('sort');
+        next.delete('dir');
+        next.delete('shape');
         const qs = next.toString();
         router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     }, [pathname, router, searchParams]);
 
-    useEffect(() => {
-        if (skipDebounce.current) {
-            skipDebounce.current = false;
-            return;
-        }
-        const handle = window.setTimeout(() => {
-            const next = searchDraft.trim();
-            if (next === q) return;
-            replaceQuery({ q: next || null }, true);
-        }, SEARCH_DEBOUNCE_MS);
-        return () => window.clearTimeout(handle);
-    }, [searchDraft, q, replaceQuery]);
+    const applyFamily = useCallback((next: ReasonsFamily) => {
+        const kept = nextToneForFamily(next, tone);
+        replaceQuery({
+            family: next === 'all' ? null : next,
+            tone: kept === 'all' ? null : kept,
+        });
+    }, [replaceQuery, tone]);
+
+    const applyTone = useCallback((next: ReasonsToneParam) => {
+        replaceQuery({ tone: next === 'all' ? null : next });
+    }, [replaceQuery]);
 
     useEffect(() => {
-        document.title = isFocus ? `Reasons Focus · ${rsn}` : 'Reasons Overview · QC root-cause';
+        document.title = isFocus ? `Defects Focus · ${rsn}` : 'Defects · Overview';
     }, [isFocus, rsn]);
 
+    // Layer A — overview only when no rsn
     useEffect(() => {
         if (isFocus) {
-            setLoading(false);
+            setOverviewLoading(false);
             return;
         }
         const controller = new AbortController();
         const params = new URLSearchParams({
             year: String(year),
             kind,
-            page: String(page),
-            pageSize: String(pageSize),
-            sort,
-            dir,
+            family,
+            tone,
+            cp,
+            forming,
+            glaze,
         });
-        if (q) params.set('q', q);
-        if (listRetryNonce > 0) params.set('refresh', '1');
-
-        setLoading(true);
-        setError(null);
-
-        fetch(`/api/reasons?${params}`, { signal: controller.signal })
+        const groupQuery = reasonsGroupsQuery(group);
+        if (groupQuery) params.set('group', groupQuery);
+        if (overviewRetry > 0) params.set('refresh', '1');
+        setOverviewLoading(true);
+        setOverviewError(null);
+        fetch(`/api/reasons/overview?${params}`, { signal: controller.signal })
             .then(async (res) => {
                 const body = await res.json();
                 if (!res.ok || body?.error) {
                     throw new Error(String(body?.error || `Request failed (${res.status})`));
                 }
-                const payload = body as ReasonsListResponse;
-                setItems(payload.items || []);
-                setMeta(payload.meta);
-                if (payload.meta?.page && payload.meta.page !== page) {
-                    replaceQuery({ page: payload.meta.page });
-                }
+                setOverview(body as ReasonsOverviewResponse);
             })
             .catch((err: unknown) => {
                 if (controller.signal.aborted) return;
-                setItems([]);
-                setMeta(null);
-                setError(err instanceof Error ? err.message : 'Reasons list failed');
+                setOverview(null);
+                setOverviewError(err instanceof Error ? err.message : 'Overview failed');
             })
             .finally(() => {
-                if (!controller.signal.aborted) setLoading(false);
+                if (!controller.signal.aborted) setOverviewLoading(false);
             });
-
         return () => controller.abort();
-    }, [isFocus, year, kind, q, page, pageSize, sort, dir, listRetryNonce, replaceQuery]);
+    }, [isFocus, year, kind, family, tone, cp, groupKey, forming, glaze, overviewRetry]);
 
+    // Layer B — detail only when rsn present
     useEffect(() => {
-        if (!isFocus) {
+        if (!isFocus || !rsn) {
             setDetail(null);
             setDetailLoading(false);
             setDetailError(null);
@@ -296,12 +587,15 @@ export function ReasonsPage() {
             kind,
             family,
             tone,
+            cp,
+            forming,
+            glaze,
         });
-        if (detailRetryNonce > 0) params.set('refresh', '1');
-
+        const groupQuery = reasonsGroupsQuery(group);
+        if (groupQuery) params.set('group', groupQuery);
+        if (detailRetry > 0) params.set('refresh', '1');
         setDetailLoading(true);
         setDetailError(null);
-
         fetch(`/api/reasons/detail?${params}`, { signal: controller.signal })
             .then(async (res) => {
                 const body = await res.json();
@@ -313,31 +607,24 @@ export function ReasonsPage() {
             .catch((err: unknown) => {
                 if (controller.signal.aborted) return;
                 setDetail(null);
-                setDetailError(err instanceof Error ? err.message : 'Reasons detail failed');
+                setDetailError(err instanceof Error ? err.message : 'Detail failed');
             })
             .finally(() => {
                 if (!controller.signal.aborted) setDetailLoading(false);
             });
-
         return () => controller.abort();
-    }, [isFocus, rsn, year, kind, family, tone, detailRetryNonce]);
+    }, [isFocus, rsn, year, kind, family, tone, cp, groupKey, forming, glaze, detailRetry]);
 
-    const onSort = (nextSort: ReasonsSort) => {
-        if (sort === nextSort) {
-            replaceQuery({ dir: dir === 'desc' ? 'asc' : 'desc' }, true);
-            return;
-        }
-        replaceQuery({ sort: nextSort, dir: 'desc' }, true);
-    };
-
-    const showingFrom = meta && meta.total > 0 ? (meta.page - 1) * meta.pageSize + 1 : 0;
-    const showingTo = meta ? Math.min(meta.page * meta.pageSize, meta.total) : 0;
-    const maxPage = meta ? Math.max(1, Math.ceil(meta.total / meta.pageSize) || 1) : 1;
+    const groupOptions = overview?.groupOptions?.length
+        ? overview.groupOptions
+        : (detail?.groupOptions || []);
+    const refreshing = isFocus ? detailLoading : overviewLoading;
+    const iconBtn = `p-2 sm:p-2.5 rounded-xl ${theme.inputBg} ${theme.textSecondary} hover:${theme.textWhite} transition-all shrink-0 touch-manipulation`;
 
     return (
         <div
             className={`dash-skin flex h-screen ${theme.pageBg} ${theme.textPrimary} font-sans overflow-hidden transition-colors duration-300`}
-            data-skin={isFocus ? reasonsSkin(family, tone) : 'all'}
+            data-skin={reasonsSkin(family, tone)}
             data-ui-theme={currentTheme}
             data-mode={isFocus ? 'focus' : 'overview'}
         >
@@ -348,83 +635,146 @@ export function ReasonsPage() {
                 theme={theme}
                 view="overview"
                 isSidebarOpen={sidebarOpen}
-                onSetView={() => router.push('/dashboard')}
+                onSetView={(next) => router.push(dashboardViewHref(next))}
                 onClose={() => setSidebarOpen(false)}
             />
             <main className="flex-1 flex flex-col overflow-hidden min-w-0">
-                <header className={`sticky top-0 z-30 ${theme.headerBg} backdrop-blur-xl border-b ${theme.borderColor}`}>
-                    <div className="flex items-center justify-between gap-2 px-3 sm:px-4 md:px-6 min-h-14 md:min-h-16 py-2">
+                <header className={`sticky top-0 z-50 ${theme.headerBg} backdrop-blur-xl border-b ${theme.borderColor}`}>
+                    <div className="flex items-center justify-between gap-2 px-3 sm:px-4 md:px-6 min-h-14 md:min-h-16 py-2 min-w-0">
                         <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
                             <button
                                 type="button"
                                 onClick={() => setSidebarOpen(true)}
-                                className={`p-2 rounded-xl ${theme.inputBg} md:hidden`}
-                                aria-label="Open sidebar"
+                                className={iconBtn}
+                                title="Toggle Sidebar"
+                                aria-label="Toggle sidebar"
                             >
-                                <Menu size={18} />
+                                <Menu size={20} />
                             </button>
-                            <div className="min-w-0">
-                                <h1 className={`text-sm sm:text-base md:text-lg font-bold ${theme.textWhite} tracking-tight truncate`}>
-                                    {isFocus ? 'Reasons Focus' : 'Reasons Overview'}
-                                </h1>
-                                <p className={`text-[11px] ${theme.textMuted} hidden sm:block`}>
-                                    QC root-cause tracking · not the main dashboard · not Production Mix
-                                </p>
-                            </div>
+                            <h1 className={`text-sm sm:text-base md:text-lg font-bold ${theme.textWhite} tracking-tight truncate flex items-center gap-2 min-w-0`}>
+                                {isFocus ? (
+                                    <>
+                                        <span className="shrink-0">Focus</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => replaceQuery({ rsn: null })}
+                                            className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg ${theme.inputBg} border ${theme.borderColor} text-[11px] font-bold ${theme.textSecondary} shrink-0`}
+                                            title="กลับภาพรวม"
+                                        >
+                                            <ArrowLeft size={14} />
+                                            ภาพรวม
+                                        </button>
+                                    </>
+                                ) : (
+                                    <span className="truncate">Defects</span>
+                                )}
+                                {refreshing && (
+                                    <span className="inline-flex h-2 w-2 rounded-full bg-green-500 animate-pulse shrink-0" />
+                                )}
+                            </h1>
+                            <FamilyToggle
+                                theme={theme}
+                                family={family}
+                                tone={tone}
+                                toneOptions={toneOptions}
+                                onFamily={applyFamily}
+                                onTone={applyTone}
+                                className="hidden lg:flex"
+                            />
                         </div>
                         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-                            <Link
-                                href="/dashboard"
-                                className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl ${theme.inputBg} ${theme.textSecondary} text-xs font-bold`}
+                            <div className="hidden lg:flex items-center gap-2">
+                                <ExtraFilters
+                                    theme={theme}
+                                    currentTheme={currentTheme}
+                                    kind={kind}
+                                    year={year}
+                                    yearOptions={yearOptions}
+                                    cp={cp}
+                                    showYear={!isFocus}
+                                    rsnOptions={overview?.rsnOptions || []}
+                                    onKind={(next) => replaceQuery({
+                                        kind: next === 'scrap' ? null : next,
+                                        ...(isFocus && next === 'reject' ? { rsn: null } : {}),
+                                    })}
+                                    onYear={(next) => replaceQuery({ year: next === 'all' ? null : next })}
+                                    onCp={(next) => replaceQuery({
+                                        cp: next === REASONS_DEFAULT_CP ? null : next,
+                                    })}
+                                    onSelectRsn={(next) => replaceQuery({ rsn: next })}
+                                />
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (isFocus) setDetailRetry((n) => n + 1);
+                                    else setOverviewRetry((n) => n + 1);
+                                }}
+                                disabled={refreshing}
+                                className={`${iconBtn} ${refreshing ? 'animate-spin' : ''}`}
+                                title="Refresh Data"
+                                aria-label="Refresh data"
                             >
-                                <LayoutDashboard size={14} />
-                                Dashboard
-                            </Link>
+                                <RefreshCw size={18} className={refreshing ? 'skin-accent-text' : ''} />
+                            </button>
                             <button
                                 type="button"
                                 onClick={() => setCurrentTheme(currentTheme === 'dark' ? 'light' : 'dark')}
-                                className={`p-2 sm:p-2.5 rounded-xl ${theme.inputBg} ${theme.textSecondary}`}
+                                className={iconBtn}
+                                title="Toggle Theme"
                                 aria-label="Toggle theme"
                             >
                                 {currentTheme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
                             </button>
                         </div>
                     </div>
-                    {!isFocus && (
-                    <div className={`flex flex-wrap items-center gap-2 px-3 sm:px-4 md:px-6 py-2 border-t ${theme.borderColor}`}>
-                        <label className={`flex items-center gap-1.5 px-2.5 py-1.5 ${theme.inputBg} rounded-xl border ${theme.borderColor}`}>
-                            <span className={`text-[10px] font-bold ${theme.textMuted}`}>Year</span>
-                            <select
-                                value={year}
-                                onChange={(e) => replaceQuery({ year: e.target.value }, true)}
-                                className={`bg-transparent text-xs font-bold ${theme.textWhite} outline-none`}
-                            >
-                                {yearOptions.map((option) => (
-                                    <option key={option} value={option}>
-                                        {option}
-                                        {option === latestReasonsYear() ? ' · latest' : ''}
-                                    </option>
-                                ))}
-                                {!yearOptions.includes(year) && <option value={year}>{year}</option>}
-                            </select>
-                        </label>
-                        <KindToggle
+                    <div className={`flex items-center w-full min-w-0 px-3 sm:px-4 md:px-6 py-2 border-t ${theme.borderColor}`}>
+                        <MixFilters
                             theme={theme}
-                            kind={kind}
-                            onChange={(next) => replaceQuery({ kind: next === 'scrap' ? null : next }, true)}
+                            currentTheme={currentTheme}
+                            group={group}
+                            forming={forming}
+                            glaze={glaze}
+                            groupOptions={groupOptions}
+                            onGroup={(next) => replaceQuery({ group: reasonsGroupsQuery(next) })}
+                            onForming={(next) => replaceQuery({ forming: next === 'all' ? null : next })}
+                            onGlaze={(next) => replaceQuery({ glaze: next === 'all' ? null : next })}
                         />
-                        <div className={`flex items-center gap-2 px-3 py-1.5 ${theme.inputBg} rounded-xl border ${theme.borderColor} min-w-0 flex-1 basis-full sm:basis-auto`}>
-                            <Search size={14} className={`${theme.textMuted} shrink-0`} />
-                            <input
-                                type="search"
-                                value={searchDraft}
-                                onChange={(e) => setSearchDraft(e.target.value)}
-                                placeholder="Search reason…"
-                                className={`bg-transparent border-none outline-none text-xs sm:text-sm font-medium ${theme.textWhite} w-full min-w-0`}
+                    </div>
+                    <div className={`lg:hidden border-t ${theme.borderColor} px-3 sm:px-4 pt-2 pb-2`}>
+                        <FamilyToggle
+                            theme={theme}
+                            family={family}
+                            tone={tone}
+                            toneOptions={toneOptions}
+                            onFamily={applyFamily}
+                            onTone={applyTone}
+                            className="w-full"
+                        />
+                    </div>
+                    <div className={`lg:hidden border-t ${theme.borderColor} px-3 sm:px-4 pb-3 pt-2`}>
+                        <div className="flex items-center gap-2 overflow-x-auto pb-0.5 -mx-1 px-1">
+                            <ExtraFilters
+                                theme={theme}
+                                currentTheme={currentTheme}
+                                kind={kind}
+                                year={year}
+                                yearOptions={yearOptions}
+                                cp={cp}
+                                showYear={!isFocus}
+                                rsnOptions={overview?.rsnOptions || []}
+                                onKind={(next) => replaceQuery({
+                                    kind: next === 'scrap' ? null : next,
+                                    ...(isFocus && next === 'reject' ? { rsn: null } : {}),
+                                })}
+                                onYear={(next) => replaceQuery({ year: next === 'all' ? null : next })}
+                                onCp={(next) => replaceQuery({
+                                    cp: next === REASONS_DEFAULT_CP ? null : next,
+                                })}
+                                onSelectRsn={(next) => replaceQuery({ rsn: next })}
                             />
                         </div>
                     </div>
-                    )}
                 </header>
 
                 {isFocus ? (
@@ -440,129 +790,38 @@ export function ReasonsPage() {
                         loading={detailLoading}
                         error={detailError}
                         payload={detail}
-                        onBack={() => replaceQuery({ rsn: null })}
-                        onRetry={() => setDetailRetryNonce((n) => n + 1)}
-                        onKindChange={(next) => replaceQuery({ kind: next === 'scrap' ? null : next })}
-                        onFamilyChange={(next) => replaceQuery({
-                            family: next === 'all' ? null : next,
-                            tone: null,
+                        yearOptions={yearOptions}
+                        onYear={(next) => replaceQuery({ year: next === 'all' ? null : next })}
+                        onRetry={() => setDetailRetry((n) => n + 1)}
+                        onKindChange={(next) => replaceQuery({
+                            kind: next === 'scrap' ? null : next,
                         })}
-                        onToneChange={(next) => replaceQuery({
-                            tone: next === defaultToneForFamily(family) ? null : next,
-                        })}
-                        onOpenTone={(next: ReasonsFocusTone) => replaceQuery({
-                            family: familyForFocusTone(next),
-                            tone: next,
-                        })}
+                        onFamilyChange={applyFamily}
+                        onToneChange={applyTone}
+                        onOpenTone={(next: ReasonsFocusTone) => replaceQuery({ tone: next })}
                     />
                 ) : (
-                <div className="flex-1 overflow-y-auto min-h-0 p-3 sm:p-4 md:p-6">
-                    <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl shadow-sm overflow-hidden`}>
-                        <div className={`${LIST_COLS} px-3 py-2.5 border-b ${theme.borderColor} sticky top-0 z-10 ${theme.cardBg}`}>
-                            <span className={`text-[10px] font-bold uppercase tracking-wide ${theme.textMuted}`}>#</span>
-                            <span className={`text-[10px] font-bold uppercase tracking-wide ${theme.textMuted}`}>Reason</span>
-                            <div className="justify-self-end">
-                                <SortHead label="Qty" active={sort === 'qty'} dir={dir} onClick={() => onSort('qty')} theme={theme} />
-                            </div>
-                            <div className="justify-self-end">
-                                <SortHead label="%" active={sort === 'pct'} dir={dir} onClick={() => onSort('pct')} theme={theme} />
-                            </div>
-                            <span className={`justify-self-end text-[10px] font-bold uppercase tracking-wide ${theme.textMuted}`}>
-                                Trend
-                            </span>
-                        </div>
-                        {loading && <SkeletonRows theme={theme} />}
-                        {!loading && error && (
-                            <div className="px-4 py-12 text-center">
-                                <p className={`text-sm font-semibold ${theme.textWhite} mb-1`}>Could not load reasons</p>
-                                <p className={`text-xs ${theme.textMuted} mb-4`}>{error}</p>
-                                <button
-                                    type="button"
-                                    onClick={() => setListRetryNonce((n) => n + 1)}
-                                    className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-white"
-                                    style={{ background: accent }}
-                                >
-                                    <RefreshCw size={14} />
-                                    Retry
-                                </button>
-                            </div>
-                        )}
-                        {!loading && !error && items.length === 0 && (
-                            <p className={`px-4 py-12 text-center text-sm ${theme.textMuted}`}>
-                                No reasons for this year and type.
-                            </p>
-                        )}
-                        {!loading && !error && items.map((item, i) => {
-                            const rank = showingFrom + i;
-                            return (
-                                <button
-                                    key={item.rsn}
-                                    type="button"
-                                    onClick={() => replaceQuery({ rsn: item.rsn })}
-                                    className={`${LIST_COLS} w-full text-left px-3 py-2.5 border-b ${theme.borderColor} ${theme.tableRowHover}`}
-                                    aria-label={`Focus ${item.rsn}`}
-                                >
-                                    <span className={`tabular-nums text-xs font-bold ${theme.textMuted}`}>{rank}</span>
-                                    <span className={`text-xs sm:text-sm font-bold leading-snug whitespace-normal break-words ${theme.textSecondary}`}>
-                                        {item.rsn}
-                                    </span>
-                                    <span className="tabular-nums text-right text-xs font-semibold" style={{ color: accent }}>
-                                        {fmtQty(item.qty)}
-                                    </span>
-                                    <span className={`tabular-nums text-right text-xs ${theme.textMuted}`}>
-                                        {item.pct.toFixed(1)}
-                                    </span>
-                                    <span className="justify-self-end">
-                                        <SparkBars values={item.spark} color={accent} />
-                                    </span>
-                                </button>
-                            );
+                    <ReasonsOverview
+                        theme={theme}
+                        currentTheme={currentTheme}
+                        accent={accent}
+                        kind={kind}
+                        loading={overviewLoading}
+                        error={overviewError}
+                        payload={overview}
+                        onRetry={() => setOverviewRetry((n) => n + 1)}
+                        onOpenTone={(next) => replaceQuery({
+                            family: familyForFocusTone(next),
+                            tone: next,
+                            rsn: null,
                         })}
-                        <div className={`flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 border-t ${theme.borderColor}`}>
-                            <p className={`text-[11px] ${theme.textMuted}`}>
-                                {meta
-                                    ? `${
-                                        meta.total > 0
-                                            ? `Showing ${showingFrom.toLocaleString()}–${showingTo.toLocaleString()} of ${meta.total.toLocaleString()}`
-                                            : 'Showing 0 of 0'
-                                    } · ${meta.generatedAt}${meta.stale ? ' · stale' : ''}`
-                                    : loading
-                                        ? 'Loading…'
-                                        : '—'}
-                            </p>
-                            <div className="flex items-center gap-2">
-                                <select
-                                    value={pageSize}
-                                    onChange={(e) => replaceQuery({ pageSize: Number(e.target.value) === REASONS_DEFAULT_PAGE_SIZE ? null : e.target.value }, true)}
-                                    className={`bg-transparent text-[11px] font-bold ${theme.textSecondary} outline-none`}
-                                >
-                                    {PAGE_SIZE_OPTIONS.filter((n) => n <= REASONS_MAX_PAGE_SIZE).map((n) => (
-                                        <option key={n} value={n}>{n} / page</option>
-                                    ))}
-                                </select>
-                                <button
-                                    type="button"
-                                    disabled={!meta || meta.page <= 1}
-                                    onClick={() => replaceQuery({ page: page - 1 })}
-                                    className={`p-1.5 rounded-lg ${theme.inputBg} disabled:opacity-40`}
-                                    aria-label="Previous page"
-                                >
-                                    <ChevronLeft size={14} />
-                                </button>
-                                <span className={`text-[11px] tabular-nums ${theme.textMuted}`}>{meta?.page || page} / {maxPage}</span>
-                                <button
-                                    type="button"
-                                    disabled={!meta || meta.page >= maxPage}
-                                    onClick={() => replaceQuery({ page: page + 1 })}
-                                    className={`p-1.5 rounded-lg ${theme.inputBg} disabled:opacity-40`}
-                                    aria-label="Next page"
-                                >
-                                    <ChevronRight size={14} />
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                        onSelectRsn={(next, fromTone) => replaceQuery({
+                            rsn: next,
+                            ...(fromTone
+                                ? { family: familyForFocusTone(fromTone), tone: fromTone }
+                                : {}),
+                        })}
+                    />
                 )}
             </main>
         </div>

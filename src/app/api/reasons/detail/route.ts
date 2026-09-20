@@ -16,10 +16,10 @@ export async function GET(request: Request) {
             family: searchParams.get('family'),
             tone: searchParams.get('tone'),
             unit: searchParams.get('unit'),
-            shape: searchParams.get('shape'),
             forming: searchParams.get('forming'),
             customer: searchParams.get('customer'),
             glaze: searchParams.get('glaze'),
+            group: searchParams.get('group'),
             cp: searchParams.get('cp'),
         };
         const params = parseReasonsDetailParams(input);
