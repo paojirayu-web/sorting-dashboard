@@ -30,6 +30,7 @@ import {
     reasonsYearOptions,
     mergeReasonsYearDetails,
     mergeReasonsYearOverviews,
+    matchesReasonsMix,
     reasonsGroupOptions,
     yearCompareSeries,
     yearStatFromTotals,
@@ -56,7 +57,7 @@ import { displayCp, qtyProcResolveGroup } from '@/lib/qtyproc';
 import { getQtyProcResponse } from '@/lib/qtyproc-server';
 
 const CATEGORY = 'ALL';
-const CACHE_VERSION = 'v9';
+const CACHE_VERSION = 'v10';
 const FRESH_MS = 10 * 60 * 1000;
 const CP_SQL = `(
                 UPPER(RTRIM(LTRIM(ISNULL(m_cp, '')))) IN (N'C', N'C1', N'CS', N'C(FRIT&BOM)')
@@ -175,6 +176,8 @@ function mapProdRows(rows: Record<string, unknown>[]): ReasonsProdRow[] {
         rows.map((row) => ({
             mo: toFiniteNumber(row.mo),
             qtyproc: toFiniteNumber(row.qtyproc),
+            qtyscrp: toFiniteNumber(row.qtyscrp),
+            qtyrjct: toFiniteNumber(row.qtyrjct),
             tone: classifyReasonsTone({
                 source: String(row._source || ''),
                 partFamily: String(row.part_family || ''),
@@ -186,18 +189,20 @@ function mapProdRows(rows: Record<string, unknown>[]): ReasonsProdRow[] {
             mPart: String(row.m_part || '').trim(),
         })),
         ['mo', 'tone', 'desc1', 'desc2', 'cp', 'mPart'],
-        ['qtyproc'],
+        ['qtyproc', 'qtyscrp', 'qtyrjct'],
     )
         .map((row) => ({
             mo: row.mo,
             qtyproc: row.qtyproc,
+            qtyscrp: row.qtyscrp,
+            qtyrjct: row.qtyrjct,
             tone: row.tone,
             desc1: row.desc1,
             desc2: row.desc2,
             cp: row.cp,
             mPart: row.mPart,
         }))
-        .filter((row) => row.qtyproc > 0 && row.mo >= 1 && row.mo <= 12);
+        .filter((row) => (row.qtyproc > 0 || row.qtyscrp > 0 || row.qtyrjct > 0) && row.mo >= 1 && row.mo <= 12);
 }
 
 async function stampReasonsGroups<T extends { mPart?: string; group?: string; groupLabel?: string }>(rows: T[]): Promise<T[]> {
@@ -291,6 +296,8 @@ export async function queryReasonsProdRows(year: number): Promise<ReasonsProdRow
         is_round1: number;
         m_part: string;
         qtyproc: number;
+        qtyscrp: number;
+        qtyrjct: number;
     }>(
         `
             SELECT
@@ -302,7 +309,9 @@ export async function queryReasonsProdRows(year: number): Promise<ReasonsProdRow
                 cp,
                 is_round1,
                 m_part,
-                SUM(qtyproc) AS qtyproc
+                SUM(qtyproc) AS qtyproc,
+                SUM(qtyscrp) AS qtyscrp,
+                SUM(qtyrjct) AS qtyrjct
             FROM (
                 SELECT
                     MONTH(m_date) AS mo,
@@ -313,7 +322,9 @@ export async function queryReasonsProdRows(year: number): Promise<ReasonsProdRow
                     UPPER(RTRIM(LTRIM(ISNULL(m_cp, '')))) AS cp,
                     ${IS_ROUND1_JOB_SQL} AS is_round1,
                     RTRIM(LTRIM(ISNULL(m_part, ''))) AS m_part,
-                    MAX(ISNULL(qtyp, 0)) AS qtyproc
+                    MAX(ISNULL(qtyp, 0)) AS qtyproc,
+                    MAX(ISNULL(qtyscrp, 0)) AS qtyscrp,
+                    MAX(ISNULL(qtyrjct, 0)) AS qtyrjct
                 FROM ${SORT_VIEW_TOKEN} WITH (NOLOCK)
                 WHERE m_date >= @startDate
                     AND m_date < @endDate
@@ -330,7 +341,7 @@ export async function queryReasonsProdRows(year: number): Promise<ReasonsProdRow
                     RTRIM(LTRIM(ISNULL(m_part, '')))
             ) jobs
             GROUP BY mo, part_family, unit_tone, desc1, desc2, cp, is_round1, m_part
-            HAVING SUM(qtyproc) > 0
+            HAVING SUM(qtyproc) > 0 OR SUM(qtyscrp) > 0 OR SUM(qtyrjct) > 0
         `,
         queryOpts(start, endExcl),
     );
@@ -627,11 +638,20 @@ async function getDetailRows(
     return { rows: fresh.rows, stale: false, generatedAt: formatGeneratedAt(new Date(fresh.at)) };
 }
 
-function withFocusQc(payload: ReasonsDetailResponse, codeRows: ReasonsDetailRow[]): ReasonsDetailResponse {
-    const tone = payload.meta?.tone;
-    const sliced = tone && tone !== 'all'
-        ? codeRows.filter((row) => row.tone === tone)
-        : codeRows;
+function withFocusQc(
+    payload: ReasonsDetailResponse,
+    codeRows: ReasonsDetailRow[],
+    params: ReasonsDetailParams,
+): ReasonsDetailResponse {
+    const mix = {
+        family: params.family,
+        tone: params.tone,
+        cp: params.cp || 'all',
+        group: params.group || [],
+        forming: params.forming || 'all',
+        glaze: params.glaze || 'all',
+    };
+    const sliced = codeRows.filter((row) => matchesReasonsMix(row, mix));
     const pool = payload.paretoCodeware?.length ? payload.paretoCodeware : (payload.codeware || []);
     payload.paretoCodeware = pool;
     payload.pareto = buildReasonsRatePareto(pool);
@@ -647,7 +667,10 @@ export async function getReasonsDetailResponse(
         throw new Error('rsn is required');
     }
     const years = yearsForReasonsParam(params.year);
-    const packs = await Promise.all(years.map(async (year) => {
+    const fetchYears = years.length === 1 && years[0] - 1 >= REASONS_MIN_CE_YEAR
+        ? [years[0], years[0] - 1]
+        : years;
+    const packs = await Promise.all(fetchYears.map(async (year) => {
         const useMixProds = params.family === 'ww';
         const [month, detail, sqlMonth] = await Promise.all([
             getYearKindRows(year, params.kind, params.family, forceRefresh),
@@ -661,12 +684,26 @@ export async function getReasonsDetailResponse(
             codeProds,
         });
         payload.groupOptions = reasonsGroupOptions(month.defects);
-        return { year, month, detail, codeProds, payload: withFocusQc(payload, detail.rows) };
+        return { year, month, detail, codeProds, payload: withFocusQc(payload, detail.rows, params) };
     }));
     const stale = packs.some((pack) => pack.month.stale || pack.detail.stale);
     const generatedAt = packs[0]?.month.generatedAt;
+    const attachYearStratify = (payload: ReasonsDetailResponse, latest?: typeof packs[0], prev?: typeof packs[1]) => {
+        if (latest) {
+            payload.currentYear = latest.year;
+            payload.stratifyLatest = latest.payload.stratify;
+        }
+        if (prev) {
+            payload.prevYear = prev.year;
+            payload.stratifyPrev = prev.payload.stratify;
+        }
+        return payload;
+    };
+    if (years.length === 1) {
+        return attachYearStratify(packs[0].payload, packs[0], packs[1]);
+    }
     if (packs.length === 1) {
-        return packs[0].payload;
+        return attachYearStratify(packs[0].payload, packs[0]);
     }
     const combined = buildReasonsDetail(
         packs.flatMap((pack) => pack.month.defects),
@@ -680,10 +717,10 @@ export async function getReasonsDetailResponse(
         },
     );
     combined.groupOptions = reasonsGroupOptions(packs.flatMap((pack) => pack.month.defects));
-    return withFocusQc(mergeReasonsYearDetails(
+    return attachYearStratify(withFocusQc(mergeReasonsYearDetails(
         packs.map((pack) => ({ year: pack.year, payload: pack.payload })),
         combined,
-    ), packs.flatMap((pack) => pack.detail.rows));
+    ), packs.flatMap((pack) => pack.detail.rows), { ...params, year: 'all' }), packs[0], packs[1]);
 }
 
 export async function getReasonsOverviewResponse(

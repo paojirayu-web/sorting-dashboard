@@ -9,7 +9,12 @@ import {
     buildReasonsRatePareto,
     buildReasonsStratify,
     filterReasonsCodewareGroup,
+    rankReasonsCodeware,
+    reasonsCodewareTotal,
     reasonsParetoGroupOptions,
+    sliceReasonsCodeware,
+    sortReasonsCodeware,
+    stratifyYearCompare,
     classifyReasonsTone,
     defaultToneForFamily,
     formatReasonsCodewareLabel,
@@ -52,6 +57,7 @@ import {
     REASONS_WW_TONE_OPTIONS,
 } from '../src/lib/reasons';
 import { displayCp, qtyProcCodewareSize, qtyProcGroupSize, qtyProcMajorGroup, qtyProcResolveSize } from '../src/lib/qtyproc';
+import { buildReasonsCodewareDisposition, buildReasonsCodewareFilename } from '../src/lib/reasons-codeware-excel';
 
 const now = new Date('2026-09-11T08:00:00+07:00');
 
@@ -101,6 +107,8 @@ assert.ok(reasonsCpMatches('C1', 'C(FRIT&BOM)'));
 assert.ok(!reasonsCpMatches('C1', 'C'));
 assert.ok(reasonsGroupIsHidden('unclassified'));
 assert.ok(reasonsGroupIsHidden('Unknown'));
+assert.ok(!reasonsGroupIsHidden('unclassified', 'inglaze'));
+assert.ok(!reasonsGroupIsHidden('unclassified', 'onglaze'));
 assert.ok(!reasonsGroupIsHidden('MUG&CUP'));
 assert.ok(!reasonsGroupIsHidden(''));
 assert.ok(!reasonsGroupIsHidden(undefined));
@@ -437,7 +445,8 @@ assert.ok(detail.pareto?.length);
 assert.ok(!detail.pareto.some((row) => row.other));
 assert.ok((detail.pareto[0].pct || 0) >= (detail.pareto[detail.pareto.length - 1]?.pct || 0));
 assert.ok(Math.abs((detail.pareto[detail.pareto.length - 1]?.cum || 0) - 100) < 1e-6);
-assert.ok(detail.stratify?.forming.length >= 1);
+assert.ok((groupedFocus.stratify?.group.length || 0) === 1);
+assert.equal(groupedFocus.stratify?.group[0]?.key, 'MUG&CUP');
 
 const openGroupFocus = buildReasonsDetail(monthRows, groupedDetailRows, groupedProds, {
     rsn: 'Crack',
@@ -446,6 +455,7 @@ const openGroupFocus = buildReasonsDetail(monthRows, groupedDetailRows, groupedP
     family: 'ww',
     tone: 'white',
 }, { generatedAt: '2026-09-11 04:00', stale: false });
+assert.ok((openGroupFocus.stratify?.group.length || 0) > 1);
 assert.equal(openGroupFocus.paretoCodeware?.find((row) => row.code === 'A12')?.group, 'MUG&CUP');
 assert.equal(openGroupFocus.paretoCodeware?.find((row) => row.code === 'B9')?.group, 'BOWL');
 assert.deepEqual(reasonsParetoGroupOptions(openGroupFocus.paretoCodeware || []).map((opt) => opt.value), ['MUG&CUP', 'BOWL', 'ACCESSORIES']);
@@ -493,11 +503,50 @@ const sizeFromCode = buildReasonsStratify([
 assert.equal(sizeFromCode.size.find((row) => row.key === 'S')?.qty, 50);
 assert.ok(!sizeFromCode.size.some((row) => row.key === '—' || row.label === 'ACCESSORIES'));
 assert.ok(!sizeFromCode.size.some((row) => row.key === 'M'));
-assert.deepEqual(buildReasonsRatePareto([
-    { code: 'A', qty: 80, qtyproc: 1000, pct: 8, desc1: 'Ware A' },
-    { code: 'B', qty: 15, qtyproc: 100, pct: 15, desc1: 'Ware B' },
-    { code: 'C', qty: 5, qtyproc: 50, pct: 10, desc1: 'Ware C' },
-]).map((row) => row.code), ['B', 'C', 'A']);
+assert.deepEqual(rankReasonsCodeware([
+    { code: 'A', qty: 80, qtyproc: 1000, pct: 8 },
+    { code: 'B', qty: 15, qtyproc: 100, pct: 15 },
+    { code: 'C', qty: 5, qtyproc: 50, pct: 10 },
+], 'qty').map((row) => row.code), ['A', 'B', 'C']);
+assert.deepEqual(rankReasonsCodeware([
+    { code: 'A', qty: 80, qtyproc: 1000, pct: 8 },
+    { code: 'B', qty: 15, qtyproc: 100, pct: 15 },
+    { code: 'C', qty: 5, qtyproc: 50, pct: 10 },
+], 'rate').map((row) => row.code), ['B', 'C', 'A']);
+assert.equal(rankReasonsCodeware(
+    Array.from({ length: 12 }, (_, index) => ({
+        code: `C${index}`,
+        qty: 12 - index,
+        qtyproc: 100,
+        pct: 20 - index,
+    })),
+    'qty',
+).length, REASONS_CODEWARE_TOP_N);
+assert.deepEqual(reasonsCodewareTotal([
+    { code: 'A', qty: 80, qtyproc: 1000, pct: 8 },
+    { code: 'B', qty: 20, qtyproc: 200, pct: 10 },
+]), { code: 'Total', qty: 100, qtyproc: 1200, pct: (100 / 1200) * 100 });
+const twelveWares = Array.from({ length: 12 }, (_, index) => ({
+    code: `C${index}`,
+    qty: 12 - index,
+    qtyproc: 100,
+    pct: 12 - index,
+}));
+const slicedQty = sliceReasonsCodeware(sortReasonsCodeware(twelveWares, 'qty'));
+assert.equal(slicedQty.codeware.length, REASONS_CODEWARE_TOP_N);
+assert.equal(slicedQty.other?.code, 'Other');
+assert.equal(slicedQty.other?.qty, 3);
+assert.equal(
+    slicedQty.codeware.reduce((sum, row) => sum + row.qty, 0) + (slicedQty.other?.qty || 0),
+    reasonsCodewareTotal(twelveWares).qty,
+);
+assert.deepEqual(stratifyYearCompare(
+    [{ key: 'A', label: 'A', color: '#111', months: [], qty: 120, pct: 60 }],
+    [{ key: 'A', label: 'A', color: '#111', months: [], qty: 100, pct: 50 }, { key: 'B', label: 'B', color: '#222', months: [], qty: 40, pct: 20 }],
+).map((row) => ({ key: row.key, currentQty: row.currentQty, prevQty: row.prevQty, deltaPct: row.deltaPct })), [
+    { key: 'A', currentQty: 120, prevQty: 100, deltaPct: 20 },
+    { key: 'B', currentQty: 0, prevQty: 40, deltaPct: -100 },
+]);
 assert.equal(buildReasonsRatePareto(
     Array.from({ length: 12 }, (_, index) => ({
         code: `C${index}`,
@@ -670,9 +719,13 @@ const fromMix = reasonsRowsFromMixPayload({
     }],
 }, 2026, 'scrap');
 const overviewFromMix = buildReasonsOverview(fromMix.defects, fromMix.prods, { ...mixAll, cp: 'C' });
-assert.equal(overviewFromMix.meta.qty, 15);
+assert.equal(fromMix.prods[0]?.qtyscrp, 10);
+assert.equal(overviewFromMix.meta.qty, 10);
 assert.equal(overviewFromMix.meta.qtyproc, 100);
+assert.ok(Math.abs((overviewFromMix.meta.qty / overviewFromMix.meta.qtyproc) * 100 - 10) < 1e-9);
+assert.ok(Math.abs((overviewFromMix.trend?.[0].pct || 0) - 10) < 1e-9);
 assert.equal(overviewFromMix.top?.length, 2);
+assert.equal(overviewFromMix.top?.reduce((sum, row) => sum + row.qty, 0), 15);
 const mixFocusRows = [{
     mo: 1,
     code: 'W/W JMSC76/T0040(VG)',
@@ -842,6 +895,37 @@ assert.equal(overviewHiddenGroup.top?.[0].rsn, 'Crack');
 assert.equal(overviewHiddenGroup.meta.qty, 10);
 assert.equal(overviewHiddenGroup.meta.qtyproc, 100);
 
+const dwUnclassifiedDefects = [
+    { rsn: 'Pin hole', mo: 1, qty: 40, tone: 'inglaze' as const, cp: 'C', group: 'unclassified' },
+    { rsn: 'Shade', mo: 1, qty: 25, tone: 'onglaze' as const, cp: 'C', group: 'unclassified' },
+    { rsn: 'Ghost', mo: 1, qty: 99, tone: 'white' as const, cp: 'C', group: 'unclassified' },
+];
+const dwUnclassifiedProds = [
+    { mo: 1, qtyproc: 400, qtyscrp: 40, tone: 'inglaze' as const, cp: 'C', group: 'unclassified' },
+    { mo: 1, qtyproc: 250, qtyscrp: 25, tone: 'onglaze' as const, cp: 'C', group: 'unclassified' },
+    { mo: 1, qtyproc: 900, qtyscrp: 99, tone: 'white' as const, cp: 'C', group: 'unclassified' },
+];
+const overviewDwUnclassified = buildReasonsOverview(dwUnclassifiedDefects, dwUnclassifiedProds, {
+    ...mixAll,
+    family: 'all',
+    tone: 'all',
+});
+assert.equal(overviewDwUnclassified.meta.qty, 65);
+assert.equal(overviewDwUnclassified.meta.qtyproc, 650);
+const dwCards = Object.fromEntries((overviewDwUnclassified.cards || []).map((card) => [card.tone, card]));
+assert.equal(dwCards.inglaze?.qty, 40);
+assert.equal(dwCards.inglaze?.qtyproc, 400);
+assert.equal(dwCards.onglaze?.qty, 25);
+assert.equal(dwCards.onglaze?.qtyproc, 250);
+assert.equal(dwCards.white?.qty || 0, 0);
+const overviewDwOnly = buildReasonsOverview(dwUnclassifiedDefects, dwUnclassifiedProds, {
+    ...mixAll,
+    family: 'dw',
+    tone: 'all',
+});
+assert.equal(overviewDwOnly.meta.qty, 65);
+assert.equal(overviewDwOnly.meta.qtyproc, 650);
+
 const source = readFileSync(join(process.cwd(), 'src/lib/reasons-query.ts'), 'utf8');
 const sqlBlocks = [...source.matchAll(/`([\s\S]*?)`/g)].map((m) => m[1]);
 assert.ok(sqlBlocks.some((block) => /SELECT/i.test(block) && /GROUP BY/i.test(block)));
@@ -857,10 +941,14 @@ assert.equal((source.match(/kilnDirect: true/g) || []).length, 2);
 assert.match(source, /yearsForReasonsParam/);
 assert.match(source, /mergeReasonsYearOverviews/);
 assert.match(source, /mergeReasonsYearDetails/);
+assert.match(source, /stratifyPrev/);
+assert.match(source, /fetchYears/);
 assert.match(source, /m_cp/);
 assert.match(source, /is_round1/);
 assert.match(source, /displayCp/);
-assert.match(source, /CACHE_VERSION = 'v9'/);
+assert.match(source, /CACHE_VERSION = 'v10'/);
+assert.match(source, /MAX\(ISNULL\(qtyscrp, 0\)\)/);
+assert.match(source, /MAX\(ISNULL\(qtyrjct, 0\)\)/);
 assert.match(source, /RTRIM\(LTRIM\(ISNULL\(m_part, ''\)\)\) AS m_part/);
 assert.match(source, /reasonsRowsFromMixPayload/);
 assert.match(source, /getQtyProcResponse/);
@@ -941,6 +1029,7 @@ assert.match(overviewUi, /WW \/ DW on each bar/);
 assert.match(overviewUi, /White \/ Black on each bar/);
 assert.match(overviewUi, /toneOrigin/);
 assert.match(overviewUi, /CategoryRatePie/);
+assert.match(overviewUi, /qtyscrp'\}\/qtyproc/);
 assert.match(overviewUi, /Scrap mix|kindLabel\} mix/);
 assert.match(overviewUi, /\(ปีก่อน\)/);
 assert.doesNotMatch(overviewUi, /RatePieCard/);
@@ -997,11 +1086,52 @@ assert.match(focus, /fmtPct\(item\.pct\)/);
 assert.match(focus, /setParetoGroup/);
 assert.match(focus, /reasonsParetoGroupOptions/);
 assert.match(focus, /filterReasonsCodewareGroup/);
-assert.match(focus, /Top \{REASONS_CODEWARE_TOP_N\} by rate/);
-assert.doesNotMatch(focus, /setParetoMetric/);
-assert.doesNotMatch(focus, /paretoMetric/);
+assert.match(focus, /Top \$\{REASONS_CODEWARE_TOP_N\} by rate/);
+assert.match(focus, /sortReasonsCodeware/);
+assert.match(focus, /sliceReasonsCodeware/);
+assert.match(focus, /reasonsCodewareTotal/);
+assert.match(focus, /isTotal/);
+assert.match(focus, /isOther/);
+assert.match(focus, /isTotal \? 'Total'/);
+assert.match(focus, /isOther \? 'Other'/);
+assert.match(focus, /paretoMetric/);
+assert.match(focus, /buildReasonsPareto/);
+assert.match(focus, /80% line/);
+assert.match(focus, /dataKey="cum"/);
+assert.match(focus, /flex-nowrap/);
+assert.match(focus, /w-\[10\.75rem\]/);
+assert.match(focus, /label: 'Month'/);
+assert.match(focus, /label: 'Year'/);
+assert.match(focus, /function StratifyYearChart/);
+assert.match(focus, /\/api\/export\/reasons-codeware\/excel/);
 assert.doesNotMatch(focus, /Stacked by \$\{activeLayer\}/);
-assert.match(focus, /StratifyTooltip/);
+assert.match(focus, /function trendDotStyle/);
+assert.match(focus, /strokeLinecap="round"/);
+assert.match(focus, /lollipop/);
+assert.match(focus, /function MiniTrendPanel/);
+assert.match(focus, /function CombinedOverlayChart/);
+assert.match(focus, /splitPanels/);
+assert.match(focus, /LineChart/);
+assert.match(focus, /domain=\{\['auto', 'auto'\]\}/);
+assert.match(focus, /connectNulls/);
+assert.match(focus, /h-\[6\.25rem\]/);
+assert.match(focus, /Mix-style line/);
+assert.match(focus, /own scale/);
+assert.match(focus, /Share of month/);
+assert.match(focus, /flex flex-col gap-1\.5/);
+assert.match(focus, /min-h-\[6\.25rem\]/);
+assert.match(focus, /fmtPct\(share\)/);
+assert.match(focus, /Ranked \$\{activeLayer\}/);
+assert.match(focus, /items-stretch/);
+assert.doesNotMatch(focus, /sharedMax/);
+assert.doesNotMatch(focus, /function SparkPeakLabel/);
+assert.doesNotMatch(focus, /maxBarSize=\{16\}/);
+assert.doesNotMatch(focus, /function HistogramBarLabel/);
+assert.doesNotMatch(focus, />Histogram</);
+assert.doesNotMatch(focus, /One bar per/);
+assert.doesNotMatch(focus, /qty vs share %/);
+assert.doesNotMatch(focus, /overlayDotDodge/);
+assert.doesNotMatch(focus, /Monthly qty · each/);
 assert.match(focus, /b\.qty - a\.qty/);
 assert.match(focus, /FamilyShareDonut/);
 assert.match(focus, /onOpenTone/);
@@ -1020,8 +1150,31 @@ assert.match(focus, /hasShare/);
 assert.match(focus, /title="Select year"/);
 assert.doesNotMatch(focus, /· latest/);
 assert.match(focus, /onYear/);
+assert.match(focus, /\/api\/export\/reasons-codeware\/excel/);
+assert.doesNotMatch(focus, /\/api\/reasons\/detail/);
 assert.doesNotMatch(focus, /ภาพรวม/);
 assert.doesNotMatch(focus, />Rank</);
-assert.doesNotMatch(focus, /fetch\(/);
+
+const excelLib = readFileSync(join(process.cwd(), 'src/lib/reasons-codeware-excel.ts'), 'utf8');
+assert.match(excelLib, /Rate %/);
+assert.match(excelLib, /Description 1/);
+assert.match(excelLib, /Description 2/);
+assert.doesNotMatch(excelLib, /header: 'Code'/);
+assert.match(excelLib, /Defects/);
+assert.match(excelLib, /Qty share %/);
+assert.match(excelLib, /'Total'/);
+assert.match(excelLib, /x20-\\x7E/);
+const excelRoute = readFileSync(join(process.cwd(), 'src/app/api/export/reasons-codeware/excel/route.ts'), 'utf8');
+assert.match(excelRoute, /buildReasonsCodewareWorkbook/);
+assert.match(excelRoute, /buildReasonsCodewareDisposition/);
+const thaiFile = buildReasonsCodewareFilename({
+    rsn: 'C ฟุตบิ่น',
+    year: 2026,
+    kind: 'scrap',
+    family: 'ww',
+    rows: [],
+});
+assert.ok([...thaiFile].every((ch) => ch.charCodeAt(0) <= 127));
+assert.ok([...buildReasonsCodewareDisposition(thaiFile)].every((ch) => ch.charCodeAt(0) <= 127));
 
 console.log('check-reasons-list: ok');

@@ -122,6 +122,15 @@ export type ReasonsStratify = {
     size: ReasonsStratifySeries[];
 };
 
+export type ReasonsStratifyYearRow = {
+    key: string;
+    label: string;
+    color: string;
+    currentQty: number;
+    prevQty: number;
+    deltaPct: number | null;
+};
+
 export type ReasonsControlPoint = {
     mo: number;
     label: string;
@@ -215,6 +224,10 @@ export type ReasonsDetailResponse = {
     compare?: ReasonsNamedTrend[];
     yearStats?: ReasonsYearStat[];
     groupOptions?: ReasonsGroupOption[];
+    currentYear?: number;
+    prevYear?: number;
+    stratifyLatest?: ReasonsStratify;
+    stratifyPrev?: ReasonsStratify;
 };
 
 export type ReasonsDetailQueryInput = {
@@ -301,6 +314,8 @@ export type ReasonsMonthRow = {
 export type ReasonsProdRow = {
     mo: number;
     qtyproc: number;
+    qtyscrp?: number;
+    qtyrjct?: number;
     tone?: ReasonsToneKey;
     desc1?: string;
     desc2?: string;
@@ -588,7 +603,13 @@ export function parseReasonsGlaze(raw: string | null | undefined): string {
     return GLAZE_VALUES.has(v) ? v : 'all';
 }
 
-export function reasonsGroupIsHidden(group?: string | null): boolean {
+/** DW Inglaze/Onglaze parts are not in the WW glaze group map — keep them visible. */
+function isDwReasonsTone(tone?: ReasonsToneKey | null): boolean {
+    return tone === 'inglaze' || tone === 'onglaze';
+}
+
+export function reasonsGroupIsHidden(group?: string | null, tone?: ReasonsToneKey | null): boolean {
+    if (isDwReasonsTone(tone)) return false;
     const key = String(group || '').trim().toLowerCase();
     if (!key) return false;
     return QTYPROC_HIDDEN_KEYS.has(key);
@@ -598,7 +619,7 @@ export function matchesReasonsMix(
     row: { tone?: ReasonsToneKey; cp?: string; desc1?: string; desc2?: string; group?: string; forming?: string; glaze?: string },
     params: ReasonsMixParams,
 ): boolean {
-    if (reasonsGroupIsHidden(row.group)) return false;
+    if (reasonsGroupIsHidden(row.group, row.tone)) return false;
     if (!rowMatchesSlice(row.tone, params.family, params.tone)) return false;
     if (!reasonsCpMatches(params.cp, row.cp)) return false;
     if (!qtyProcGroupMatches(params.group, row.group)) return false;
@@ -653,6 +674,8 @@ export function reasonsRowsFromMixPayload(
         prods.push({
             mo: Number(row.m) || 0,
             qtyproc: Number(row.qtyproc) || 0,
+            qtyscrp: Number(row.qtyscrp) || 0,
+            qtyrjct: Number(row.qtyrjct) || 0,
             tone: mixToneToReasons(row.tone),
             cp: mixCpToReasons(row.cp),
             group: row.group,
@@ -957,6 +980,37 @@ function sumQtyproc(rows: ReasonsProdRow[]): number {
     return rows.reduce((sum, row) => sum + (Number(row.qtyproc) || 0), 0);
 }
 
+function jobKindValue(row: ReasonsProdRow, kind: ReasonsKind): number | null {
+    const raw = kind === 'reject' ? row.qtyrjct : row.qtyscrp;
+    if (raw == null || !Number.isFinite(Number(raw))) return null;
+    return Number(raw) || 0;
+}
+
+function sumJobKind(rows: ReasonsProdRow[], kind: ReasonsKind): number | null {
+    let sum = 0;
+    let has = false;
+    for (const row of rows) {
+        const value = jobKindValue(row, kind);
+        if (value == null) continue;
+        has = true;
+        sum += value;
+    }
+    return has ? sum : null;
+}
+
+function jobKindSpark(rows: ReasonsProdRow[], kind: ReasonsKind): number[] | null {
+    const spark = emptySpark();
+    let has = false;
+    for (const row of rows) {
+        const value = jobKindValue(row, kind);
+        if (value == null) continue;
+        has = true;
+        const idx = monthIndex(Number(row.mo));
+        if (idx != null) spark[idx] += value;
+    }
+    return has ? spark : null;
+}
+
 function focusToneOf(tone: ReasonsToneKey | undefined): ReasonsFocusTone | undefined {
     if (tone === 'white' || tone === 'black' || tone === 'inglaze' || tone === 'onglaze') return tone;
     return undefined;
@@ -1175,6 +1229,43 @@ export function sliceReasonsCodeware(
     return { codeware: top, other };
 }
 
+function eligibleCodeware(items: ReasonsCodewareItem[]): ReasonsCodewareItem[] {
+    return items.filter((item) => item.qty > 0 && item.code !== REASONS_PARETO_OTHER);
+}
+
+/** Sort every ware for the Focus list — Qty by qty, Rate by defect rate. */
+export function sortReasonsCodeware(
+    items: ReasonsCodewareItem[],
+    metric: 'qty' | 'rate',
+): ReasonsCodewareItem[] {
+    return [...eligibleCodeware(items)].sort((a, b) => (
+        metric === 'qty'
+            ? (b.qty - a.qty || a.code.localeCompare(b.code, 'th'))
+            : (b.pct - a.pct || b.qty - a.qty || a.code.localeCompare(b.code, 'th'))
+    ));
+}
+
+/** Top N for the Focus list — Qty view by qty, Rate view by defect rate. */
+export function rankReasonsCodeware(
+    items: ReasonsCodewareItem[],
+    metric: 'qty' | 'rate',
+    topN = REASONS_CODEWARE_TOP_N,
+): ReasonsCodewareItem[] {
+    return sortReasonsCodeware(items, metric).slice(0, topN);
+}
+
+export function reasonsCodewareTotal(items: ReasonsCodewareItem[]): ReasonsCodewareItem {
+    const rows = eligibleCodeware(items);
+    const qty = rows.reduce((sum, row) => sum + row.qty, 0);
+    const qtyproc = rows.reduce((sum, row) => sum + row.qtyproc, 0);
+    return {
+        code: 'Total',
+        qty,
+        qtyproc,
+        pct: qtyproc > 0 ? (qty / qtyproc) * 100 : 0,
+    };
+}
+
 /** Top N by defect rate (same ranking as the codeware list). */
 export function buildReasonsRatePareto(
     items: ReasonsCodewareItem[],
@@ -1261,11 +1352,39 @@ function stratifyBucket(
     return collapseStratify(values);
 }
 
+export function stratifyYearCompare(
+    current: ReasonsStratifySeries[],
+    prev?: ReasonsStratifySeries[],
+): ReasonsStratifyYearRow[] {
+    const prevMap = new Map((prev || []).map((row) => [row.key, row]));
+    const keys = new Set([
+        ...current.map((row) => row.key),
+        ...(prev || []).map((row) => row.key),
+    ]);
+    return [...keys]
+        .map((key) => {
+            const now = current.find((row) => row.key === key);
+            const old = prevMap.get(key);
+            const currentQty = now?.qty || 0;
+            const prevQty = old?.qty || 0;
+            return {
+                key,
+                label: now?.label || old?.label || key,
+                color: now?.color || old?.color || '#71717a',
+                currentQty,
+                prevQty,
+                deltaPct: prevQty > 0 ? ((currentQty - prevQty) / prevQty) * 100 : null,
+            };
+        })
+        .filter((row) => row.currentQty > 0 || row.prevQty > 0)
+        .sort((a, b) => b.currentQty - a.currentQty || a.label.localeCompare(b.label, 'th'));
+}
+
 export function buildReasonsStratify(rows: ReasonsDetailRow[]): ReasonsStratify {
     return {
         group: stratifyBucket(rows, (row) => {
             const raw = String(row.group || '').trim();
-            if (QTYPROC_HIDDEN_KEYS.has(raw.toLowerCase())) return null;
+            if (reasonsGroupIsHidden(raw, row.tone)) return null;
             const label = qtyProcMajorGroup(row.groupLabel || raw) || 'Other';
             if (!label || label === 'Other' && !raw) {
                 return { key: 'other', label: 'Other', color: '#71717a' };
@@ -1291,7 +1410,7 @@ function codewareMajorGroup(row: ReasonsDetailRow): string {
     const raw = String(row.group || '').trim();
     const label = qtyProcMajorGroup(row.groupLabel || raw);
     if (!label || label === 'Other') {
-        if (raw && !QTYPROC_HIDDEN_KEYS.has(raw.toLowerCase())) return raw;
+        if (raw && !reasonsGroupIsHidden(raw, row.tone)) return raw;
         return '';
     }
     return label;
@@ -1778,7 +1897,7 @@ function tonesForOverview(family: ReasonsFamily, tone: ReasonsToneParam): Reason
     return [...REASONS_FOCUS_TONES];
 }
 
-/** Layer A overview — one in-memory pass over year×kind cache. Ranked by sub_qty / qtyproc. */
+/** Layer A overview — overall rate is job qtyscrp|qtyrjct / qtyproc (Mix). Pareto stays reason qty / qtyproc. */
 export function buildReasonsOverview(
     rows: ReasonsMonthRow[],
     prods: ReasonsProdRow[],
@@ -1790,22 +1909,26 @@ export function buildReasonsOverview(
     const sliced = rows.filter((row) => matchesReasonsMix(row, params));
     const slicedProds = prods.filter((row) => matchesReasonsMix(row, params));
     const ranked = rankedFromRows(sliced, slicedProds, params.family);
+    const overviewQty = sumJobKind(slicedProds, params.kind) ?? ranked.qty;
+    const overviewSpark = jobKindSpark(slicedProds, params.kind) ?? ranked.spark;
     const tones = tonesForOverview(params.family, params.tone);
     const cards: ReasonsOverviewCard[] = tones.map((tone) => {
         const mix = { ...params, family: params.family === 'all' ? 'all' as const : familyForFocusTone(tone), tone };
         const toneRows = rows.filter((row) => matchesReasonsMix(row, mix));
         const toneProds = prods.filter((row) => matchesReasonsMix(row, mix));
         const toneRanked = rankedFromRows(toneRows, toneProds, mix.family);
-        const toneTrend = scopeTrendFromSparks(toneRanked.spark, prodSparkFromRows(toneProds));
+        const toneQty = sumJobKind(toneProds, params.kind) ?? toneRanked.qty;
+        const toneSpark = jobKindSpark(toneProds, params.kind) ?? toneRanked.spark;
+        const toneTrend = scopeTrendFromSparks(toneSpark, prodSparkFromRows(toneProds));
         return {
             tone,
             label: REASONS_TONE_LABEL[tone],
-            qty: toneRanked.qty,
+            qty: toneQty,
             qtyproc: toneRanked.qtyproc,
-            rate: toneRanked.qtyproc > 0 ? (toneRanked.qty / toneRanked.qtyproc) * 100 : 0,
+            rate: toneRanked.qtyproc > 0 ? (toneQty / toneRanked.qtyproc) * 100 : 0,
             pct: 0,
             top: paretoTopItems(toneRanked.items),
-            spark: toneRanked.spark,
+            spark: toneSpark,
             trend: toneTrend,
         };
     });
@@ -1834,7 +1957,7 @@ export function buildReasonsOverview(
             kind: params.kind,
             family: params.family,
             tone: params.tone,
-            qty: ranked.qty,
+            qty: overviewQty,
             qtyproc: ranked.qtyproc,
             reasonCount: ranked.reasonCount,
             generatedAt,
@@ -1843,7 +1966,7 @@ export function buildReasonsOverview(
         cards,
         top: paretoAllItems(ranked.items),
         rsnOptions: ranked.items.map((item) => item.rsn),
-        trend: scopeTrendFromSparks(ranked.spark, prodSparkFromRows(slicedProds)),
+        trend: scopeTrendFromSparks(overviewSpark, prodSparkFromRows(slicedProds)),
         compare,
     };
 }

@@ -2,6 +2,167 @@
 
 All notable changes to the **Sorting Dashboard** project will be documented in this file.
 
+## [1.6.137] - 2026-09-21
+
+### Fixed
+- **Defects Overview:** DW Inglaze and Onglaze show again. Those parts are not in the WW Mix group map, so they were marked unclassified and dropped. WW unclassified stays hidden. No database objects were changed.
+
+---
+
+## [1.6.136] - 2026-09-21
+
+### Changed
+- **Defects Focus:** Group / Forming / Size month view uses Mix-style line charts (grid, own scale, dots). Rows stay ranked with share %. No database objects were changed.
+
+---
+
+## [1.6.135] - 2026-09-21
+
+### Changed
+- **Defects Focus:** Group / Forming / Size monthly view is shared-scale bars, not sparklines. The % is that bucket’s share of this defect, not vs qtyproc. No database objects were changed.
+
+---
+
+## [1.6.134] - 2026-09-21
+
+### Changed
+- **Defects Focus:** Group / Forming / Size rows show name, qty, share bar on the left and a shared-scale area sparkline on the right, with peak month labeled. No database objects were changed.
+
+---
+
+## [1.6.133] - 2026-09-21
+
+### Changed
+- **Defects Focus:** Group / Forming / Size fold Histogram into ranked one-row charts with share %, stretched to Pareto height. No database objects were changed.
+
+---
+
+## [1.6.132] - 2026-09-21
+
+### Changed
+- **Defects Overview:** Overall qty and % use job `qtyscrp` / `qtyproc` (or `qtyrjct` in Reject), same as Production Mix. Pareto and Focus stay on reason codes. No database objects were changed.
+
+---
+
+## [1.6.131] - 2026-09-21
+
+### Changed
+- **Defects Focus:** White vs Black stay on one Trend overlay. Group / Forming / Size keep split charts, packed into a tighter grid. No database objects were changed.
+
+---
+
+## [1.6.130] - 2026-09-21
+
+### Changed
+- **Defects Focus:** Group / Forming / Size Month trend is one small chart per bucket on its own scale, so lines no longer overlap. Histogram still compares size. No database objects were changed.
+
+---
+
+## [1.6.129] - 2026-09-21
+
+### Changed
+- **Defects Focus:** Group overlay no longer draws through empty months, offsets overlapping dots, and uses dashes plus click-to-isolate so equal small series do not sit on one line. No database objects were changed.
+
+---
+
+## [1.6.128] - 2026-09-21
+
+### Changed
+- **Defects Focus:** Sparse Trend months use lollipops or solid dots with values; dense months keep the ring line. Overlay keeps the top groups bold. Histogram shows qty and share % as separate labels. No database objects were changed.
+
+---
+
+## [1.6.127] - 2026-09-21
+
+### Changed
+- **Defects Focus:** Trend points use a ring marker. Histogram bars show qty and % on each bar. No database objects were changed.
+
+---
+
+## [1.6.126] - 2026-09-21
+
+### Changed
+- **Defects Focus:** Histogram is one bar per Group / Forming / Size (how much of this defect sits in each bucket). Monthly lines stay on Trend. No database objects were changed.
+
+---
+
+## [1.6.125] - 2026-09-21
+
+### Changed
+- **Defects Focus:** Group / Forming / Size Trend is one line per bucket by month, or year vs previous year. A monthly histogram of each bucket sits under Trend. No database objects were changed.
+
+---
+
+## [1.6.124] - 2026-09-21
+
+### Changed
+- **Defects Focus:** Group / Forming / Size Month view is a ranked bar of each bucket’s qty, not a monthly stacked bar. Year stays current vs previous year. No database objects were changed.
+
+---
+
+## [1.6.123] - 2026-09-21
+
+### Changed
+- **Defects Focus:** Codeware Excel adds Description 2 next to Description 1, still without a Code column. No database objects were changed.
+
+---
+
+## [1.6.122] - 2026-09-21
+
+### Changed
+- **Defects Focus:** Codeware Excel lists Description 1 only, without repeating the ware code. No database objects were changed.
+
+---
+
+## [1.6.121] - 2026-09-21
+
+### Changed
+- **Defects Focus:** The codeware Excel column `Qty` is now `Defects`. No database objects were changed.
+
+---
+
+## [1.6.120] - 2026-09-21
+
+### Fixed
+- **Defects Focus:** Excel export failed when the defect name had Thai characters in the download header. No database objects were changed.
+
+---
+
+## [1.6.119] - 2026-09-21
+
+### Added
+- **Defects Focus:** Group / Forming / Size can switch Month (current monthly stack) or Year (each bucket vs previous year). Pareto · codeware can export every ware’s Qty and Rate to Excel. No database objects were changed.
+
+---
+
+## [1.6.118] - 2026-09-21
+
+### Changed
+- **Defects Focus:** The codeware list is Top 10, then Other for the rest, then Total of every ware in the current Group. Qty/Rate still sorts both the list and Other remainder. No database objects were changed.
+
+---
+
+## [1.6.117] - 2026-09-21
+
+### Changed
+- **Defects Focus:** The codeware Top 10 list follows Qty or Rate with the Pareto chart. The last row is Total of every ware in the current Group. No database objects were changed.
+
+---
+
+## [1.6.116] - 2026-09-21
+
+### Changed
+- **Defects Focus:** Filter and Qty/Rate controls stay in a fixed header so they do not jump when the view or caption changes. No database objects were changed.
+
+---
+
+## [1.6.115] - 2026-09-21
+
+### Changed
+- **Defects Focus:** Pareto · codeware can switch Qty (all wares + 80% line) or Rate (top 10). No database objects were changed.
+
+---
+
 ## [1.6.114] - 2026-09-21
 
 ### Fixed

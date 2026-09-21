@@ -585,22 +585,12 @@ function CombinedPareto({
                         : `${theme.cardBg} border ${theme.borderColor} rounded-xl overflow-hidden flex flex-col min-w-0`
                 }
             >
-                <div className="px-2.5 pt-2 pb-1 flex flex-wrap items-start justify-between gap-2 shrink-0">
-                    <div className="min-w-0">
-                        <p className={`text-[9px] font-bold uppercase tracking-wide ${theme.textMuted}`}>
+                <div className="px-2.5 pt-2 pb-1 shrink-0">
+                    <div className="flex items-center justify-between gap-2 min-h-[1.75rem] flex-nowrap">
+                        <p className={`text-[9px] font-bold uppercase tracking-wide ${theme.textMuted} truncate min-w-0`}>
                             {view === 'top15' ? 'Pareto top 15 + Other' : 'Pareto · all defects'}
                         </p>
-                        <p className={`text-[10px] ${theme.textMuted} mt-0.5`}>
-                            Combined ranking · {originHint}
-                            {view === 'all' && namedCount ? ` · ${namedCount.toLocaleString()} types` : ''}
-                            {view === 'top15' && namedCount ? ` · ${namedCount.toLocaleString()} bars` : ''}
-                            {view === 'top15' && other
-                                ? ` · Other ${other.otherCount ? `${other.otherCount.toLocaleString()} types · ` : ''}${fmtQty(other.qty)} (${fmtRate(other.share || 0)})${otherOnChart ? '' : ' · grouped, not on chart'}`
-                                : ''}
-                            {fullscreen ? ' · fit all bars' : ''}
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
+                        <div className="flex items-center gap-1.5 shrink-0 flex-nowrap">
                         <div className={`flex items-center ${theme.inputBg} rounded-lg p-0.5 border ${theme.borderColor}`}>
                             {([
                                 { value: 'all' as const, label: 'All defects' },
@@ -631,6 +621,16 @@ function CombinedPareto({
                             {fullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
                         </button>
                     </div>
+                    </div>
+                    <p className={`text-[10px] ${theme.textMuted} mt-0.5 min-h-[1.25rem] leading-5 truncate`}>
+                        Combined ranking · {originHint}
+                        {view === 'all' && namedCount ? ` · ${namedCount.toLocaleString()} types` : ''}
+                        {view === 'top15' && namedCount ? ` · ${namedCount.toLocaleString()} bars` : ''}
+                        {view === 'top15' && other
+                            ? ` · Other ${other.otherCount ? `${other.otherCount.toLocaleString()} types · ` : ''}${fmtQty(other.qty)} (${fmtRate(other.share || 0)})${otherOnChart ? '' : ' · grouped, not on chart'}`
+                            : ''}
+                        {fullscreen ? ' · fit all bars' : ''}
+                    </p>
                 </div>
                 <div className={fullscreen ? 'flex-1 min-h-0 px-2 pb-2' : 'px-1 pb-1'}>
                     <ParetoChart
@@ -1072,7 +1072,7 @@ export function ReasonsOverview({
                         theme={theme}
                         label="Rate vs qtyproc"
                         value={fmtRate(rate)}
-                        hint={`${fmtQty(payload.meta.qtyproc)} process`}
+                        hint={`${fmtQty(payload.meta.qtyproc)} process · ${kind === 'reject' ? 'qtyrjct' : 'qtyscrp'}/qtyproc`}
                         color={accent}
                     />
                     <KpiCard
