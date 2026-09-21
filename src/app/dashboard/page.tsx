@@ -198,6 +198,7 @@ function Dashboard() {
     const monthlyStatsAbortRef = useRef<AbortController | null>(null);
     const dataAbortRef = useRef<AbortController | null>(null);
     const productListAbortRef = useRef<AbortController | null>(null);
+    const qtyProcReasonsPollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     /** Product whose auto date range was last applied (skip repeat API on PA↔MA switch). */
     const appliedAutoDateRangeProductRef = useRef<string | null>(null);
     /** When set to selectedProduct, PA/MA data fetches may run with current analysis dates. */
@@ -928,6 +929,11 @@ function Dashboard() {
             setQtyProcPayload(result as QtyProcPayload);
             if (!forceRefresh && result?.stale) {
                 void fetchQtyProc(true, true);
+            } else if (result?.reasonsPending) {
+                if (qtyProcReasonsPollRef.current) clearTimeout(qtyProcReasonsPollRef.current);
+                qtyProcReasonsPollRef.current = setTimeout(() => {
+                    void fetchQtyProc(false, true);
+                }, 2500);
             }
         } catch (e) {
             console.error(e);
@@ -1034,6 +1040,9 @@ function Dashboard() {
     useEffect(() => {
         if (view !== "qty-process") return;
         void fetchQtyProc(false);
+        return () => {
+            if (qtyProcReasonsPollRef.current) clearTimeout(qtyProcReasonsPollRef.current);
+        };
     }, [view, fetchQtyProc]);
 
     useEffect(() => {

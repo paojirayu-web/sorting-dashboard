@@ -1124,19 +1124,40 @@ export function QtyProcessView({
         && firingRowOk(r)
         && qtyProcRowMatches(cp, r.cp, scope)
     ));
-    const topByPeriod = qualityYears.map((row, i) => {
-        const y = isMonthly ? selectedYear : QTYPROC_DISPLAY_BE_YEARS[i];
-        const m = isMonthly ? i + 1 : null;
-        const rows = qualityView === 'group'
-            ? qualityReasonRows.filter((r) => majorOf(r) === row.name)
-            : qualityReasonRows.filter((r) => r.y === y && (m == null || Number(r.m) === m));
-        return {
-            name: row.name,
-            year: y,
-            scrap: topQualityReasons(rows.filter((r) => r.kind === 'scrap'), row.Process),
-            reject: topQualityReasons(rows.filter((r) => r.kind === 'reject'), row.Process),
-        };
-    }).filter((period) => period.scrap.length > 0 || period.reject.length > 0);
+    const mixOkProcessAt = (y: number, month?: number) =>
+        (payload?.mix || []).reduce((sum, row) => {
+            if (row.y !== y || !firingRowOk(row) || !qtyProcRowMatches(cp, row.cp, scope)) return sum;
+            if (month != null && Number(row.m) !== month) return sum;
+            return sum + row.qtyproc;
+        }, 0);
+    const topByPeriod = qualityView === 'group'
+        ? qualityYears.map((row) => {
+            const rows = qualityReasonRows.filter((r) => majorOf(r) === row.name);
+            return {
+                name: row.name,
+                year: selectedYear,
+                scrap: topQualityReasons(rows.filter((r) => r.kind === 'scrap'), row.Process),
+                reject: topQualityReasons(rows.filter((r) => r.kind === 'reject'), row.Process),
+            };
+        }).filter((period) => period.scrap.length > 0 || period.reject.length > 0)
+        : isMonthly
+            ? [{
+                name: `Year ${selectedYear}`,
+                year: selectedYear,
+                scrap: topQualityReasons(qualityReasonRows.filter((r) => r.kind === 'scrap'), mixOkProcessAt(selectedYear)),
+                reject: topQualityReasons(qualityReasonRows.filter((r) => r.kind === 'reject'), mixOkProcessAt(selectedYear)),
+            }].filter((period) => period.scrap.length > 0 || period.reject.length > 0)
+            : qualityYears.map((row, i) => {
+                const y = QTYPROC_DISPLAY_BE_YEARS[i];
+                const rows = qualityReasonRows.filter((r) => r.y === y);
+                const process = mixOkProcessAt(y);
+                return {
+                    name: row.name,
+                    year: y,
+                    scrap: topQualityReasons(rows.filter((r) => r.kind === 'scrap'), process),
+                    reject: topQualityReasons(rows.filter((r) => r.kind === 'reject'), process),
+                };
+            }).filter((period) => period.scrap.length > 0 || period.reject.length > 0);
 
     const cpPie = firingPie;
 

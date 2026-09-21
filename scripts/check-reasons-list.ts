@@ -5,6 +5,11 @@ import {
     buildReasonsDetail,
     buildReasonsList,
     buildReasonsOverview,
+    buildReasonsPareto,
+    buildReasonsRatePareto,
+    buildReasonsStratify,
+    filterReasonsCodewareGroup,
+    reasonsParetoGroupOptions,
     classifyReasonsTone,
     defaultToneForFamily,
     formatReasonsCodewareLabel,
@@ -13,12 +18,16 @@ import {
     parseReasonsFamily,
     parseReasonsForming,
     parseReasonsGlaze,
+    reasonsCpMatches,
+    reasonsGroupIsHidden,
+    reasonsRowsFromMixPayload,
     parseReasonsGroups,
     parseReasonsListParams,
     parseReasonsTone,
     paretoTopItems,
     paretoAllItems,
     parseReasonsYearParam,
+    reasonsControlChart,
     reasonsFocusHref,
     reasonsYearOptions,
     toneFitsFamily,
@@ -34,6 +43,7 @@ import {
     REASONS_ALL_TONE_OPTIONS,
     REASONS_CODEWARE_MIN_QTYPROC,
     REASONS_CODEWARE_TOP_N,
+    REASONS_CP_OPTIONS,
     REASONS_DEFAULT_CP,
     REASONS_DW_TONE_OPTIONS,
     REASONS_FOCUS_TONES,
@@ -41,6 +51,7 @@ import {
     REASONS_MONTH_LABELS,
     REASONS_WW_TONE_OPTIONS,
 } from '../src/lib/reasons';
+import { displayCp, qtyProcCodewareSize, qtyProcGroupSize, qtyProcMajorGroup, qtyProcResolveSize } from '../src/lib/qtyproc';
 
 const now = new Date('2026-09-11T08:00:00+07:00');
 
@@ -67,8 +78,8 @@ assert.equal(parseReasonsListParams({}, now).kind, 'scrap');
 assert.equal(parseReasonsListParams({}, now).cp, REASONS_DEFAULT_CP);
 assert.deepEqual(reasonsYearOptions(now), [2026, 2025]);
 assert.equal(parseReasonsYearParam('all', now), 'all');
-assert.equal(parseReasonsYearParam(undefined, now), 'all');
-assert.equal(parseReasonsYearParam('', now), 'all');
+assert.equal(parseReasonsYearParam(undefined, now), 2026);
+assert.equal(parseReasonsYearParam('', now), 2026);
 assert.deepEqual(yearsForReasonsParam('all', now), [2026, 2025]);
 assert.equal(formatReasonsYearLabel('all', now), '2025–2026');
 assert.deepEqual(compareTonesForSlice('ww', 'all'), ['white', 'black']);
@@ -80,14 +91,36 @@ assert.equal(parseReasonsListParams({ year: '2024' }, now).year, 2026);
 assert.equal(parseReasonsCp(null), 'C');
 assert.equal(parseReasonsCp('all'), 'all');
 assert.equal(parseReasonsCp('p1'), 'P1');
+assert.equal(parseReasonsCp('C+C1'), 'C');
+assert.equal(parseReasonsCp('FF'), 'C');
+assert.ok(reasonsCpMatches('C', 'C'));
+assert.ok(reasonsCpMatches('C', 'C1'));
+assert.ok(reasonsCpMatches('C', 'CS'));
+assert.ok(!reasonsCpMatches('C', 'P1'));
+assert.ok(reasonsCpMatches('C1', 'C(FRIT&BOM)'));
+assert.ok(!reasonsCpMatches('C1', 'C'));
+assert.ok(reasonsGroupIsHidden('unclassified'));
+assert.ok(reasonsGroupIsHidden('Unknown'));
+assert.ok(!reasonsGroupIsHidden('MUG&CUP'));
+assert.ok(!reasonsGroupIsHidden(''));
+assert.ok(!reasonsGroupIsHidden(undefined));
+assert.ok(reasonsCpMatches('C1', 'C', 1));
+assert.ok(reasonsCpMatches('C', 'C', 1));
+assert.ok(reasonsCpMatches('C', 'C', 0));
+assert.equal(displayCp('C', 1), 'C1');
+assert.equal(displayCp('C', 0), 'C');
+assert.equal(REASONS_DEFAULT_CP, 'C');
+assert.ok(!REASONS_CP_OPTIONS.some((opt) => opt.value === 'FF' || opt.label === 'C+C1'));
+assert.ok(REASONS_CP_OPTIONS.some((opt) => opt.value === 'C' && opt.label === 'C'));
 
 const windowNow = new Date(2026, 8, 11);
 assert.equal(yearQueryWindow(2026, windowNow).start, '2026-01-01');
-assert.equal(yearQueryWindow(2026, windowNow).endExcl, '2026-09-12');
+assert.equal(yearQueryWindow(2026, windowNow).endExcl, '2027-01-01');
 assert.equal(yearQueryWindow(2025, windowNow).endExcl, '2026-01-01');
 assert.equal(yearQueryWindow(2027, windowNow).endExcl, '2027-01-01');
 
-assert.equal(parseReasonsFamily(undefined), 'all');
+assert.equal(parseReasonsFamily(undefined), 'ww');
+assert.equal(parseReasonsFamily('all'), 'all');
 assert.equal(parseReasonsFamily('WW'), 'ww');
 assert.equal(parseReasonsFamily('dw'), 'dw');
 assert.equal(originLabelFromQty(10, 0), 'WW');
@@ -207,8 +240,8 @@ assert.equal(detailParsed.family, 'ww');
 assert.equal(detailParsed.tone, 'black');
 assert.equal(parseReasonsDetailParams({}, now).rsn, '');
 assert.equal(parseReasonsDetailParams({}, now).kind, 'scrap');
-assert.equal(parseReasonsDetailParams({}, now).family, 'all');
-assert.equal(parseReasonsDetailParams({}, now).year, 'all');
+assert.equal(parseReasonsDetailParams({}, now).family, 'ww');
+assert.equal(parseReasonsDetailParams({}, now).year, 2026);
 assert.equal(parseReasonsDetailParams({}, now).tone, 'all');
 assert.equal(parseReasonsDetailParams({ family: 'dw' }, now).tone, 'all');
 assert.equal(parseReasonsDetailParams({}, now).cp, 'C');
@@ -379,16 +412,18 @@ assert.ok(!sparseAllFocus.compare?.some((s) => s.key === 'inglaze' || s.key === 
 assert.deepEqual(sparseAllFocus.familyShare?.map((item) => item.tone), ['white', 'black']);
 
 const groupedDetailRows = [
-    { mo: 1, code: 'A12', qty: 40, tone: 'white' as const, group: 'MUG&CUP' },
-    { mo: 2, code: 'A12', qty: 60, tone: 'white' as const, group: 'MUG&CUP' },
-    { mo: 1, code: 'B9', qty: 30, tone: 'white' as const, group: 'BOWL' },
-    { mo: 1, code: 'C1', qty: 5, tone: 'white' as const, group: 'MUG&CUP' },
+    { mo: 1, code: 'A12', qty: 40, tone: 'white' as const, group: 'MUG&CUP', groupLabel: 'MUG&CUP (S)' },
+    { mo: 2, code: 'A12', qty: 60, tone: 'white' as const, group: 'MUG&CUP', groupLabel: 'MUG&CUP (M)' },
+    { mo: 1, code: 'B9', qty: 30, tone: 'white' as const, group: 'BOWL', groupLabel: 'BOWL (L)' },
+    { mo: 1, code: 'C1', qty: 5, tone: 'white' as const, group: 'MUG&CUP', groupLabel: 'MUG&CUP (S)' },
+    { mo: 1, code: 'D1', qty: 10, tone: 'white' as const, group: 'ACC', groupLabel: 'ACCESSORIES' },
 ];
 const groupedProds = [
     { mo: 1, qtyproc: 400, tone: 'white' as const, desc1: 'A12', group: 'MUG&CUP' },
     { mo: 2, qtyproc: 100, tone: 'white' as const, desc1: 'A12', group: 'MUG&CUP' },
     { mo: 1, qtyproc: 400, tone: 'white' as const, desc1: 'B9', group: 'BOWL' },
     { mo: 1, qtyproc: 50, tone: 'white' as const, desc1: 'C1', group: 'MUG&CUP' },
+    { mo: 1, qtyproc: 300, tone: 'white' as const, desc1: 'D1', group: 'ACC' },
 ];
 const groupedFocus = buildReasonsDetail(monthRows, groupedDetailRows, groupedProds, {
     rsn: 'Crack',
@@ -398,7 +433,102 @@ const groupedFocus = buildReasonsDetail(monthRows, groupedDetailRows, groupedPro
     tone: 'white',
     group: ['MUG&CUP'],
 }, { generatedAt: '2026-09-11 04:00', stale: false });
-assert.ok(groupedFocus.codeware.length >= 1);
+assert.ok(detail.pareto?.length);
+assert.ok(!detail.pareto.some((row) => row.other));
+assert.ok((detail.pareto[0].pct || 0) >= (detail.pareto[detail.pareto.length - 1]?.pct || 0));
+assert.ok(Math.abs((detail.pareto[detail.pareto.length - 1]?.cum || 0) - 100) < 1e-6);
+assert.ok(detail.stratify?.forming.length >= 1);
+
+const openGroupFocus = buildReasonsDetail(monthRows, groupedDetailRows, groupedProds, {
+    rsn: 'Crack',
+    year: 2026,
+    kind: 'scrap',
+    family: 'ww',
+    tone: 'white',
+}, { generatedAt: '2026-09-11 04:00', stale: false });
+assert.equal(openGroupFocus.paretoCodeware?.find((row) => row.code === 'A12')?.group, 'MUG&CUP');
+assert.equal(openGroupFocus.paretoCodeware?.find((row) => row.code === 'B9')?.group, 'BOWL');
+assert.deepEqual(reasonsParetoGroupOptions(openGroupFocus.paretoCodeware || []).map((opt) => opt.value), ['MUG&CUP', 'BOWL', 'ACCESSORIES']);
+assert.deepEqual(filterReasonsCodewareGroup(openGroupFocus.paretoCodeware || [], 'BOWL').map((row) => row.code), ['B9']);
+
+const controlPct = reasonsControlChart(
+    REASONS_MONTH_LABELS.map((label, i) => ({
+        mo: i + 1,
+        label,
+        qty: i === 5 ? 200 : 50,
+        pct: i === 5 ? 20 : 5,
+        qtyproc: 1000,
+        delta: null,
+    })),
+    'pct',
+);
+assert.equal(controlPct?.kind, 'p');
+assert.ok(controlPct?.outLabels.includes('Jun'));
+assert.equal(reasonsControlChart(detail.trend.slice(0, 3), 'pct'), null);
+
+const strat = buildReasonsStratify(groupedDetailRows);
+assert.ok(strat.group.length >= 2);
+assert.deepEqual(strat.size.map((row) => row.key), ['S', 'M', 'L']);
+assert.equal(strat.size.find((row) => row.key === 'S')?.qty, 45);
+assert.ok(!strat.size.some((row) => row.key === '—' || row.label === 'ACCESSORIES'));
+assert.ok(Math.abs(strat.size.reduce((sum, row) => sum + row.pct, 0) - 100) < 1e-6);
+assert.ok(strat.group.every((row) => row.pct > 0));
+assert.equal(qtyProcGroupSize('MUG&CUP (S)'), 'S');
+assert.equal(qtyProcGroupSize('PLATE EMB/DMB (XXL)'), 'XXL');
+assert.equal(qtyProcGroupSize('BOWL'), '');
+assert.equal(qtyProcGroupSize('ACCESSORIES'), '');
+assert.equal(qtyProcCodewareSize('W/W JMSC76/T0040'), 'S');
+assert.equal(qtyProcCodewareSize('JMME38'), 'M');
+assert.equal(qtyProcCodewareSize('JMXA64'), 'XL');
+assert.equal(qtyProcCodewareSize('NOCODE'), '');
+assert.equal(qtyProcResolveSize('MUG&CUP (L)', 'W/W JMSC76/T0040'), 'L');
+assert.equal(qtyProcResolveSize('ACCESSORIES', 'W/W JMSC76/T0040'), 'S');
+assert.equal(qtyProcResolveSize('ACCESSORIES', 'NOCODE'), '');
+assert.equal(qtyProcMajorGroup('MUG&CUP (S)'), 'MUG&CUP');
+const sizeFromCode = buildReasonsStratify([
+    { mo: 1, code: 'A12', qty: 40, tone: 'white' as const, group: 'MUG&CUP', groupLabel: 'MUG&CUP (S)', desc1: 'W/W JMMC76/T0040' },
+    { mo: 1, code: 'D1', qty: 10, tone: 'white' as const, group: 'ACC', groupLabel: 'ACCESSORIES', desc1: 'W/W JMSC76/T0040' },
+    { mo: 1, code: 'E1', qty: 7, tone: 'white' as const, group: 'ACC', groupLabel: 'ACCESSORIES', desc1: 'NOCODE' },
+]);
+assert.equal(sizeFromCode.size.find((row) => row.key === 'S')?.qty, 50);
+assert.ok(!sizeFromCode.size.some((row) => row.key === '—' || row.label === 'ACCESSORIES'));
+assert.ok(!sizeFromCode.size.some((row) => row.key === 'M'));
+assert.deepEqual(buildReasonsRatePareto([
+    { code: 'A', qty: 80, qtyproc: 1000, pct: 8, desc1: 'Ware A' },
+    { code: 'B', qty: 15, qtyproc: 100, pct: 15, desc1: 'Ware B' },
+    { code: 'C', qty: 5, qtyproc: 50, pct: 10, desc1: 'Ware C' },
+]).map((row) => row.code), ['B', 'C', 'A']);
+assert.equal(buildReasonsRatePareto(
+    Array.from({ length: 12 }, (_, index) => ({
+        code: `C${index}`,
+        qty: 12 - index,
+        qtyproc: 100,
+        pct: 20 - index,
+        desc1: `Ware ${index}`,
+    })),
+).length, REASONS_CODEWARE_TOP_N);
+assert.deepEqual(buildReasonsPareto([
+    { code: 'A', qty: 80, qtyproc: 100, pct: 80, desc1: 'Ware A' },
+    { code: 'B', qty: 15, qtyproc: 100, pct: 15, desc1: 'Ware B' },
+    { code: 'C', qty: 5, qtyproc: 100, pct: 5, desc1: 'Ware C' },
+]).map((row) => row.code), ['A', 'B', 'C']);
+assert.deepEqual(buildReasonsPareto([
+    { code: 'A', qty: 80, qtyproc: 100, pct: 80, desc1: 'Ware A' },
+    { code: 'B', qty: 15, qtyproc: 100, pct: 15, desc1: 'Ware B' },
+    { code: 'C', qty: 5, qtyproc: 100, pct: 5, desc1: 'Ware C' },
+]).map((row) => row.name), ['Ware A', 'Ware B', 'Ware C']);
+const manyPareto = buildReasonsPareto(
+    Array.from({ length: 12 }, (_, index) => ({
+        code: `C${index}`,
+        qty: 12 - index,
+        qtyproc: 100,
+        pct: 12 - index,
+        desc1: `Ware ${index}`,
+    })),
+);
+assert.equal(manyPareto.length, 12);
+assert.ok(!manyPareto.some((row) => row.other));
+assert.equal(manyPareto[0].name, 'Ware 0');
 assert.equal(groupedFocus.codeware[0].code, 'A12');
 assert.ok(!groupedFocus.codeware.some((row) => row.code === 'B9'));
 assert.ok(groupedFocus.codeware.some((row) => row.code === 'C1'));
@@ -473,6 +603,77 @@ const mixAll = {
     forming: 'all',
     glaze: 'all',
 };
+const c1SliceDefects = [
+    { rsn: 'Crack', mo: 1, qty: 10, tone: 'white' as const, cp: 'C1' },
+    { rsn: 'Pin hole', mo: 1, qty: 5, tone: 'white' as const, cp: 'C' },
+];
+const c1SliceProds = [
+    { mo: 1, qtyproc: 100, tone: 'white' as const, cp: 'C1' },
+    { mo: 1, qtyproc: 100, tone: 'white' as const, cp: 'C' },
+];
+const overviewC1Only = buildReasonsOverview(c1SliceDefects, c1SliceProds, { ...mixAll, cp: 'C1' });
+assert.equal(overviewC1Only.top?.[0].rsn, 'Crack');
+assert.equal(overviewC1Only.top?.length, 1);
+assert.equal(overviewC1Only.meta.qty, 10);
+const overviewCOnly = buildReasonsOverview(c1SliceDefects, c1SliceProds, { ...mixAll, cp: 'C' });
+assert.equal(overviewCOnly.top?.length, 2);
+assert.equal(overviewCOnly.meta.qty, 15);
+assert.equal(overviewCOnly.meta.qtyproc, 200);
+const overviewAllCp = buildReasonsOverview(c1SliceDefects, c1SliceProds, { ...mixAll, cp: 'all' });
+assert.equal(overviewAllCp.top?.length, 2);
+
+const fromMix = reasonsRowsFromMixPayload({
+    reasons: [{
+        y: 2569,
+        m: 1,
+        rsn_desc: 'Crack',
+        kind: 'scrap',
+        shape: 'mug',
+        forming: 'JIG',
+        group: 'MUG&CUP',
+        groupLabel: 'MUG&CUP',
+        cp: 'C',
+        tone: 'WHITE',
+        customer: '',
+        glaze: 'T',
+        qty: 10,
+    }, {
+        y: 2569,
+        m: 1,
+        rsn_desc: 'FritCrack',
+        kind: 'scrap',
+        shape: 'mug',
+        forming: 'JIG',
+        group: 'MUG&CUP',
+        groupLabel: 'MUG&CUP',
+        cp: 'FRIT',
+        tone: 'WHITE',
+        customer: '',
+        glaze: 'T',
+        qty: 5,
+    }],
+    mix: [{
+        y: 2569,
+        m: 1,
+        shape: 'mug',
+        forming: 'JIG',
+        group: 'MUG&CUP',
+        groupLabel: 'MUG&CUP',
+        cp: 'C',
+        tone: 'WHITE',
+        customer: '',
+        glaze: 'T',
+        qtyproc: 100,
+        qtycomp: 80,
+        qtyscrp: 10,
+        qtyrjct: 10,
+    }],
+}, 2026, 'scrap');
+const overviewFromMix = buildReasonsOverview(fromMix.defects, fromMix.prods, { ...mixAll, cp: 'C' });
+assert.equal(overviewFromMix.meta.qty, 15);
+assert.equal(overviewFromMix.meta.qtyproc, 100);
+assert.equal(overviewFromMix.top?.length, 2);
+
 const overviewAll = buildReasonsOverview(mixDefects, mixProds, mixAll);
 assert.equal(overviewAll.mode, 'scope');
 assert.equal(overviewAll.cards?.[0].top[0].rsn, 'Pin hole');
@@ -599,6 +800,21 @@ const overviewGlazeT = buildReasonsOverview(mixDefects, mixProds, { ...mixAll, g
 assert.equal(overviewGlazeT.cards?.[0].top[0].rsn, 'Crack');
 assert.equal(overviewGlazeT.meta.qty, 10);
 
+const hiddenGroupDefects = [
+    { rsn: 'Crack', mo: 1, qty: 10, tone: 'white' as const, cp: 'C', group: 'MUG&CUP' },
+    { rsn: 'Ghost', mo: 1, qty: 99, tone: 'white' as const, cp: 'C', group: 'unclassified' },
+    { rsn: 'Shade', mo: 1, qty: 50, tone: 'white' as const, cp: 'C', group: 'unknown' },
+];
+const hiddenGroupProds = [
+    { mo: 1, qtyproc: 100, tone: 'white' as const, cp: 'C', group: 'MUG&CUP' },
+    { mo: 1, qtyproc: 900, tone: 'white' as const, cp: 'C', group: 'unclassified' },
+];
+const overviewHiddenGroup = buildReasonsOverview(hiddenGroupDefects, hiddenGroupProds, mixAll);
+assert.equal(overviewHiddenGroup.top?.length, 1);
+assert.equal(overviewHiddenGroup.top?.[0].rsn, 'Crack');
+assert.equal(overviewHiddenGroup.meta.qty, 10);
+assert.equal(overviewHiddenGroup.meta.qtyproc, 100);
+
 const source = readFileSync(join(process.cwd(), 'src/lib/reasons-query.ts'), 'utf8');
 const sqlBlocks = [...source.matchAll(/`([\s\S]*?)`/g)].map((m) => m[1]);
 assert.ok(sqlBlocks.some((block) => /SELECT/i.test(block) && /GROUP BY/i.test(block)));
@@ -615,6 +831,12 @@ assert.match(source, /yearsForReasonsParam/);
 assert.match(source, /mergeReasonsYearOverviews/);
 assert.match(source, /mergeReasonsYearDetails/);
 assert.match(source, /m_cp/);
+assert.match(source, /is_round1/);
+assert.match(source, /displayCp/);
+assert.match(source, /CACHE_VERSION = 'v9'/);
+assert.match(source, /RTRIM\(LTRIM\(ISNULL\(m_part, ''\)\)\) AS m_part/);
+assert.match(source, /reasonsRowsFromMixPayload/);
+assert.match(source, /getQtyProcResponse/);
 assert.doesNotMatch(source, /mcpWhereSql/);
 assert.doesNotMatch(source, /for \(const tone of REASONS_FOCUS_TONES\)/);
 for (const block of sqlBlocks) {
@@ -675,6 +897,7 @@ assert.match(page, /applyFamily/);
 assert.match(page, /applyTone/);
 assert.match(page, /parseReasonsYearParam/);
 assert.match(page, /title="Select year"/);
+assert.doesNotMatch(page, /year: next === 'all' \? null/);
 assert.doesNotMatch(page, /· latest/);
 assert.match(page, /DefectPicker/);
 assert.match(page, /Select defect/);
@@ -730,6 +953,29 @@ const focus = readFileSync(join(process.cwd(), 'src/components/dashboard/Reasons
 assert.doesNotMatch(focus, /function AllMode/);
 assert.doesNotMatch(focus, /sharedPctMax/);
 assert.doesNotMatch(focus, /family === 'all' && tone === 'all'/);
+assert.match(focus, /Pareto/);
+assert.doesNotMatch(focus, /UCL/);
+assert.match(focus, /stratify/);
+assert.doesNotMatch(focus, /Control chart/);
+assert.doesNotMatch(focus, /label: 'Control'/);
+assert.match(focus, /label: 'All'/);
+assert.match(focus, /label: 'Size'/);
+assert.match(focus, /function ParetoAxisTick/);
+assert.match(focus, /paretoTickLabel/);
+assert.match(focus, /labelAngle = -42/);
+assert.match(focus, /W\\\/W\\s\+/);
+assert.match(focus, /BarChart/);
+assert.match(focus, /h-\[22rem\]/);
+assert.match(focus, /fmtPct\(item\.pct\)/);
+assert.match(focus, /setParetoGroup/);
+assert.match(focus, /reasonsParetoGroupOptions/);
+assert.match(focus, /filterReasonsCodewareGroup/);
+assert.match(focus, /Top \{REASONS_CODEWARE_TOP_N\} by rate/);
+assert.doesNotMatch(focus, /setParetoMetric/);
+assert.doesNotMatch(focus, /paretoMetric/);
+assert.doesNotMatch(focus, /Stacked by \$\{activeLayer\}/);
+assert.match(focus, /StratifyTooltip/);
+assert.match(focus, /b\.qty - a\.qty/);
 assert.match(focus, /FamilyShareDonut/);
 assert.match(focus, /onOpenTone/);
 assert.match(focus, /Rate vs qtyproc/);

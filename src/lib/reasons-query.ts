@@ -9,6 +9,8 @@ import { getAppDataDir } from '@/lib/daily-report-automation-settings';
 import {
     buildReasonsDetail,
     buildReasonsList,
+    buildReasonsRatePareto,
+    buildReasonsStratify,
     classifyReasonsTone,
     formatGeneratedAt,
     formatReasonsCodewareLabel,
@@ -22,6 +24,7 @@ import {
     parseReasonsGroups,
     parseReasonsForming,
     parseReasonsGlaze,
+    reasonsRowsFromMixPayload,
     parseReasonsListParams,
     yearQueryWindow,
     reasonsYearOptions,
@@ -49,15 +52,23 @@ import { bindIsoDate } from '@/lib/sql-params';
 import { SORT_VIEW_TOKEN, sourcesForCategory } from '@/lib/sort-source';
 import { toFiniteNumber } from '@/lib/utils';
 import { loadGlazePtGroupMap } from '@/lib/glaze-pt-group';
-import { qtyProcResolveGroup } from '@/lib/qtyproc';
+import { displayCp, qtyProcResolveGroup } from '@/lib/qtyproc';
+import { getQtyProcResponse } from '@/lib/qtyproc-server';
 
 const CATEGORY = 'ALL';
-const CACHE_VERSION = 'v7';
+const CACHE_VERSION = 'v9';
 const FRESH_MS = 10 * 60 * 1000;
 const CP_SQL = `(
                 UPPER(RTRIM(LTRIM(ISNULL(m_cp, '')))) IN (N'C', N'C1', N'CS', N'C(FRIT&BOM)')
                 OR UPPER(RTRIM(LTRIM(ISNULL(m_cp, '')))) LIKE 'P[1-5]%'
             )`;
+/** Mix C1 = somboon user + CP C. SELECT-only — no database objects are changed. */
+const IS_ROUND1_SQL = `CASE WHEN LOWER(RTRIM(LTRIM(ISNULL(m_user, '')))) LIKE 'somboon%' THEN 1 ELSE 0 END`;
+const IS_ROUND1_JOB_SQL = `MAX(CASE WHEN LOWER(RTRIM(LTRIM(ISNULL(m_user, '')))) LIKE 'somboon%' THEN 1 ELSE 0 END)`;
+
+function reasonsDisplayCp(row: Record<string, unknown>): string {
+    return displayCp(String(row.cp || '').trim(), toFiniteNumber(row.is_round1));
+}
 
 const PART_FAMILY_SQL = `CASE
                 WHEN m_part LIKE '143%' THEN '143'
@@ -140,10 +151,10 @@ function mapMonthRows(rows: Record<string, unknown>[]): ReasonsMonthRow[] {
             }),
             desc1: String(row.desc1 || '').trim(),
             desc2: String(row.desc2 || '').trim(),
-            cp: String(row.cp || '').trim().toUpperCase(),
+            cp: reasonsDisplayCp(row),
             mPart: String(row.m_part || '').trim(),
         })),
-        ['rsn', 'mo', 'tone', 'desc1', 'desc2', 'cp'],
+        ['rsn', 'mo', 'tone', 'desc1', 'desc2', 'cp', 'mPart'],
         ['qty'],
     )
         .map((row) => ({
@@ -171,10 +182,10 @@ function mapProdRows(rows: Record<string, unknown>[]): ReasonsProdRow[] {
             }),
             desc1: String(row.desc1 || '').trim(),
             desc2: String(row.desc2 || '').trim(),
-            cp: String(row.cp || '').trim().toUpperCase(),
+            cp: reasonsDisplayCp(row),
             mPart: String(row.m_part || '').trim(),
         })),
-        ['mo', 'tone', 'desc1', 'desc2', 'cp'],
+        ['mo', 'tone', 'desc1', 'desc2', 'cp', 'mPart'],
         ['qtyproc'],
     )
         .map((row) => ({
@@ -224,6 +235,7 @@ export async function queryReasonsMonthRows(year: number, kind: ReasonsKind): Pr
         desc1: string;
         desc2: string;
         cp: string;
+        is_round1: number;
         m_part: string;
         qty: number;
     }>(
@@ -236,7 +248,8 @@ export async function queryReasonsMonthRows(year: number, kind: ReasonsKind): Pr
                 RTRIM(LTRIM(ISNULL(pt_desc1, ''))) AS desc1,
                 RTRIM(LTRIM(ISNULL(pt_desc2, ''))) AS desc2,
                 UPPER(RTRIM(LTRIM(ISNULL(m_cp, '')))) AS cp,
-                MAX(m_part) AS m_part,
+                ${IS_ROUND1_SQL} AS is_round1,
+                RTRIM(LTRIM(ISNULL(m_part, ''))) AS m_part,
                 SUM(sub_qty) AS qty
             FROM ${SORT_VIEW_TOKEN} WITH (NOLOCK)
             WHERE m_date >= @startDate
@@ -254,7 +267,9 @@ export async function queryReasonsMonthRows(year: number, kind: ReasonsKind): Pr
                 ${UNIT_TONE_SQL},
                 RTRIM(LTRIM(ISNULL(pt_desc1, ''))),
                 RTRIM(LTRIM(ISNULL(pt_desc2, ''))),
-                UPPER(RTRIM(LTRIM(ISNULL(m_cp, ''))))
+                UPPER(RTRIM(LTRIM(ISNULL(m_cp, '')))),
+                ${IS_ROUND1_SQL},
+                RTRIM(LTRIM(ISNULL(m_part, '')))
             HAVING SUM(sub_qty) > 0
         `,
         queryOpts(start, endExcl),
@@ -273,6 +288,7 @@ export async function queryReasonsProdRows(year: number): Promise<ReasonsProdRow
         desc1: string;
         desc2: string;
         cp: string;
+        is_round1: number;
         m_part: string;
         qtyproc: number;
     }>(
@@ -284,7 +300,8 @@ export async function queryReasonsProdRows(year: number): Promise<ReasonsProdRow
                 desc1,
                 desc2,
                 cp,
-                MAX(m_part) AS m_part,
+                is_round1,
+                m_part,
                 SUM(qtyproc) AS qtyproc
             FROM (
                 SELECT
@@ -294,7 +311,8 @@ export async function queryReasonsProdRows(year: number): Promise<ReasonsProdRow
                     MAX(RTRIM(LTRIM(ISNULL(pt_desc1, '')))) AS desc1,
                     MAX(RTRIM(LTRIM(ISNULL(pt_desc2, '')))) AS desc2,
                     UPPER(RTRIM(LTRIM(ISNULL(m_cp, '')))) AS cp,
-                    MAX(m_part) AS m_part,
+                    ${IS_ROUND1_JOB_SQL} AS is_round1,
+                    RTRIM(LTRIM(ISNULL(m_part, ''))) AS m_part,
                     MAX(ISNULL(qtyp, 0)) AS qtyproc
                 FROM ${SORT_VIEW_TOKEN} WITH (NOLOCK)
                 WHERE m_date >= @startDate
@@ -308,9 +326,10 @@ export async function queryReasonsProdRows(year: number): Promise<ReasonsProdRow
                     m_kiln,
                     m_cp,
                     ${PART_FAMILY_SQL},
-                    ${UNIT_TONE_SQL}
+                    ${UNIT_TONE_SQL},
+                    RTRIM(LTRIM(ISNULL(m_part, '')))
             ) jobs
-            GROUP BY mo, part_family, unit_tone, desc1, desc2, cp
+            GROUP BY mo, part_family, unit_tone, desc1, desc2, cp, is_round1, m_part
             HAVING SUM(qtyproc) > 0
         `,
         queryOpts(start, endExcl),
@@ -403,6 +422,25 @@ async function getMonthRows(
     return pack(await rebuild(year, kind), false);
 }
 
+async function getYearKindRows(
+    year: number,
+    kind: ReasonsKind,
+    family: string,
+    forceRefresh: boolean,
+): Promise<{ defects: ReasonsMonthRow[]; prods: ReasonsProdRow[]; stale: boolean; generatedAt: string }> {
+    if (family === 'ww') {
+        const mix = await getQtyProcResponse(forceRefresh);
+        const { defects, prods } = reasonsRowsFromMixPayload(mix, year, kind);
+        return {
+            defects,
+            prods,
+            stale: Boolean(mix.stale || mix.reasonsPending),
+            generatedAt: mix.generatedAt || formatGeneratedAt(),
+        };
+    }
+    return getMonthRows(year, kind, forceRefresh);
+}
+
 export async function getReasonsListResponse(
     input: ReasonsQueryInput,
     forceRefresh = false,
@@ -449,11 +487,11 @@ function mapDetailRows(rows: Record<string, unknown>[]): ReasonsDetailRow[] {
                 tone,
                 desc1,
                 desc2,
-                cp: String(row.cp || '').trim().toUpperCase(),
+                cp: reasonsDisplayCp(row),
                 mPart,
             };
         }),
-        ['mo', 'code', 'tone', 'cp'],
+        ['mo', 'code', 'tone', 'cp', 'mPart'],
         ['qty'],
     )
         .map((row) => ({
@@ -489,6 +527,7 @@ export async function queryReasonsDetailRows(
         code: string;
         code2: string;
         cp: string;
+        is_round1: number;
         m_part: string;
         qty: number;
     }>(
@@ -500,7 +539,8 @@ export async function queryReasonsDetailRows(
                 RTRIM(LTRIM(ISNULL(pt_desc1, ''))) AS code,
                 RTRIM(LTRIM(ISNULL(pt_desc2, ''))) AS code2,
                 UPPER(RTRIM(LTRIM(ISNULL(m_cp, '')))) AS cp,
-                MAX(m_part) AS m_part,
+                ${IS_ROUND1_SQL} AS is_round1,
+                RTRIM(LTRIM(ISNULL(m_part, ''))) AS m_part,
                 SUM(sub_qty) AS qty
             FROM ${SORT_VIEW_TOKEN} WITH (NOLOCK)
             WHERE m_date >= @startDate
@@ -516,7 +556,9 @@ export async function queryReasonsDetailRows(
                 ${UNIT_TONE_SQL},
                 RTRIM(LTRIM(ISNULL(pt_desc1, ''))),
                 RTRIM(LTRIM(ISNULL(pt_desc2, ''))),
-                UPPER(RTRIM(LTRIM(ISNULL(m_cp, ''))))
+                UPPER(RTRIM(LTRIM(ISNULL(m_cp, '')))),
+                ${IS_ROUND1_SQL},
+                RTRIM(LTRIM(ISNULL(m_part, '')))
             HAVING SUM(sub_qty) > 0
         `,
         {
@@ -585,6 +627,17 @@ async function getDetailRows(
     return { rows: fresh.rows, stale: false, generatedAt: formatGeneratedAt(new Date(fresh.at)) };
 }
 
+function withFocusQc(payload: ReasonsDetailResponse, codeRows: ReasonsDetailRow[]): ReasonsDetailResponse {
+    const tone = payload.meta?.tone;
+    const sliced = tone && tone !== 'all'
+        ? codeRows.filter((row) => row.tone === tone)
+        : codeRows;
+    const pool = payload.paretoCodeware?.length ? payload.paretoCodeware : (payload.codeware || []);
+    payload.paretoCodeware = pool;
+    payload.pareto = buildReasonsRatePareto(pool);
+    payload.stratify = buildReasonsStratify(sliced);
+    return payload;
+}
 export async function getReasonsDetailResponse(
     input: ReasonsDetailQueryInput,
     forceRefresh = false,
@@ -596,7 +649,7 @@ export async function getReasonsDetailResponse(
     const years = yearsForReasonsParam(params.year);
     const packs = await Promise.all(years.map(async (year) => {
         const [month, detail] = await Promise.all([
-            getMonthRows(year, params.kind, forceRefresh),
+            getYearKindRows(year, params.kind, params.family, forceRefresh),
             getDetailRows(year, params.kind, params.rsn, forceRefresh),
         ]);
         const payload = buildReasonsDetail(month.defects, detail.rows, month.prods, { ...params, year }, {
@@ -604,7 +657,7 @@ export async function getReasonsDetailResponse(
             stale: month.stale || detail.stale,
         });
         payload.groupOptions = reasonsGroupOptions(month.defects);
-        return { year, month, detail, payload };
+        return { year, month, detail, payload: withFocusQc(payload, detail.rows) };
     }));
     const stale = packs.some((pack) => pack.month.stale || pack.detail.stale);
     const generatedAt = packs[0]?.month.generatedAt;
@@ -619,10 +672,10 @@ export async function getReasonsDetailResponse(
         { generatedAt, stale },
     );
     combined.groupOptions = reasonsGroupOptions(packs.flatMap((pack) => pack.month.defects));
-    return mergeReasonsYearDetails(
+    return withFocusQc(mergeReasonsYearDetails(
         packs.map((pack) => ({ year: pack.year, payload: pack.payload })),
         combined,
-    );
+    ), packs.flatMap((pack) => pack.detail.rows));
 }
 
 export async function getReasonsOverviewResponse(
@@ -649,7 +702,7 @@ export async function getReasonsOverviewResponse(
     const glaze = parseReasonsGlaze(input.glaze);
     const mix = { kind, family, tone, cp, group, forming, glaze };
     const packs = await Promise.all(years.map(async (year) => {
-        const month = await getMonthRows(year, kind, forceRefresh);
+        const month = await getYearKindRows(year, kind, family, forceRefresh);
         const payload = buildReasonsOverview(
             month.defects,
             month.prods,
@@ -663,7 +716,7 @@ export async function getReasonsOverviewResponse(
         const current = packs[0];
         const prevYear = current.year - 1;
         if (prevYear >= REASONS_MIN_CE_YEAR) {
-            const prevMonth = await getMonthRows(prevYear, kind, forceRefresh);
+            const prevMonth = await getYearKindRows(prevYear, kind, family, forceRefresh);
             const prevPayload = buildReasonsOverview(
                 prevMonth.defects,
                 prevMonth.prods,

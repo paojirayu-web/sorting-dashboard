@@ -7,6 +7,8 @@ export const BE_OFFSET = 543;
 export const QTYPROC_BE_YEARS = QTYPROC_CE_YEARS.map((y) => y + BE_OFFSET);
 /** Charts / year filter start at 2567 (CE 2024). 2566 is still queried but not shown. */
 export const QTYPROC_DISPLAY_BE_YEARS = QTYPROC_BE_YEARS.filter((y) => y >= 2567);
+/** Mix year dropdown default — current display year (2569 = 2026). */
+export const QTYPROC_DEFAULT_YEAR = QTYPROC_DISPLAY_BE_YEARS[QTYPROC_DISPLAY_BE_YEARS.length - 1];
 export const QTYPROC_MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
 
 export const QTYPROC_HIDDEN_KEYS = new Set(['unknown', 'unclassified', '']);
@@ -122,11 +124,29 @@ export function qtyProcPruneGroups(selected: string[], keys: string[]): string[]
     return next.length === selected.length ? selected : next;
 }
 
+const QTYPROC_SIZE_RE = /\s*\((S|M|L|XL|XXL)\)\s*$/i;
+export const QTYPROC_SIZES = ['S', 'M', 'L', 'XL', 'XXL'] as const;
+export type QtyProcSize = (typeof QTYPROC_SIZES)[number];
+export const QTYPROC_SIZE_COLOR: Record<string, string> = {
+    S: '#22c55e',
+    M: '#3b82f6',
+    L: '#f97316',
+    XL: '#a855f7',
+    XXL: '#ef4444',
+};
+
+/** MUG&CUP (S) → S. Unlabeled → ''. */
+export function qtyProcGroupSize(label: string | null | undefined): QtyProcSize | '' {
+    const name = String(label || '').trim();
+    const match = name.match(/\((S|M|L|XL|XXL)\)/i);
+    return match ? (match[1].toUpperCase() as QtyProcSize) : '';
+}
+
 /** MUG&CUP (S) / MUG&CUP EMB/DMB (XL) → MUG&CUP. PLATE (L) → PLATE. */
 export function qtyProcMajorGroup(label: string | null | undefined): string {
     const name = String(label || '').trim();
     if (!name) return 'Other';
-    const noSize = name.replace(/\s*\((?:S|M|L|XL|XXL)\)\s*$/i, '').trim() || name;
+    const noSize = name.replace(QTYPROC_SIZE_RE, '').trim() || name;
     return noSize.split(/\s+/)[0] || noSize;
 }
 
@@ -374,6 +394,8 @@ export type QtyProcPayload = {
     months: { y: number; m: number; qtyproc: number; qtycomp: number; qtyscrp: number; qtyrjct: number; c: number; c1: number; frit: number; bom: number; p1: number; p2: number; p3: number; p4: number; p5: number; customC: number }[];
     mix: QtyProcMixRow[];
     reasons: QtyProcReasonRow[];
+    /** Mix charts are ready; Top 10 scrap/reject is still loading. */
+    reasonsPending?: boolean;
 };
 
 function extractModelCode(desc: string | null | undefined): string | null {
@@ -392,6 +414,31 @@ function extractModelCode(desc: string | null | undefined): string | null {
         core = `${core}-L`;
     }
     return core;
+}
+
+/**
+ * Ware-code size letter: W/W JMSC76/T0040 → JMSC76 → S.
+ * Format [Forming][Type][Size]…  3rd char S/M/L/X; XX after that is XXL.
+ */
+export function qtyProcCodewareSize(
+    desc1?: string | null,
+    desc2?: string | null,
+): QtyProcSize | '' {
+    const code = extractModelCode(desc1) || extractModelCode(desc2);
+    if (!code || code.length < 3) return '';
+    const third = code[2].toUpperCase();
+    if (third === 'S' || third === 'M' || third === 'L') return third;
+    if (third === 'X') return code[3]?.toUpperCase() === 'X' ? 'XXL' : 'XL';
+    return '';
+}
+
+/** Group label (S) wins. Codeware letter only when the group has no size. */
+export function qtyProcResolveSize(
+    groupLabel?: string | null,
+    desc1?: string | null,
+    desc2?: string | null,
+): QtyProcSize | '' {
+    return qtyProcGroupSize(groupLabel) || qtyProcCodewareSize(desc1, desc2);
 }
 
 export function classifyDesc(desc: string | null | undefined): { shape: string; forming: string } {
@@ -483,7 +530,7 @@ function addQtyProcMix(mix: Map<string, QtyProcMixRow>, row: QtyProcMixRow) {
 }
 
 function addQtyProcReason(reasons: Map<string, QtyProcReasonRow>, row: QtyProcReasonRow) {
-    const key = `${row.y}|${row.m}|${row.kind}|${row.rsn_desc}|${row.group}|${row.shape}|${row.forming}|${row.cp}|${row.tone}|${row.customer}|${row.glaze}`;
+    const key = `${row.y}|${row.m}|${row.kind}|${row.rsn_desc}|${row.group}|${row.forming}|${row.cp}|${row.tone}|${row.customer}|${row.glaze}`;
     const existing = reasons.get(key);
     if (existing) {
         existing.qty += row.qty;

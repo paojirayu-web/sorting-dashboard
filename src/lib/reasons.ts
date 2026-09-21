@@ -2,13 +2,23 @@
 import {
     classifyGlaze,
     classifyProduct,
+    FORM_COLOR,
     GLAZE_LABEL,
     QTYPROC_GLAZE_TYPES,
     QTYPROC_HIDDEN_KEYS,
+    qtyProcGroupColor,
     qtyProcGroupLabels,
     qtyProcGroupMatches,
     qtyProcGroupsSelected,
+    qtyProcMajorGroup,
+    qtyProcResolveSize,
+    displayCp,
+    BE_OFFSET,
+    QTYPROC_SIZE_COLOR,
+    QTYPROC_SIZES,
     SHAPE_LABEL,
+    type QtyProcMixRow,
+    type QtyProcReasonRow,
 } from '@/lib/qtyproc';
 
 export const REASONS_MAX_PAGE_SIZE = 100;
@@ -27,6 +37,8 @@ export const REASONS_FUTURE_FILTER_KEYS = ['unit', 'group', 'forming', 'customer
 export const REASONS_PARETO_TOP_N = 10;
 export const REASONS_PARETO_CHART_N = 15;
 export const REASONS_PARETO_OTHER = 'Other';
+export const REASONS_STRATIFY_TOP = 5;
+export const REASONS_CONTROL_MIN_POINTS = 6;
 
 export const REASONS_FOCUS_TONES = ['white', 'black', 'inglaze', 'onglaze'] as const;
 export const REASONS_FAMILIES = ['all', 'ww', 'dw'] as const;
@@ -35,6 +47,7 @@ export type ReasonsKind = 'scrap' | 'reject';
 export type ReasonsSort = 'qty' | 'pct';
 export type ReasonsDir = 'asc' | 'desc';
 export type ReasonsFamily = (typeof REASONS_FAMILIES)[number];
+export const REASONS_DEFAULT_FAMILY: ReasonsFamily = 'ww';
 export type ReasonsFocusTone = (typeof REASONS_FOCUS_TONES)[number];
 export type ReasonsToneParam = ReasonsFocusTone | 'all';
 export type ReasonsYearParam = number | 'all';
@@ -79,7 +92,54 @@ export type ReasonsTrendPoint = {
     label: string;
     qty: number;
     pct: number;
+    qtyproc?: number;
     delta: number | null;
+};
+
+export type ReasonsParetoItem = {
+    code: string;
+    name?: string;
+    qty: number;
+    pct?: number;
+    share: number;
+    cum: number;
+    other?: boolean;
+    tone?: ReasonsFocusTone;
+};
+
+export type ReasonsStratifySeries = {
+    key: string;
+    label: string;
+    color: string;
+    months: number[];
+    qty: number;
+    pct: number;
+};
+
+export type ReasonsStratify = {
+    group: ReasonsStratifySeries[];
+    forming: ReasonsStratifySeries[];
+    size: ReasonsStratifySeries[];
+};
+
+export type ReasonsControlPoint = {
+    mo: number;
+    label: string;
+    value: number;
+    cl: number;
+    ucl: number;
+    lcl: number;
+    out: boolean;
+    qty: number;
+    pct: number;
+    qtyproc: number;
+};
+
+export type ReasonsControlChart = {
+    kind: 'p' | 'xmr';
+    cl: number;
+    points: ReasonsControlPoint[];
+    outLabels: string[];
 };
 
 /** Overlay series for year-all (2026 vs 2025) or tone-all (White vs Black). */
@@ -106,6 +166,7 @@ export type ReasonsCodewareItem = {
     qtyproc: number;
     pct: number;
     tone?: ReasonsFocusTone;
+    group?: string;
 };
 
 export type ReasonsFamilyShareItem = {
@@ -145,6 +206,9 @@ export type ReasonsDetailResponse = {
     trend: ReasonsTrendPoint[];
     codeware: ReasonsCodewareItem[];
     other?: ReasonsCodewareItem;
+    pareto?: ReasonsParetoItem[];
+    paretoCodeware?: ReasonsCodewareItem[];
+    stratify?: ReasonsStratify;
     familyShare?: ReasonsFamilyShareItem[];
     series?: ReasonsToneSeries[];
     activeTone?: ReasonsFocusTone;
@@ -230,6 +294,8 @@ export type ReasonsMonthRow = {
     mPart?: string;
     group?: string;
     groupLabel?: string;
+    forming?: string;
+    glaze?: string;
 };
 
 export type ReasonsProdRow = {
@@ -242,6 +308,8 @@ export type ReasonsProdRow = {
     mPart?: string;
     group?: string;
     groupLabel?: string;
+    forming?: string;
+    glaze?: string;
 };
 
 export type ReasonsMixParams = {
@@ -357,10 +425,11 @@ export function parseReasonsYear(raw: string | null | undefined, now: Date = ban
     return ce;
 }
 
-/** Header year: a single CE year, or `all` to overlay the lookback window. */
+/** Header year: a single CE year, or `all` to overlay the lookback window. Missing param → current year. */
 export function parseReasonsYearParam(raw: string | null | undefined, now: Date = bangkokNow()): ReasonsYearParam {
     const v = String(raw || '').trim().toLowerCase();
-    if (!v || v === 'all') return 'all';
+    if (v === 'all') return 'all';
+    if (!v) return latestReasonsYear(now);
     return parseReasonsYear(raw, now);
 }
 
@@ -413,9 +482,11 @@ export function parseReasonsKind(raw: string | null | undefined): ReasonsKind {
 
 export function parseReasonsFamily(raw: string | null | undefined): ReasonsFamily {
     const v = String(raw || '').trim().toLowerCase();
+    if (!v) return REASONS_DEFAULT_FAMILY;
+    if (v === 'all') return 'all';
     if (v === 'ww') return 'ww';
     if (v === 'dw') return 'dw';
-    return 'all';
+    return REASONS_DEFAULT_FAMILY;
 }
 
 export function defaultToneForFamily(_family: ReasonsFamily): ReasonsToneParam {
@@ -445,9 +516,27 @@ export function parseReasonsCp(raw: string | null | undefined): string {
     const v = String(raw || '').trim();
     if (!v) return REASONS_DEFAULT_CP;
     if (v.toLowerCase() === 'all') return 'all';
-    const cp = v.toUpperCase();
+    const cp = v.toUpperCase().replace(/\s+/g, '');
+    if (cp === 'FF' || cp === 'C+C1' || cp === 'C,C1') return REASONS_DEFAULT_CP;
     if (!/^[A-Z0-9][A-Z0-9._()-]{0,20}$/.test(cp)) return REASONS_DEFAULT_CP;
     return cp;
+}
+
+/** Mix displayCp: somboon+C and CS / C(FRIT&BOM) are C1. */
+export function reasonsNormCp(cp: string | null | undefined, isRound1?: number | null): string {
+    return displayCp(cp, isRound1);
+}
+
+export function reasonsCpMatches(
+    filter: string | null | undefined,
+    rowCp: string | null | undefined,
+    isRound1?: number | null,
+): boolean {
+    if (!filter || filter === 'all') return true;
+    const row = reasonsNormCp(rowCp, isRound1);
+    if (filter === 'C1') return row === 'C1';
+    if (filter === 'C') return row === 'C' || row === 'C1';
+    return row === String(filter).trim().toUpperCase();
 }
 
 const SHAPE_VALUES = new Set(REASONS_SHAPE_OPTIONS.map((o) => o.value));
@@ -499,20 +588,80 @@ export function parseReasonsGlaze(raw: string | null | undefined): string {
     return GLAZE_VALUES.has(v) ? v : 'all';
 }
 
+export function reasonsGroupIsHidden(group?: string | null): boolean {
+    const key = String(group || '').trim().toLowerCase();
+    if (!key) return false;
+    return QTYPROC_HIDDEN_KEYS.has(key);
+}
+
 export function matchesReasonsMix(
-    row: { tone?: ReasonsToneKey; cp?: string; desc1?: string; desc2?: string; group?: string },
+    row: { tone?: ReasonsToneKey; cp?: string; desc1?: string; desc2?: string; group?: string; forming?: string; glaze?: string },
     params: ReasonsMixParams,
 ): boolean {
+    if (reasonsGroupIsHidden(row.group)) return false;
     if (!rowMatchesSlice(row.tone, params.family, params.tone)) return false;
-    if (params.cp && params.cp !== 'all' && String(row.cp || '').toUpperCase() !== params.cp) return false;
+    if (!reasonsCpMatches(params.cp, row.cp)) return false;
     if (!qtyProcGroupMatches(params.group, row.group)) return false;
     const forming = params.forming || 'all';
     const glaze = params.glaze || 'all';
     if (forming === 'all' && glaze === 'all') return true;
-    const classified = classifyProduct(row.desc1, row.desc2);
-    if (forming !== 'all' && classified.forming !== forming) return false;
-    if (glaze !== 'all' && classifyGlaze(row.desc1, row.desc2) !== glaze) return false;
+    const rowForming = row.forming || classifyProduct(row.desc1, row.desc2).forming;
+    const rowGlaze = row.glaze || classifyGlaze(row.desc1, row.desc2);
+    if (forming !== 'all' && rowForming !== forming) return false;
+    if (glaze !== 'all' && rowGlaze !== glaze) return false;
     return true;
+}
+
+function mixToneToReasons(tone: string | null | undefined): ReasonsToneKey {
+    const t = String(tone || '').trim().toUpperCase();
+    if (t === 'WHITE') return 'white';
+    if (t === 'BLACK') return 'black';
+    return 'ww';
+}
+
+function mixCpToReasons(cp: string | null | undefined): string {
+    const v = String(cp || '').trim().toUpperCase();
+    if (v === 'FRIT' || v === 'BOM' || v === 'C1') return 'C1';
+    return v;
+}
+
+/** WW Defects rows from Production Mix — same qty as Mix Top 10. */
+export function reasonsRowsFromMixPayload(
+    payload: { reasons?: QtyProcReasonRow[]; mix?: QtyProcMixRow[] },
+    year: number,
+    kind: ReasonsKind,
+): { defects: ReasonsMonthRow[]; prods: ReasonsProdRow[] } {
+    const be = year + BE_OFFSET;
+    const defects: ReasonsMonthRow[] = [];
+    for (const row of payload.reasons || []) {
+        if (row.y !== be || row.kind !== kind) continue;
+        defects.push({
+            rsn: String(row.rsn_desc || '').trim(),
+            mo: Number(row.m) || 0,
+            qty: Number(row.qty) || 0,
+            tone: mixToneToReasons(row.tone),
+            cp: mixCpToReasons(row.cp),
+            group: row.group,
+            groupLabel: row.groupLabel,
+            forming: row.forming,
+            glaze: row.glaze,
+        });
+    }
+    const prods: ReasonsProdRow[] = [];
+    for (const row of payload.mix || []) {
+        if (row.y !== be || String(row.cp) === 'CUSTOM_C') continue;
+        prods.push({
+            mo: Number(row.m) || 0,
+            qtyproc: Number(row.qtyproc) || 0,
+            tone: mixToneToReasons(row.tone),
+            cp: mixCpToReasons(row.cp),
+            group: row.group,
+            groupLabel: row.groupLabel,
+            forming: row.forming,
+            glaze: row.glaze,
+        });
+    }
+    return { defects, prods };
 }
 
 export function parseReasonsSort(raw: string | null | undefined): ReasonsSort {
@@ -671,15 +820,12 @@ export function addDaysIso(isoDate: string, days: number): string {
     return `${next.getUTCFullYear()}-${pad2(next.getUTCMonth() + 1)}-${pad2(next.getUTCDate())}`;
 }
 
-/** Inclusive start, exclusive end. Current year stops at tomorrow so we do not scan empty future months. */
+/** Inclusive start, exclusive end. Full calendar year — same window Mix uses for a selected year. */
 export function yearQueryWindow(year: number, now: Date = bangkokNow()): { start: string; endExcl: string } {
     const start = `${year}-01-01`;
     const yearEndExcl = `${year + 1}-01-01`;
-    const today = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
-    const tomorrow = addDaysIso(today, 1);
-    if (year < now.getFullYear()) return { start, endExcl: yearEndExcl };
     if (year > now.getFullYear()) return { start, endExcl: start };
-    return { start, endExcl: tomorrow < yearEndExcl ? tomorrow : yearEndExcl };
+    return { start, endExcl: yearEndExcl };
 }
 
 export function emptySpark(): number[] {
@@ -865,50 +1011,147 @@ function buildTrend(rsnSpark: number[], kindSpark: number[], prodSpark?: number[
             pct: prodSpark
                 ? (comp > 0 ? (monthQty / comp) * 100 : 0)
                 : (kindQty > 0 ? (monthQty / kindQty) * 100 : 0),
+            qtyproc: prodSpark ? comp : undefined,
             delta: i === 0 ? null : monthQty - rsnSpark[i - 1],
         };
     });
 }
 
-function buildCodeware(
-    rows: ReasonsDetailRow[],
-    prodByCode: Map<string, number>,
-    topN: number,
-    minQtyproc = REASONS_CODEWARE_MIN_QTYPROC,
-    splitTone = false,
-): { codeware: ReasonsCodewareItem[]; other?: ReasonsCodewareItem } {
-    const byKey = new Map<string, { code: string; qty: number; tone?: ReasonsFocusTone; desc1?: string; desc2?: string }>();
-    for (const row of rows) {
-        const qty = Number(row.qty) || 0;
-        if (qty <= 0) continue;
-        const code = String(row.code || '').trim();
-        if (!code) continue;
-        const tone = splitTone ? focusToneOf(row.tone) : undefined;
-        const key = splitTone ? `${tone || '_'}\t${code}` : code;
-        const desc1 = String(row.desc1 || '').trim() || code;
-        const desc2 = String(row.desc2 || '').trim();
-        const slot = byKey.get(key) || { code, qty: 0, tone, desc1, desc2: desc2 || undefined };
-        slot.qty += qty;
-        if (!slot.desc1 && desc1) slot.desc1 = desc1;
-        if (!slot.desc2 && desc2) slot.desc2 = desc2;
-        byKey.set(key, slot);
-    }
-    const ranked = [...byKey.entries()]
-        .map(([key, row]) => {
-            const qtyproc = prodByCode.get(key) || 0;
-            const item: ReasonsCodewareItem = {
-                code: row.code,
-                qty: row.qty,
-                qtyproc,
-                pct: qtyproc > 0 ? (row.qty / qtyproc) * 100 : 0,
+function trendQtyproc(point: ReasonsTrendPoint): number {
+    if (Number(point.qtyproc) > 0) return Number(point.qtyproc);
+    if (point.pct > 0 && point.qty > 0) return point.qty / (point.pct / 100);
+    return 0;
+}
+
+/** p-chart on rate, XmR on monthly qty. Months with no process qty are plotted but not flagged. */
+export function reasonsControlChart(
+    trend: ReasonsTrendPoint[],
+    metric: 'qty' | 'pct',
+): ReasonsControlChart | null {
+    if (metric === 'pct') {
+        const samples = trend.filter((point) => trendQtyproc(point) > 0);
+        if (samples.length < REASONS_CONTROL_MIN_POINTS) return null;
+        const np = samples.reduce((sum, point) => sum + point.qty, 0);
+        const n = samples.reduce((sum, point) => sum + trendQtyproc(point), 0);
+        if (n <= 0) return null;
+        const pbar = np / n;
+        const cl = pbar * 100;
+        const points = trend.map((point) => {
+            const ni = trendQtyproc(point);
+            const value = point.pct;
+            if (ni <= 0) {
+                return {
+                    mo: point.mo,
+                    label: point.label,
+                    value,
+                    cl,
+                    ucl: cl,
+                    lcl: cl,
+                    out: false,
+                    qty: point.qty,
+                    pct: point.pct,
+                    qtyproc: ni,
+                };
+            }
+            const sigma = Math.sqrt(Math.max(0, pbar * (1 - pbar) / ni));
+            const ucl = Math.min(100, (pbar + 3 * sigma) * 100);
+            const lcl = Math.max(0, (pbar - 3 * sigma) * 100);
+            return {
+                mo: point.mo,
+                label: point.label,
+                value,
+                cl,
+                ucl,
+                lcl,
+                out: value > ucl + 1e-9 || value < lcl - 1e-9,
+                qty: point.qty,
+                pct: point.pct,
+                qtyproc: ni,
             };
-            if (row.tone) item.tone = row.tone;
-            if (row.desc1) item.desc1 = row.desc1;
-            if (row.desc2) item.desc2 = row.desc2;
-            return item;
-        })
-        .filter((row) => row.qtyproc >= minQtyproc)
-        .sort((a, b) => b.pct - a.pct || b.qty - a.qty || a.code.localeCompare(b.code, 'th'));
+        });
+        return { kind: 'p', cl, points, outLabels: points.filter((point) => point.out).map((point) => point.label) };
+    }
+
+    const samples = trend.filter((point) => trendQtyproc(point) > 0 || point.qty > 0);
+    if (samples.length < REASONS_CONTROL_MIN_POINTS) return null;
+    const xbar = samples.reduce((sum, point) => sum + point.qty, 0) / samples.length;
+    const ranges: number[] = [];
+    for (let i = 1; i < samples.length; i += 1) {
+        ranges.push(Math.abs(samples[i].qty - samples[i - 1].qty));
+    }
+    if (ranges.length < 2) return null;
+    const mrbar = ranges.reduce((sum, value) => sum + value, 0) / ranges.length;
+    const ucl = xbar + 2.66 * mrbar;
+    const lcl = Math.max(0, xbar - 2.66 * mrbar);
+    const points = trend.map((point) => {
+        const produced = trendQtyproc(point) > 0 || point.qty > 0;
+        return {
+            mo: point.mo,
+            label: point.label,
+            value: point.qty,
+            cl: xbar,
+            ucl,
+            lcl,
+            out: produced && (point.qty > ucl + 1e-9 || point.qty < lcl - 1e-9),
+            qty: point.qty,
+            pct: point.pct,
+            qtyproc: trendQtyproc(point),
+        };
+    });
+    return { kind: 'xmr', cl: xbar, points, outLabels: points.filter((point) => point.out).map((point) => point.label) };
+}
+
+function toParetoItem(item: ReasonsCodewareItem, share: number, cum: number): ReasonsParetoItem {
+    return {
+        code: item.code,
+        name: String(item.desc1 || '').trim() || item.code,
+        qty: item.qty,
+        pct: item.pct,
+        share,
+        cum,
+        tone: item.tone,
+    };
+}
+
+/** Full ranking for Focus Pareto — every codeware, no Other bucket. */
+export function buildReasonsPareto(items: ReasonsCodewareItem[]): ReasonsParetoItem[] {
+    const eligible = items.filter((item) => item.qty > 0 && item.code !== REASONS_PARETO_OTHER);
+    const total = eligible.reduce((sum, item) => sum + item.qty, 0);
+    const sorted = [...eligible].sort((a, b) => b.qty - a.qty || a.code.localeCompare(b.code, 'th'));
+    let cum = 0;
+    return sorted.map((item) => {
+        const share = total > 0 ? (item.qty / total) * 100 : 0;
+        cum += share;
+        return toParetoItem(item, share, cum);
+    });
+}
+
+/** Groups that actually appear on this defect's codeware (for the Pareto filter). */
+export function reasonsParetoGroupOptions(items: ReasonsCodewareItem[]): ReasonsGroupOption[] {
+    const qtyByGroup = new Map<string, number>();
+    for (const item of items) {
+        const key = String(item.group || '').trim();
+        if (!key || QTYPROC_HIDDEN_KEYS.has(key.toLowerCase())) continue;
+        qtyByGroup.set(key, (qtyByGroup.get(key) || 0) + (Number(item.qty) || 0));
+    }
+    return [...qtyByGroup.entries()]
+        .filter(([, qty]) => qty > 0)
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'th'))
+        .map(([value]) => ({ value, label: value }));
+}
+
+export function filterReasonsCodewareGroup(
+    items: ReasonsCodewareItem[],
+    group: string,
+): ReasonsCodewareItem[] {
+    if (!group || group === 'all') return items;
+    return items.filter((item) => item.group === group);
+}
+
+export function sliceReasonsCodeware(
+    ranked: ReasonsCodewareItem[],
+    topN = REASONS_CODEWARE_TOP_N,
+): { codeware: ReasonsCodewareItem[]; other?: ReasonsCodewareItem } {
     const top = ranked.slice(0, topN);
     const rest = ranked.slice(topN);
     const otherQty = rest.reduce((sum, row) => sum + row.qty, 0);
@@ -922,6 +1165,192 @@ function buildCodeware(
         }
         : undefined;
     return { codeware: top, other };
+}
+
+/** Top N by defect rate (same ranking as the codeware list). */
+export function buildReasonsRatePareto(
+    items: ReasonsCodewareItem[],
+    topN = REASONS_CODEWARE_TOP_N,
+): ReasonsParetoItem[] {
+    const eligible = items.filter((item) => item.qty > 0 && item.code !== REASONS_PARETO_OTHER);
+    const sorted = [...eligible].sort((a, b) => b.pct - a.pct || b.qty - a.qty || a.code.localeCompare(b.code, 'th'));
+    const top = sorted.slice(0, topN);
+    const total = top.reduce((sum, item) => sum + item.qty, 0);
+    let cum = 0;
+    return top.map((item) => {
+        const share = total > 0 ? (item.qty / total) * 100 : 0;
+        cum += share;
+        return toParetoItem(item, share, cum);
+    });
+}
+
+function emptyMonths(): number[] {
+    return Array.from({ length: REASONS_SPARK_MONTHS }, () => 0);
+}
+
+function withStratifyPct(series: ReasonsStratifySeries[]): ReasonsStratifySeries[] {
+    const total = series.reduce((sum, item) => sum + item.qty, 0);
+    return series.map((item) => ({
+        ...item,
+        pct: total > 0 ? (item.qty / total) * 100 : 0,
+    }));
+}
+
+function collapseStratify(series: ReasonsStratifySeries[]): ReasonsStratifySeries[] {
+    const sorted = [...series].filter((item) => item.qty > 0).sort((a, b) => b.qty - a.qty || a.label.localeCompare(b.label, 'th'));
+    if (sorted.length <= REASONS_STRATIFY_TOP) return withStratifyPct(sorted);
+    const top = sorted.slice(0, REASONS_STRATIFY_TOP);
+    const rest = sorted.slice(REASONS_STRATIFY_TOP);
+    const other = rest.reduce<ReasonsStratifySeries>((acc, item) => {
+        acc.qty += item.qty;
+        acc.months = acc.months.map((qty, i) => qty + (item.months[i] || 0));
+        return acc;
+    }, {
+        key: REASONS_PARETO_OTHER,
+        label: REASONS_PARETO_OTHER,
+        color: '#71717a',
+        months: emptyMonths(),
+        qty: 0,
+        pct: 0,
+    });
+    return withStratifyPct([...top, other]);
+}
+
+function stratifyBucket(
+    rows: ReasonsDetailRow[],
+    of: (row: ReasonsDetailRow) => { key: string; label: string; color: string } | null,
+    options?: { collapse?: boolean; order?: string[] },
+): ReasonsStratifySeries[] {
+    const map = new Map<string, ReasonsStratifySeries>();
+    for (const row of rows) {
+        const qty = Number(row.qty) || 0;
+        if (qty <= 0) continue;
+        const bucket = of(row);
+        if (!bucket) continue;
+        const slot = map.get(bucket.key) || {
+            key: bucket.key,
+            label: bucket.label,
+            color: bucket.color,
+            months: emptyMonths(),
+            qty: 0,
+            pct: 0,
+        };
+        const idx = monthIndex(Number(row.mo));
+        if (idx != null) slot.months[idx] += qty;
+        slot.qty += qty;
+        map.set(bucket.key, slot);
+    }
+    const values = [...map.values()].filter((item) => item.qty > 0);
+    if (options?.collapse === false) {
+        if (options.order) {
+            const rank = new Map(options.order.map((key, index) => [key, index]));
+            values.sort((a, b) => (rank.get(a.key) ?? 99) - (rank.get(b.key) ?? 99) || b.qty - a.qty);
+        } else {
+            values.sort((a, b) => b.qty - a.qty || a.label.localeCompare(b.label, 'th'));
+        }
+        return withStratifyPct(values);
+    }
+    return collapseStratify(values);
+}
+
+export function buildReasonsStratify(rows: ReasonsDetailRow[]): ReasonsStratify {
+    return {
+        group: stratifyBucket(rows, (row) => {
+            const raw = String(row.group || '').trim();
+            if (QTYPROC_HIDDEN_KEYS.has(raw.toLowerCase())) return null;
+            const label = qtyProcMajorGroup(row.groupLabel || raw) || 'Other';
+            if (!label || label === 'Other' && !raw) {
+                return { key: 'other', label: 'Other', color: '#71717a' };
+            }
+            return { key: label, label, color: qtyProcGroupColor(raw) };
+        }),
+        forming: stratifyBucket(rows, (row) => {
+            const forming = classifyProduct(row.desc1, row.desc2).forming;
+            if (!forming || QTYPROC_HIDDEN_KEYS.has(forming.toLowerCase())) {
+                return { key: 'Unknown', label: 'Unknown', color: FORM_COLOR.Unknown || '#71717a' };
+            }
+            return { key: forming, label: forming, color: FORM_COLOR[forming] || '#71717a' };
+        }),
+        size: stratifyBucket(rows, (row) => {
+            const size = qtyProcResolveSize(row.groupLabel, row.desc1, row.desc2);
+            if (!size) return null;
+            return { key: size, label: size, color: QTYPROC_SIZE_COLOR[size] || '#71717a' };
+        }, { collapse: false, order: [...QTYPROC_SIZES] }),
+    };
+}
+
+function codewareMajorGroup(row: ReasonsDetailRow): string {
+    const raw = String(row.group || '').trim();
+    const label = qtyProcMajorGroup(row.groupLabel || raw);
+    if (!label || label === 'Other') {
+        if (raw && !QTYPROC_HIDDEN_KEYS.has(raw.toLowerCase())) return raw;
+        return '';
+    }
+    return label;
+}
+
+function pickMajorGroup(groupQty: Map<string, number>): string | undefined {
+    let best = '';
+    let bestQty = 0;
+    for (const [group, qty] of groupQty) {
+        if (!group || qty < bestQty) continue;
+        if (qty > bestQty || group.localeCompare(best, 'th') < 0) {
+            best = group;
+            bestQty = qty;
+        }
+    }
+    return best || undefined;
+}
+
+function collectCodeware(
+    rows: ReasonsDetailRow[],
+    prodByCode: Map<string, number>,
+    minQtyproc: number,
+    splitTone = false,
+): ReasonsCodewareItem[] {
+    const byKey = new Map<string, {
+        code: string;
+        qty: number;
+        tone?: ReasonsFocusTone;
+        desc1?: string;
+        desc2?: string;
+        groupQty: Map<string, number>;
+    }>();
+    for (const row of rows) {
+        const qty = Number(row.qty) || 0;
+        if (qty <= 0) continue;
+        const code = String(row.code || '').trim();
+        if (!code) continue;
+        const tone = splitTone ? focusToneOf(row.tone) : undefined;
+        const key = splitTone ? `${tone || '_'}\t${code}` : code;
+        const desc1 = String(row.desc1 || '').trim() || code;
+        const desc2 = String(row.desc2 || '').trim();
+        const slot = byKey.get(key) || { code, qty: 0, tone, desc1, desc2: desc2 || undefined, groupQty: new Map() };
+        slot.qty += qty;
+        if (!slot.desc1 && desc1) slot.desc1 = desc1;
+        if (!slot.desc2 && desc2) slot.desc2 = desc2;
+        const group = codewareMajorGroup(row);
+        if (group) slot.groupQty.set(group, (slot.groupQty.get(group) || 0) + qty);
+        byKey.set(key, slot);
+    }
+    return [...byKey.entries()]
+        .map(([key, row]) => {
+            const qtyproc = prodByCode.get(key) || 0;
+            const item: ReasonsCodewareItem = {
+                code: row.code,
+                qty: row.qty,
+                qtyproc,
+                pct: qtyproc > 0 ? (row.qty / qtyproc) * 100 : 0,
+            };
+            if (row.tone) item.tone = row.tone;
+            if (row.desc1) item.desc1 = row.desc1;
+            if (row.desc2) item.desc2 = row.desc2;
+            const group = pickMajorGroup(row.groupQty);
+            if (group) item.group = group;
+            return item;
+        })
+        .filter((row) => row.qtyproc >= minQtyproc)
+        .sort((a, b) => b.pct - a.pct || b.qty - a.qty || a.code.localeCompare(b.code, 'th'));
 }
 
 function trendHasQty(trend: ReasonsTrendPoint[]): boolean {
@@ -985,6 +1414,9 @@ type SliceBuild = {
     trend: ReasonsTrendPoint[];
     codeware: ReasonsCodewareItem[];
     other?: ReasonsCodewareItem;
+    pareto: ReasonsParetoItem[];
+    paretoCodeware: ReasonsCodewareItem[];
+    stratify: ReasonsStratify;
 };
 
 function buildSlice(
@@ -1016,22 +1448,14 @@ function buildSlice(
     const slicedCodes = codeRows.filter((row) => matchesReasonsMix(row, mix));
     const splitTone = params.tone === 'all';
     const minQtyproc = mixIsNarrow(mix) ? 0 : REASONS_CODEWARE_MIN_QTYPROC;
-    let { codeware, other } = buildCodeware(
-        slicedCodes,
-        prodProcByCode(slicedProds, splitTone),
-        options?.topN ?? REASONS_CODEWARE_TOP_N,
-        minQtyproc,
-        splitTone,
-    );
-    if (codeware.length === 0 && !other && slicedCodes.some((row) => (Number(row.qty) || 0) > 0)) {
-        ({ codeware, other } = buildCodeware(
-            slicedCodes,
-            prodProcByCode(slicedProds, splitTone),
-            options?.topN ?? REASONS_CODEWARE_TOP_N,
-            0,
-            splitTone,
-        ));
+    const prodByCode = prodProcByCode(slicedProds, splitTone);
+    let pool = collectCodeware(slicedCodes, prodByCode, minQtyproc, splitTone);
+    if (pool.length === 0 && slicedCodes.some((row) => (Number(row.qty) || 0) > 0)) {
+        pool = collectCodeware(slicedCodes, prodByCode, 0, splitTone);
     }
+    const { codeware, other } = sliceReasonsCodeware(pool, options?.topN ?? REASONS_CODEWARE_TOP_N);
+    const pareto = buildReasonsRatePareto(pool);
+    const stratify = buildReasonsStratify(slicedCodes);
 
     return {
         meta: {
@@ -1053,6 +1477,9 @@ function buildSlice(
         trend,
         codeware,
         other,
+        pareto,
+        paretoCodeware: pool,
+        stratify,
     };
 }
 
@@ -1139,6 +1566,9 @@ export function buildReasonsDetail(
             meta: { ...mixed.meta, family: 'all', tone: params.tone === 'all' ? 'all' : activeTone },
             trend: mixed.trend,
             codeware: mixed.codeware,
+            pareto: mixed.pareto,
+            paretoCodeware: mixed.paretoCodeware,
+            stratify: mixed.stratify,
             series,
             activeTone,
         };
@@ -1164,6 +1594,9 @@ export function buildReasonsDetail(
         meta: slice.meta,
         trend: slice.trend,
         codeware: slice.codeware,
+        pareto: slice.pareto,
+        paretoCodeware: slice.paretoCodeware,
+        stratify: slice.stratify,
     };
     if (slice.other) payload.other = slice.other;
     const familyShare = buildFamilyShare(
@@ -1302,7 +1735,7 @@ function rankedFromRows(
                 toneOrigin,
             };
         })
-        .sort((a, b) => b.pct - a.pct || b.qty - a.qty || a.rsn.localeCompare(b.rsn, 'th'));
+        .sort((a, b) => b.qty - a.qty || b.pct - a.pct || a.rsn.localeCompare(b.rsn, 'th'));
     return { items, qty, qtyproc, spark, reasonCount: items.length };
 }
 

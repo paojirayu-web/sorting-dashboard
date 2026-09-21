@@ -22,6 +22,7 @@ import { themes, type Theme, type ThemeName } from '@/lib/themes';
 import {
     REASONS_CP_OPTIONS,
     REASONS_DEFAULT_CP,
+    REASONS_DEFAULT_FAMILY,
     REASONS_FAMILY_OPTIONS,
     REASONS_FORMING_OPTIONS,
     REASONS_GLAZE_OPTIONS,
@@ -519,7 +520,7 @@ export function ReasonsPage() {
     const applyFamily = useCallback((next: ReasonsFamily) => {
         const kept = nextToneForFamily(next, tone);
         replaceQuery({
-            family: next === 'all' ? null : next,
+            family: next === REASONS_DEFAULT_FAMILY ? null : next,
             tone: kept === 'all' ? null : kept,
         });
     }, [replaceQuery, tone]);
@@ -697,7 +698,7 @@ export function ReasonsPage() {
                                         kind: next === 'scrap' ? null : next,
                                         ...(isFocus && next === 'reject' ? { rsn: null } : {}),
                                     })}
-                                    onYear={(next) => replaceQuery({ year: next === 'all' ? null : next })}
+                                    onYear={(next) => replaceQuery({ year: next })}
                                     onCp={(next) => replaceQuery({
                                         cp: next === REASONS_DEFAULT_CP ? null : next,
                                     })}
@@ -767,7 +768,7 @@ export function ReasonsPage() {
                                     kind: next === 'scrap' ? null : next,
                                     ...(isFocus && next === 'reject' ? { rsn: null } : {}),
                                 })}
-                                onYear={(next) => replaceQuery({ year: next === 'all' ? null : next })}
+                                onYear={(next) => replaceQuery({ year: next })}
                                 onCp={(next) => replaceQuery({
                                     cp: next === REASONS_DEFAULT_CP ? null : next,
                                 })}
@@ -791,7 +792,7 @@ export function ReasonsPage() {
                         error={detailError}
                         payload={detail}
                         yearOptions={yearOptions}
-                        onYear={(next) => replaceQuery({ year: next === 'all' ? null : next })}
+                        onYear={(next) => replaceQuery({ year: next })}
                         onRetry={() => setDetailRetry((n) => n + 1)}
                         onKindChange={(next) => replaceQuery({
                             kind: next === 'scrap' ? null : next,

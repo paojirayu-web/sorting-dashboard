@@ -69,6 +69,171 @@ export function SettingsView({ theme, currentTheme, setCurrentTheme }: SettingsV
                     theme={theme}
                 >
                 <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.113 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-20</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Defects / Mix:</strong> WW Defects reads the same Mix payload, so Top 10 qty matches. Defects defaults to WW, ranks by qty, and Mix Top 10 for a selected year is the year total. Unclassified groups stay hidden. No database objects were changed.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.112 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-20</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Defects:</strong> The C filter includes C1 (first fire). C1 remains available as its own filter. No database objects were changed.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.111 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-20</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Defects:</strong> CP default is C again. The C+C1 option is removed; C and C1 stay as separate filters. No database objects were changed.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.110 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-20</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Defects:</strong> Drops Unclassified / unknown groups from Overview, Focus, and Pareto, same as Mix. No database objects were changed.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.109 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-20</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Fixed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Defects:</strong> C1 now uses the same Mix rule (somboon + CP C, plus CS / C(FRIT&BOM)). Selecting C1 no longer returns an empty page. No database objects were changed.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.108 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-20</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Defects:</strong> Default CP is C+C1 (first fire, same as Mix FF). C and C1 remain available as separate filters. No database objects were changed.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.107 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-20</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Defects / Mix:</strong> Year defaults to 2026 (Mix 2569). Choosing All on Defects now stays in the URL as <code className={`${theme.inputBg} px-1 rounded`}>year=all</code>. No database objects were changed.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.106 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-20</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Defects Focus:</strong> Pareto is Rate top 10 only. A Pareto-only Group filter lists groups that actually have codeware on this defect. No database objects were changed.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.105 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-20</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Defects Focus:</strong> Pareto can switch Qty (all codeware + 80% line) or Rate (top 10). Size stacks infer S/M/L/XL from the ware code letter when the group has no size, e.g. <code className={`${theme.inputBg} px-1 rounded`}>W/W JMSC76/T0040</code> → S. No database objects were changed.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.104 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-20</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Defects Focus:</strong> Dropped the Stratification caption. Pareto ticks drop the <code className={`${theme.inputBg} px-1 rounded`}>W/W</code> prefix and sit at a diagonal. All trend is Qty or Rate again, not both on one chart. No database objects were changed.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.103 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-20</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Defects Focus:</strong> Restored the monthly qty + rate trend (no control chart, no Qty/Rate toggle). Size stacks omit unlabeled groups. Bar-chart tooltips hide empty series and sort high to low. No database objects were changed.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.102 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-20</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Defects Focus:</strong> Pareto lists every codeware with names on the axis (no Other bucket). Control chart stays on the Control pill even when Year/tone is All. Group / Forming / Size stacks show qty and %. No database objects were changed.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.101 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-20</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Added</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Defects Focus:</strong> 7QC on the existing Focus payload — <strong>control chart</strong> (XmR on qty, p-chart on rate), <strong>Pareto of codeware</strong> (qty + 80% line), and <strong>stratification</strong> stacked by Group / Forming. No database objects were changed.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.100 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-20</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Production Mix:</strong> Serves charts as soon as WW jobs are ready, then fills Top 10 scrap/reject in the background. Cache hits return immediately from disk. No database objects were changed.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.99 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-20</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Changed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Production Mix:</strong> Reads WW jobs and reasons from <strong>Db_Sorting</strong> directly (<code className={`${theme.inputBg} px-1 rounded`}>v_rpt_sort</code>), same path as Reasons. Linked <code className={`${theme.inputBg} px-1 rounded`}>kilndb.v_rpt_sort_1</code> is only a fallback. No database objects were changed.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
                     <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.98 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-19</span></h3>
                     <div className="space-y-4">
                         <div>

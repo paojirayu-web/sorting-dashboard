@@ -58,7 +58,7 @@ export async function querySortSources<T extends Record<string, unknown>>(
         bind?: SortQueryBind;
         required?: boolean;
         category?: string;
-        /** Reasons page only: query Db_Sorting directly instead of kilndb linked view. */
+        /** Query Db_Sorting directly instead of kilndb linked view. */
         kilnDirect?: boolean;
     },
 ): Promise<{ recordset: T[] }> {

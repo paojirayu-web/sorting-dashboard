@@ -2,6 +2,111 @@
 
 All notable changes to the **Sorting Dashboard** project will be documented in this file.
 
+## [1.6.113] - 2026-09-20
+
+### Changed
+- **Defects / Mix:** WW Defects reads the same Mix payload, so Top 10 qty matches. Defects defaults to WW, ranks by qty, and Mix Top 10 for a selected year is the year total. Unclassified groups stay hidden. No database objects were changed.
+
+---
+
+## [1.6.112] - 2026-09-20
+
+### Changed
+- **Defects:** The C filter includes C1 (first fire). C1 remains available as its own filter. No database objects were changed.
+
+---
+
+## [1.6.111] - 2026-09-20
+
+### Changed
+- **Defects:** CP default is C again. The C+C1 option is removed; C and C1 stay as separate filters. No database objects were changed.
+
+---
+
+## [1.6.110] - 2026-09-20
+
+### Changed
+- **Defects:** Drops Unclassified / unknown groups from Overview, Focus, and Pareto, same as Mix. No database objects were changed.
+
+---
+
+## [1.6.109] - 2026-09-20
+
+### Fixed
+- **Defects:** C1 now uses the same Mix rule (somboon + CP C, plus CS / C(FRIT&BOM)). Selecting C1 no longer returns an empty page. No database objects were changed.
+
+---
+
+## [1.6.108] - 2026-09-20
+
+### Changed
+- **Defects:** Default CP is C+C1 (first fire, same as Mix FF). C and C1 remain available as separate filters. No database objects were changed.
+
+---
+
+## [1.6.107] - 2026-09-20
+
+### Changed
+- **Defects / Mix:** Year defaults to 2026 (Mix 2569). Choosing All on Defects now stays in the URL as `year=all`. No database objects were changed.
+
+---
+
+## [1.6.106] - 2026-09-20
+
+### Changed
+- **Defects Focus:** Pareto is Rate top 10 only. A Pareto-only Group filter lists groups that actually have codeware on this defect. No database objects were changed.
+
+---
+
+## [1.6.105] - 2026-09-20
+
+### Changed
+- **Defects Focus:** Pareto can switch Qty (all codeware + 80% line) or Rate (top 10). Size stacks infer S/M/L/XL from the ware code letter when the group has no size, e.g. `W/W JMSC76/T0040` → S. No database objects were changed.
+
+---
+
+## [1.6.104] - 2026-09-20
+
+### Changed
+- **Defects Focus:** Dropped the Stratification caption. Pareto ticks drop the `W/W ` prefix and sit at a diagonal. All trend is Qty or Rate again, not both on one chart. No database objects were changed.
+
+---
+
+## [1.6.103] - 2026-09-20
+
+### Changed
+- **Defects Focus:** Restored the monthly qty + rate trend (no control chart, no Qty/Rate toggle). Size stacks omit unlabeled groups. Bar-chart tooltips hide empty series and sort high to low. No database objects were changed.
+
+---
+
+## [1.6.102] - 2026-09-20
+
+### Changed
+- **Defects Focus:** Pareto lists every codeware with names on the axis (no Other bucket). Control chart stays on the Control pill even when Year/tone is All. Group / Forming / Size stacks show qty and %. No database objects were changed.
+
+---
+
+## [1.6.101] - 2026-09-20
+
+### Added
+- **Defects Focus:** 7QC on the existing Focus payload — **control chart** (XmR on qty, p-chart on rate), **Pareto of codeware** (qty + 80% line), and **stratification** stacked by Group / Forming. No database objects were changed.
+
+---
+
+## [1.6.100] - 2026-09-20
+
+### Changed
+- **Production Mix:** Serves charts as soon as WW jobs are ready, then fills Top 10 scrap/reject in the background. Cache hits return immediately from disk. No database objects were changed.
+
+---
+
+## [1.6.99] - 2026-09-20
+
+### Changed
+- **Production Mix:** Reads WW jobs and reasons from **Db_Sorting** directly (`v_rpt_sort`), same path as Reasons. Linked `kilndb.v_rpt_sort_1` is only a fallback. No database objects were changed.
+
+---
+
 ## [1.6.98] - 2026-09-19
 
 ### Added

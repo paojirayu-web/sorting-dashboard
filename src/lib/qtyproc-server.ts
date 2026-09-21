@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'fs/promises';
+import { mkdir, readFile, rename, writeFile } from 'fs/promises';
 import path from 'path';
 import { C1_SPECIAL_REASON_SQL } from '@/lib/c1-special-reason';
 import { getAppDataDir } from '@/lib/daily-report-automation-settings';
@@ -28,9 +28,10 @@ type CacheEntry = { at: number; key?: string; payload: QtyProcPayload };
 
 const memCache = new Map<string, CacheEntry>();
 const FRESH_MS = 30 * 60 * 1000;
-const CACHE_KEY = 'WW|ALL|v21';
+const CACHE_KEY = 'WW|ALL|v22';
 
 let rebuildInflight: Promise<CacheEntry> | null = null;
+let rebuildMixReady: Promise<CacheEntry> | null = null;
 
 function cacheFilePath() {
     return path.join(getAppDataDir(), 'data', 'qtyproc-cache.json');
@@ -84,9 +85,24 @@ function payloadHasMixGroup(payload: QtyProcPayload): boolean {
 }
 
 function payloadHasReasons(payload: QtyProcPayload): boolean {
+    if (payload.reasonsPending) return false;
     const rows = payload.reasons;
     return Array.isArray(rows) && (rows.length === 0 || typeof rows[0]?.m === 'number');
 }
+
+function payloadHasMix(payload: QtyProcPayload): boolean {
+    return payloadHasMixTone(payload)
+        && payloadHasMixCustomer(payload)
+        && payloadHasMixGlaze(payload)
+        && payloadHasMixGroup(payload)
+        && payloadHasCustomC(payload);
+}
+
+function payloadIsComplete(payload: QtyProcPayload): boolean {
+    return payloadHasMix(payload) && payloadHasReasons(payload);
+}
+
+const kilnOpts = { sources: ['kilndb'] as SortSourceId[], required: true, category: 'WW', kilnDirect: true };
 
 function jobsSql(start: string, endExcl: string) {
     return `
@@ -235,27 +251,31 @@ function mapReasonRows(recordset: Record<string, unknown>[]): QtyProcReasonJobRo
     }));
 }
 
-async function queryKiln(): Promise<QtyProcPayload> {
-    const t0 = Date.now();
-    const yearQueries = QTYPROC_CE_YEARS.map((ce) => {
-        const start = `${ce}-01-01`;
-        const endExcl = `${ce + 1}-01-01`;
-        const opts = { sources: ['kilndb'] as SortSourceId[], required: true, category: 'WW' };
-        return Promise.all([
-            querySortSources<Record<string, unknown>>(jobsSql(start, endExcl), opts),
-            querySortSources<Record<string, unknown>>(reasonsSql(start, endExcl), opts),
-        ]);
-    });
-    const [yearParts, groupByPart] = await Promise.all([
-        Promise.all(yearQueries),
-        loadGlazePtGroupMap().catch((err) => {
-            const message = err instanceof Error ? err.message : String(err);
-            console.warn(`[qtyproc] Db_glaze pt_group lookup failed: ${message}`);
-            return new Map();
+async function queryYearRows(sqlText: (start: string, endExcl: string) => string) {
+    const parts = await Promise.all(
+        QTYPROC_CE_YEARS.map((ce) => {
+            const start = `${ce}-01-01`;
+            const endExcl = `${ce + 1}-01-01`;
+            return querySortSources<Record<string, unknown>>(sqlText(start, endExcl), kilnOpts);
         }),
-    ]);
-    const jobRows = mapJobRows(yearParts.flatMap(([jobs]) => jobs.recordset));
-    const reasonRows = mapReasonRows(yearParts.flatMap(([, reasons]) => reasons.recordset));
+    );
+    return parts.flatMap((part) => part.recordset);
+}
+
+async function loadGroups() {
+    return loadGlazePtGroupMap().catch((err) => {
+        const message = err instanceof Error ? err.message : String(err);
+        console.warn(`[qtyproc] Db_glaze pt_group lookup failed: ${message}`);
+        return new Map();
+    });
+}
+
+function buildPayload(
+    jobRows: QtyProcJobRow[],
+    reasonRows: QtyProcReasonJobRow[],
+    groupByPart: Map<string, { code: string; name: string }>,
+    reasonsPending: boolean,
+): QtyProcPayload {
     const payload = buildQtyProcPayload(
         jobRows,
         {
@@ -266,48 +286,113 @@ async function queryKiln(): Promise<QtyProcPayload> {
         reasonRows,
         groupByPart,
     );
-    const y2567 = payload.byYear['2567'];
-    console.info(
-        `[qtyproc] ${Date.now() - t0}ms category=WW rows=${jobRows.length} reasons=${reasonRows.length} ` +
-        `comp=${y2567?.qtycomp || 0} scrap=${y2567?.qtyscrp || 0} reject=${y2567?.qtyrjct || 0} frit=${y2567?.frit || 0} bom=${y2567?.bom || 0} ` +
-        `p1=${y2567?.p1 || 0} p2=${y2567?.p2 || 0} p3=${y2567?.p3 || 0} p4=${y2567?.p4 || 0} p5=${y2567?.p5 || 0}`,
-    );
+    if (reasonsPending) payload.reasonsPending = true;
+    else delete payload.reasonsPending;
     return payload;
 }
 
+function logQtyProc(payload: QtyProcPayload, jobRows: QtyProcJobRow[], reasonRows: QtyProcReasonJobRow[], t0: number, phase: string) {
+    const y2567 = payload.byYear['2567'];
+    console.info(
+        `[qtyproc] ${phase} ${Date.now() - t0}ms category=WW rows=${jobRows.length} reasons=${reasonRows.length} ` +
+        `comp=${y2567?.qtycomp || 0} scrap=${y2567?.qtyscrp || 0} reject=${y2567?.qtyrjct || 0} frit=${y2567?.frit || 0} bom=${y2567?.bom || 0} ` +
+        `p1=${y2567?.p1 || 0} p2=${y2567?.p2 || 0} p3=${y2567?.p3 || 0} p4=${y2567?.p4 || 0} p5=${y2567?.p5 || 0}`,
+    );
+}
+
 async function readDiskCache(): Promise<CacheEntry | null> {
+    const started = Date.now();
     try {
         const parsed = JSON.parse(await readFile(cacheFilePath(), 'utf8')) as CacheEntry;
-        if (parsed?.at && parsed?.payload?.byYear && parsed.key === CACHE_KEY) return parsed;
-    } catch {
-        /* no disk cache */
+        if (parsed?.at && parsed?.payload?.byYear && parsed.key === CACHE_KEY) {
+            console.info(
+                `[qtyproc] disk-hit ${Date.now() - started}ms age=${Date.now() - parsed.at}ms ` +
+                `mix=${parsed.payload.mix?.length || 0} reasons=${parsed.payload.reasons?.length || 0}`,
+            );
+            return parsed;
+        }
+        console.warn(`[qtyproc] disk cache ignored key=${String(parsed?.key)}`);
+    } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (!message.includes('ENOENT')) console.warn(`[qtyproc] disk cache read failed: ${message}`);
     }
     return null;
 }
 
 function writeDiskCache(entry: CacheEntry) {
-    mkdir(path.dirname(cacheFilePath()), { recursive: true })
-        .then(() => writeFile(cacheFilePath(), JSON.stringify(entry), 'utf8'))
+    if (entry.payload.reasonsPending) return;
+    const file = cacheFilePath();
+    const tmp = `${file}.${process.pid}.tmp`;
+    mkdir(path.dirname(file), { recursive: true })
+        .then(() => writeFile(tmp, JSON.stringify(entry), 'utf8'))
+        .then(() => rename(tmp, file))
         .catch(() => { /* ignore cache write errors */ });
 }
 
-function remember(entry: CacheEntry) {
+function rememberMem(entry: CacheEntry) {
     memCache.set(CACHE_KEY, entry);
+}
+
+function remember(entry: CacheEntry) {
+    rememberMem(entry);
     writeDiskCache(entry);
 }
 
 function rebuildCache(): Promise<CacheEntry> {
     if (rebuildInflight) return rebuildInflight;
-    rebuildInflight = queryKiln()
-        .then((payload) => {
-            const entry = { at: Date.now(), key: CACHE_KEY, payload };
-            remember(entry);
-            return entry;
-        })
-        .finally(() => {
-            rebuildInflight = null;
-        });
+    let resolveMix: (entry: CacheEntry) => void = () => {};
+    let rejectMix: (err: unknown) => void = () => {};
+    rebuildMixReady = new Promise<CacheEntry>((resolve, reject) => {
+        resolveMix = resolve;
+        rejectMix = reject;
+    });
+    rebuildInflight = (async () => {
+        const t0 = Date.now();
+        const groupPromise = loadGroups();
+        try {
+            const jobRows = mapJobRows(await queryYearRows(jobsSql));
+            const groupByPart = await groupPromise;
+            const previous = memCache.get(CACHE_KEY)?.payload;
+            const mixPayload = buildPayload(jobRows, [], groupByPart, true);
+            if (previous?.reasons?.length && !previous.reasonsPending) {
+                mixPayload.reasons = previous.reasons;
+            }
+            const mixEntry: CacheEntry = {
+                at: Date.now(),
+                key: CACHE_KEY,
+                payload: mixPayload,
+            };
+            rememberMem(mixEntry);
+            resolveMix(mixEntry);
+            logQtyProc(mixEntry.payload, jobRows, [], t0, 'mix-ready');
+            try {
+                const reasonRows = mapReasonRows(await queryYearRows(reasonsSql));
+                const payload = buildPayload(jobRows, reasonRows, groupByPart, false);
+                logQtyProc(payload, jobRows, reasonRows, t0, 'complete');
+                const entry = { at: Date.now(), key: CACHE_KEY, payload };
+                remember(entry);
+                return entry;
+            } catch (err) {
+                console.error('[qtyproc] reasons failed, serving mix only:', err);
+                return mixEntry;
+            }
+        } catch (err) {
+            rejectMix(err);
+            throw err;
+        }
+    })().finally(() => {
+        rebuildInflight = null;
+        rebuildMixReady = null;
+    });
     return rebuildInflight;
+}
+
+async function waitForMix(): Promise<CacheEntry> {
+    const running = rebuildCache();
+    if (rebuildMixReady) return rebuildMixReady;
+    const mem = memCache.get(CACHE_KEY);
+    if (mem && payloadHasMix(mem.payload)) return mem;
+    return running;
 }
 
 function withMeta(entry: CacheEntry, fromCache: boolean): QtyProcApiPayload {
@@ -321,23 +406,23 @@ function withMeta(entry: CacheEntry, fromCache: boolean): QtyProcApiPayload {
 
 export async function getQtyProcResponse(forceRefresh = false): Promise<QtyProcApiPayload> {
     if (forceRefresh) {
-        return withMeta(await rebuildCache(), false);
+        return withMeta(await waitForMix(), false);
     }
 
     const mem = memCache.get(CACHE_KEY);
-    if (mem && payloadHasMixTone(mem.payload) && payloadHasMixCustomer(mem.payload) && payloadHasMixGlaze(mem.payload) && payloadHasMixGroup(mem.payload) && payloadHasCustomC(mem.payload) && payloadHasReasons(mem.payload)) {
-        if (Date.now() - mem.at > FRESH_MS) void rebuildCache();
+    if (mem && payloadHasMix(mem.payload)) {
+        if (!payloadIsComplete(mem.payload) || Date.now() - mem.at > FRESH_MS) void rebuildCache();
         return withMeta(mem, true);
     }
 
     const disk = await readDiskCache();
-    if (disk && payloadHasMixTone(disk.payload) && payloadHasMixCustomer(disk.payload) && payloadHasMixGlaze(disk.payload) && payloadHasMixGroup(disk.payload) && payloadHasCustomC(disk.payload) && payloadHasReasons(disk.payload)) {
-        remember(disk);
-        if (Date.now() - disk.at > FRESH_MS) void rebuildCache();
+    if (disk && payloadHasMix(disk.payload)) {
+        rememberMem(disk);
+        if (!payloadIsComplete(disk.payload) || Date.now() - disk.at > FRESH_MS) void rebuildCache();
         return withMeta(disk, true);
     }
 
-    return withMeta(await rebuildCache(), false);
+    return withMeta(await waitForMix(), false);
 }
 
 export function warmQtyProcCache() {

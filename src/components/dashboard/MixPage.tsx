@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MixHeader } from '@/components/dashboard/Header';
 import { QtyProcessView } from '@/components/dashboard/views/QtyProcessView';
 import { themes, type ThemeName } from '@/lib/themes';
@@ -11,6 +11,7 @@ import {
     qtyProcPruneGroups,
     qtyProcRowMatches,
     pRoundOf,
+    QTYPROC_DEFAULT_YEAR,
     type QtyProcCpFilter,
     type QtyProcLineFilter,
     type QtyProcPayload,
@@ -34,7 +35,7 @@ export function MixPage() {
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [year, setYear] = useState<QtyProcYearFilter>('all');
+    const [year, setYear] = useState<QtyProcYearFilter>(QTYPROC_DEFAULT_YEAR);
     const [line, setLine] = useState<QtyProcLineFilter>('all');
     const [cp, setCp] = useState<QtyProcCpFilter>('all');
     const [scope, setScope] = useState<QtyProcScope>('ff');
@@ -72,6 +73,8 @@ export function MixPage() {
         if (forming !== 'all' && !formingKeys.includes(forming)) setForming('all');
     }, [forming, formingKeys]);
 
+    const reasonsPollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
     const fetchQtyProc = useCallback(async (forceRefresh = false, silent = false) => {
         if (!silent) setLoading(true);
         setError(null);
@@ -89,6 +92,11 @@ export function MixPage() {
             setPayload(result as QtyProcPayload);
             if (!forceRefresh && result?.stale) {
                 void fetchQtyProc(true, true);
+            } else if (result?.reasonsPending) {
+                if (reasonsPollRef.current) clearTimeout(reasonsPollRef.current);
+                reasonsPollRef.current = setTimeout(() => {
+                    void fetchQtyProc(false, true);
+                }, 2500);
             }
         } catch (err) {
             if (!silent) {
@@ -102,6 +110,9 @@ export function MixPage() {
 
     useEffect(() => {
         void fetchQtyProc(false);
+        return () => {
+            if (reasonsPollRef.current) clearTimeout(reasonsPollRef.current);
+        };
     }, [fetchQtyProc]);
 
     const handleRefresh = useCallback(async () => {

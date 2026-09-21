@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import {
     Area,
+    Bar,
+    BarChart,
     CartesianGrid,
     Cell,
     ComposedChart,
@@ -21,15 +23,22 @@ import { RefreshCw } from 'lucide-react';
 import type { Theme, ThemeName } from '@/lib/themes';
 import {
     REASONS_CODEWARE_MIN_QTYPROC,
+    REASONS_CODEWARE_TOP_N,
     REASONS_TONE_COLOR,
     REASONS_TONE_LABEL,
     formatReasonsYearLabel,
+    buildReasonsRatePareto,
+    filterReasonsCodewareGroup,
+    reasonsParetoGroupOptions,
+    sliceReasonsCodeware,
     type ReasonsDetailResponse,
     type ReasonsFamily,
     type ReasonsFamilyShareItem,
     type ReasonsFocusTone,
     type ReasonsKind,
     type ReasonsNamedTrend,
+    type ReasonsParetoItem,
+    type ReasonsStratifySeries,
     type ReasonsToneParam,
     type ReasonsTrendPoint,
     type ReasonsYearParam,
@@ -191,43 +200,76 @@ function CodewareSkeleton({ theme }: { theme: Theme }) {
     );
 }
 
+function ChartTip({
+    currentTheme,
+    label,
+    rows,
+}: {
+    currentTheme: ThemeName;
+    label?: string;
+    rows: { name: string; value: string; color?: string }[];
+}) {
+    if (!rows.length) return null;
+    const bg = currentTheme === 'dark' ? '#141414' : '#ffffff';
+    const border = currentTheme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+    return (
+        <div className="rounded-xl px-3 py-2 text-xs shadow-lg" style={{ background: bg, border: `1px solid ${border}` }}>
+            {label ? <p className="font-bold mb-1">{label}</p> : null}
+            {rows.map((row) => (
+                <p key={row.name} className="tabular-nums flex justify-between gap-4">
+                    <span style={{ color: row.color }}>{row.name}</span>
+                    <span>{row.value}</span>
+                </p>
+            ))}
+        </div>
+    );
+}
+
 function TrendTooltip({
     active,
     payload,
     currentTheme,
 }: {
     active?: boolean;
-    payload?: { payload?: ReasonsTrendPoint; name?: string; value?: number; color?: string; dataKey?: string }[];
+    payload?: { payload?: ReasonsTrendPoint & Record<string, string | number>; name?: string; value?: number; color?: string; dataKey?: string }[];
     currentTheme: ThemeName;
 }) {
     if (!active || !payload?.length) return null;
     const row = payload[0].payload;
-    const bg = currentTheme === 'dark' ? '#141414' : '#ffffff';
-    const border = currentTheme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
-    const muted = currentTheme === 'dark' ? '#9ca3af' : '#6b7280';
-    const dataKey = String(payload[0]?.dataKey || '');
-    const isSingle = dataKey === 'qty' || dataKey === 'pct';
-    return (
-        <div className="rounded-xl px-3 py-2 text-xs shadow-lg" style={{ background: bg, border: `1px solid ${border}` }}>
-            <p className="font-bold mb-1">{row?.label}</p>
-            {!isSingle ? payload.map((entry) => {
-                const key = String(entry.dataKey || '');
-                const asPct = key === 'pct' || key.endsWith('_pct') || (!key.endsWith('_qty') && key !== 'qty');
-                return (
-                    <p key={key} className="tabular-nums flex justify-between gap-4">
-                        <span style={{ color: entry.color }}>{entry.name}</span>
-                        <span>{asPct ? fmtPct(Number(entry.value) || 0) : fmtQty(Number(entry.value) || 0)}</span>
-                    </p>
-                );
-            }) : row ? (
-                <>
-                    <p>Qty {fmtQty(row.qty)}</p>
-                    <p>% {fmtPct(row.pct)}</p>
-                    <p style={{ color: muted }}>Δ {fmtDelta(row.delta)}</p>
-                </>
-            ) : null}
-        </div>
-    );
+    const overlayKeys = [...new Set(
+        payload.map((entry) => String(entry.dataKey || '').replace(/_(qty|pct)$/, '')).filter((key) => key && key !== 'qty' && key !== 'pct'),
+    )];
+    if (overlayKeys.length) {
+        const rows = overlayKeys.map((key) => {
+            const qty = Number(row?.[`${key}_qty`]) || 0;
+            const pct = Number(row?.[`${key}_pct`]) || 0;
+            const entry = payload.find((item) => String(item.dataKey || '').startsWith(`${key}_`));
+            return {
+                name: String(entry?.name || key).replace(/\s+%$/, ''),
+                qty,
+                pct,
+                color: entry?.color,
+            };
+        }).filter((item) => item.qty > 0 || item.pct > 0).sort((a, b) => b.qty - a.qty || b.pct - a.pct);
+        return (
+            <ChartTip
+                currentTheme={currentTheme}
+                label={String(row?.label || '')}
+                rows={rows.map((item) => ({
+                    name: item.name,
+                    value: `${fmtQty(item.qty)} · ${fmtPct(item.pct)}`,
+                    color: item.color,
+                }))}
+            />
+        );
+    }
+    if (!row) return null;
+    const rows = [
+        row.qty > 0 ? { name: 'Qty', value: fmtQty(row.qty) } : null,
+        row.pct > 0 ? { name: 'Rate', value: fmtPct(row.pct) } : null,
+        row.delta != null ? { name: 'Δ', value: fmtDelta(row.delta) } : null,
+    ].filter((item): item is { name: string; value: string } => Boolean(item));
+    return <ChartTip currentTheme={currentTheme} label={row.label} rows={rows} />;
 }
 
 function TrendChart({
@@ -235,64 +277,27 @@ function TrendChart({
     compare,
     accent,
     currentTheme,
-    metric,
     peakMo,
+    metric,
 }: {
     trend: ReasonsTrendPoint[];
     compare?: ReasonsNamedTrend[];
     accent: string;
     currentTheme: ThemeName;
-    metric: 'qty' | 'pct';
     peakMo: number | null;
+    metric: 'qty' | 'pct';
 }) {
     const tick = currentTheme === 'dark' ? '#9ca3af' : '#6b7280';
     const grid = currentTheme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
     const overlays = compare && compare.length >= 2 ? compare : null;
     if (overlays) {
-        const data = trend.map((point, index) => {
-            const row: Record<string, string | number> = { label: point.label };
-            for (const series of overlays) {
-                const item = series.trend[index];
-                row[`${series.key}_qty`] = item?.qty || 0;
-                row[`${series.key}_pct`] = item?.pct || 0;
-            }
-            return row;
-        });
         return (
-            <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={grid} vertical={false} />
-                    <XAxis
-                        dataKey="label"
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fill: tick, fontSize: 11, fontWeight: 500 }}
-                    />
-                    <YAxis
-                        axisLine={false}
-                        tickLine={false}
-                        width={44}
-                        tick={{ fill: tick, fontSize: 11, fontWeight: 500 }}
-                        tickFormatter={(value: number) => (
-                            metric === 'pct' ? `${Number(value).toFixed(0)}%` : Number(value).toLocaleString()
-                        )}
-                    />
-                    <Tooltip content={<TrendTooltip currentTheme={currentTheme} />} />
-                    <Legend wrapperStyle={{ fontSize: 11 }} />
-                    {overlays.map((series) => (
-                        <Line
-                            key={series.key}
-                            type="monotone"
-                            dataKey={metric === 'qty' ? `${series.key}_qty` : `${series.key}_pct`}
-                            name={series.label}
-                            stroke={series.color}
-                            strokeWidth={2.2}
-                            dot={{ r: 3.5, fill: series.color, strokeWidth: 0 }}
-                            activeDot={{ r: 5, fill: series.color, strokeWidth: 0 }}
-                        />
-                    ))}
-                </ComposedChart>
-            </ResponsiveContainer>
+            <OverlayTrendChart
+                trend={trend}
+                overlays={overlays}
+                currentTheme={currentTheme}
+                metric={metric}
+            />
         );
     }
     const values = trend.map((point) => (metric === 'qty' ? point.qty : point.pct));
@@ -323,14 +328,16 @@ function TrendChart({
                     width={44}
                     tick={{ fill: tick, fontSize: 11, fontWeight: 500 }}
                     tickFormatter={(value: number) => (
-                        metric === 'pct' ? `${Number(value).toFixed(0)}%` : Number(value).toLocaleString()
+                        metric === 'pct'
+                            ? (Math.abs(value) < 10 ? `${Number(value).toFixed(1)}%` : `${Number(value).toFixed(0)}%`)
+                            : Number(value).toLocaleString()
                     )}
                 />
                 <Tooltip content={<TrendTooltip currentTheme={currentTheme} />} />
                 <Area
                     type="monotone"
                     dataKey={dataKey}
-                    name={metric === 'qty' ? 'Qty' : '%'}
+                    name={metric === 'qty' ? 'Qty' : 'Rate'}
                     stroke={accent}
                     strokeWidth={2}
                     fill="url(#reasonsFocusTrend)"
@@ -348,6 +355,295 @@ function TrendChart({
                 )}
             </ComposedChart>
         </ResponsiveContainer>
+    );
+}
+
+function OverlayTrendChart({
+    trend,
+    overlays,
+    currentTheme,
+    metric,
+}: {
+    trend: ReasonsTrendPoint[];
+    overlays: ReasonsNamedTrend[];
+    currentTheme: ThemeName;
+    metric: 'qty' | 'pct';
+}) {
+    const tick = currentTheme === 'dark' ? '#9ca3af' : '#6b7280';
+    const grid = currentTheme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+    const data = trend.map((point, index) => {
+        const row: Record<string, string | number> = { label: point.label };
+        for (const series of overlays) {
+            const item = series.trend[index];
+            row[`${series.key}_qty`] = item?.qty || 0;
+            row[`${series.key}_pct`] = item?.pct || 0;
+        }
+        return row;
+    });
+    return (
+        <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={grid} vertical={false} />
+                <XAxis
+                    dataKey="label"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: tick, fontSize: 11, fontWeight: 500 }}
+                />
+                <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    width={44}
+                    tick={{ fill: tick, fontSize: 11, fontWeight: 500 }}
+                    tickFormatter={(value: number) => (
+                        metric === 'pct'
+                            ? (Math.abs(value) < 10 ? `${Number(value).toFixed(1)}%` : `${Number(value).toFixed(0)}%`)
+                            : Number(value).toLocaleString()
+                    )}
+                />
+                <Tooltip content={<TrendTooltip currentTheme={currentTheme} />} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                {overlays.map((series) => (
+                    <Line
+                        key={series.key}
+                        type="monotone"
+                        dataKey={metric === 'qty' ? `${series.key}_qty` : `${series.key}_pct`}
+                        name={series.label}
+                        stroke={series.color}
+                        strokeWidth={2.2}
+                        dot={{ r: 3.5, fill: series.color, strokeWidth: 0 }}
+                        activeDot={{ r: 5, fill: series.color, strokeWidth: 0 }}
+                    />
+                ))}
+            </ComposedChart>
+        </ResponsiveContainer>
+    );
+}
+
+function StratifyTooltip({
+    active,
+    payload,
+    label,
+    currentTheme,
+    series,
+}: {
+    active?: boolean;
+    payload?: { name?: string; value?: number; color?: string; dataKey?: string }[];
+    label?: string;
+    currentTheme: ThemeName;
+    series: ReasonsStratifySeries[];
+}) {
+    if (!active || !payload?.length) return null;
+    const monthTotal = payload.reduce((sum, entry) => sum + (Number(entry.value) || 0), 0);
+    const rows = payload
+        .map((entry) => {
+            const qty = Number(entry.value) || 0;
+            const item = series.find((row) => row.key === entry.dataKey || row.label === entry.name);
+            return {
+                name: item?.label || String(entry.name || ''),
+                qty,
+                color: item?.color || entry.color,
+            };
+        })
+        .filter((row) => row.qty > 0)
+        .sort((a, b) => b.qty - a.qty);
+    return (
+        <ChartTip
+            currentTheme={currentTheme}
+            label={label}
+            rows={rows.map((row) => ({
+                name: row.name,
+                value: `${fmtQty(row.qty)} · ${fmtPct(monthTotal > 0 ? (row.qty / monthTotal) * 100 : 0)}`,
+                color: row.color,
+            }))}
+        />
+    );
+}
+
+function StratifyChart({
+    series,
+    currentTheme,
+}: {
+    series: ReasonsStratifySeries[];
+    currentTheme: ThemeName;
+}) {
+    const tick = currentTheme === 'dark' ? '#9ca3af' : '#6b7280';
+    const grid = currentTheme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+    const labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const ranked = [...series].sort((a, b) => b.qty - a.qty || a.label.localeCompare(b.label, 'th'));
+    const data = labels.map((label, index) => {
+        const row: Record<string, string | number> = { label };
+        for (const item of ranked) row[item.key] = item.months[index] || 0;
+        return row;
+    });
+    const byKey = new Map(ranked.map((item) => [item.key, item]));
+    return (
+        <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={grid} vertical={false} />
+                <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: tick, fontSize: 11, fontWeight: 500 }} />
+                <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    width={44}
+                    tick={{ fill: tick, fontSize: 11, fontWeight: 500 }}
+                    tickFormatter={(value: number) => Number(value).toLocaleString()}
+                />
+                <Tooltip content={<StratifyTooltip currentTheme={currentTheme} series={ranked} />} />
+                <Legend
+                    wrapperStyle={{ fontSize: 11 }}
+                    formatter={(value: string) => {
+                        const item = byKey.get(value) || ranked.find((row) => row.label === value);
+                        if (!item) return value;
+                        return `${item.label} ${fmtQty(item.qty)} · ${fmtPct(item.pct)}`;
+                    }}
+                />
+                {ranked.map((item) => (
+                    <Bar
+                        key={item.key}
+                        dataKey={item.key}
+                        name={item.label}
+                        stackId="qty"
+                        fill={item.color}
+                        maxBarSize={28}
+                        isAnimationActive={false}
+                    />
+                ))}
+            </BarChart>
+        </ResponsiveContainer>
+    );
+}
+
+function ParetoTooltip({
+    active,
+    payload,
+    currentTheme,
+}: {
+    active?: boolean;
+    payload?: { name?: string; value?: number; color?: string; dataKey?: string; payload?: ReasonsParetoItem }[];
+    currentTheme: ThemeName;
+}) {
+    if (!active || !payload?.length) return null;
+    const item = payload[0]?.payload;
+    const rows = [
+        { name: 'Rate', value: fmtPct(Number(item?.pct) || 0), color: payload[0]?.color },
+        ...(Number(item?.qty) > 0
+            ? [{ name: 'Qty', value: fmtQty(Number(item?.qty) || 0), color: payload[0]?.color }]
+            : []),
+    ];
+    return <ChartTip currentTheme={currentTheme} label={item?.name || item?.code} rows={rows} />;
+}
+
+function paretoTickLabel(name: string): string {
+    return String(name || '').replace(/^W\/W\s+/i, '').trim() || name;
+}
+
+function ParetoAxisTick({
+    x = 0,
+    y = 0,
+    payload,
+    data,
+    fill,
+    fontSize,
+    angle,
+}: {
+    x?: number;
+    y?: number;
+    payload?: { value?: number };
+    data: { tick: string; name?: string; code: string }[];
+    fill: string;
+    fontSize: number;
+    angle: number;
+}) {
+    const row = data[Number(payload?.value) - 1];
+    const label = row?.tick || '';
+    if (!label) return <g />;
+    return (
+        <text
+            x={x}
+            y={y}
+            fill={fill}
+            fontSize={fontSize}
+            fontWeight={600}
+            textAnchor="end"
+            dominantBaseline="hanging"
+            transform={`rotate(${angle} ${x} ${y})`}
+            style={{ fontFamily: 'ui-sans-serif, system-ui, "Segoe UI", Tahoma, sans-serif' }}
+        >
+            <title>{row.name || row.code}</title>
+            {label}
+        </text>
+    );
+}
+
+function CodewarePareto({
+    items,
+    currentTheme,
+    accent,
+}: {
+    items: ReasonsParetoItem[];
+    currentTheme: ThemeName;
+    accent: string;
+}) {
+    const tick = currentTheme === 'dark' ? '#ffffff' : '#111111';
+    const grid = currentTheme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+    if (!items.length) return null;
+    const data = items.map((item, index) => ({
+        ...item,
+        rank: index + 1,
+        tick: paretoTickLabel(item.name || item.code),
+    }));
+    const tickFont = data.length > 24 ? 9 : data.length > 14 ? 10 : 11;
+    const longest = data.reduce((max, row) => Math.max(max, (row.tick || '').length), 8);
+    const labelAngle = -42;
+    const axisHeight = Math.min(132, Math.max(88, Math.round(longest * tickFont * 0.38) + 18));
+    const minWidth = Math.max(data.length * 36, 280);
+    const height = 168 + axisHeight;
+    return (
+        <div className="overflow-x-auto px-2 pt-2">
+            <div style={{ minWidth, height }} className="w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={data} margin={{ top: 12, right: 8, left: 4, bottom: 8 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke={grid} vertical={false} />
+                        <XAxis
+                            dataKey="rank"
+                            interval={0}
+                            height={axisHeight}
+                            tickLine={false}
+                            axisLine={false}
+                            tick={(props) => (
+                                <ParetoAxisTick
+                                    x={Number(props.x) || 0}
+                                    y={Number(props.y) || 0}
+                                    payload={props.payload}
+                                    data={data}
+                                    fill={tick}
+                                    fontSize={tickFont}
+                                    angle={labelAngle}
+                                />
+                            )}
+                        />
+                        <YAxis
+                            tick={{ fill: tick, fontSize: 9 }}
+                            tickFormatter={(n: number) => `${n.toFixed(n >= 10 ? 0 : 1)}%`}
+                            width={36}
+                            axisLine={false}
+                            tickLine={false}
+                        />
+                        <Tooltip content={<ParetoTooltip currentTheme={currentTheme} />} />
+                        <Bar dataKey="pct" name="Rate" radius={[3, 3, 0, 0]} maxBarSize={26}>
+                            {items.map((row) => (
+                                <Cell
+                                    key={`${row.tone || 'x'}-${row.code}`}
+                                    fill={row.tone ? REASONS_TONE_COLOR[row.tone] : accent}
+                                    fillOpacity={0.86}
+                                />
+                            ))}
+                        </Bar>
+                    </BarChart>
+                </ResponsiveContainer>
+            </div>
+        </div>
     );
 }
 
@@ -544,11 +840,38 @@ export function ReasonsFocus({
     onOpenTone: (tone: ReasonsFocusTone) => void;
 }) {
     const [metric, setMetric] = useState<'qty' | 'pct'>('qty');
+    const [paretoGroup, setParetoGroup] = useState('all');
+    const [layer, setLayer] = useState<'all' | 'group' | 'forming' | 'size'>('all');
     const trend = payload?.trend || [];
     const compare = (payload?.compare || []).filter((series) => (
         series.trend.some((point) => (Number(point.qty) || 0) > 0)
     ));
-    const codeware = payload?.codeware || [];
+    const pool = (payload?.paretoCodeware && payload.paretoCodeware.length > 0)
+        ? payload.paretoCodeware
+        : (payload?.codeware || []);
+    const paretoGroupOptions = reasonsParetoGroupOptions(pool);
+    const activeParetoGroup = paretoGroupOptions.some((opt) => opt.value === paretoGroup)
+        ? paretoGroup
+        : 'all';
+    const filteredCodeware = filterReasonsCodewareGroup(pool, activeParetoGroup);
+    const sliced = sliceReasonsCodeware(filteredCodeware);
+    const codeware = sliced.codeware;
+    const codewareOther = activeParetoGroup === 'all' ? payload?.other : sliced.other;
+    const paretoItems = buildReasonsRatePareto(filteredCodeware);
+    const groupSeries = payload?.stratify?.group || [];
+    const formingSeries = payload?.stratify?.forming || [];
+    const sizeSeries = payload?.stratify?.size || [];
+    const canGroup = groupSeries.length > 1;
+    const canForming = formingSeries.length > 1;
+    const canSize = sizeSeries.length > 1;
+    const activeLayer = layer === 'group' && canGroup
+        ? 'group'
+        : layer === 'forming' && canForming
+            ? 'forming'
+            : layer === 'size' && canSize
+                ? 'size'
+                : 'all';
+    const overlays = compare.length >= 2;
     const hasTrend = Boolean(
         trend.some((point) => point.qty > 0)
         || compare.some((series) => series.trend.some((point) => point.qty > 0)),
@@ -556,7 +879,15 @@ export function ReasonsFocus({
     const kindAccent = kind === 'scrap' ? SCRAP_COLOR : REJECT_COLOR;
     const meta = payload?.meta;
     const yearLabel = formatReasonsYearLabel(year);
-    const compareHint = compare && compare.length >= 2
+    const stratifySeries = activeLayer === 'group'
+        ? groupSeries
+        : activeLayer === 'forming'
+            ? formingSeries
+            : activeLayer === 'size'
+                ? sizeSeries
+                : [];
+    const showStacks = activeLayer !== 'all' && stratifySeries.length > 1;
+    const compareHint = overlays
         ? compare.map((series) => series.label).join(' vs ')
         : 'Average line · peak month marked';
     const hasShare = !loading && !error && (payload?.familyShare?.length || 0) > 0;
@@ -633,23 +964,43 @@ export function ReasonsFocus({
                 )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-3">
-                        <section className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl shadow-sm overflow-hidden flex flex-col min-h-[18rem]`}>
+            <div className="grid grid-cols-1 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-3 items-start">
+                        <section className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl shadow-sm overflow-hidden flex flex-col h-[22rem]`}>
                             <div className={`px-3 py-2.5 border-b ${theme.borderColor} flex flex-wrap items-center justify-between gap-2`}>
                                 <div>
-                                    <h2 className={`text-sm font-bold ${theme.textWhite}`}>Monthly trend</h2>
-                                    <p className={`text-[11px] ${theme.textMuted}`}>{compareHint}</p>
+                                    <h2 className={`text-sm font-bold ${theme.textWhite}`}>
+                                        {showStacks ? 'Stratification' : 'Monthly trend'}
+                                    </h2>
+                                    {!showStacks && (
+                                        <p className={`text-[11px] ${theme.textMuted}`}>{compareHint}</p>
+                                    )}
                                 </div>
-                                <SegmentedPills
-                                    theme={theme}
-                                    value={metric}
-                                    onChange={setMetric}
-                                    options={[
-                                        { value: 'qty', label: 'Qty' },
-                                        { value: 'pct', label: 'Rate' },
-                                    ]}
-                                    activeColor={accent}
-                                />
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                    <SegmentedPills
+                                        theme={theme}
+                                        value={activeLayer}
+                                        onChange={setLayer}
+                                        options={[
+                                            { value: 'all' as const, label: 'All' },
+                                            ...(canGroup ? [{ value: 'group' as const, label: 'Group' }] : []),
+                                            ...(canForming ? [{ value: 'forming' as const, label: 'Forming' }] : []),
+                                            ...(canSize ? [{ value: 'size' as const, label: 'Size' }] : []),
+                                        ]}
+                                        activeColor={accent}
+                                    />
+                                    {activeLayer === 'all' && (
+                                        <SegmentedPills
+                                            theme={theme}
+                                            value={metric}
+                                            onChange={setMetric}
+                                            options={[
+                                                { value: 'qty', label: 'Qty' },
+                                                { value: 'pct', label: 'Rate' },
+                                            ]}
+                                            activeColor={accent}
+                                        />
+                                    )}
+                                </div>
                             </div>
                             <div className="flex-1 min-h-0">
                                 {loading && <TrendSkeleton theme={theme} />}
@@ -669,35 +1020,67 @@ export function ReasonsFocus({
                                 )}
                                 {!loading && !error && hasTrend && (
                                     <div className="h-full min-h-[16rem] p-3">
-                                        <TrendChart
-                                            trend={trend}
-                                            compare={compare}
-                                            accent={accent}
-                                            currentTheme={currentTheme}
-                                            metric={metric}
-                                            peakMo={meta?.peakMo ?? null}
-                                        />
+                                        {showStacks ? (
+                                            <StratifyChart series={stratifySeries} currentTheme={currentTheme} />
+                                        ) : (
+                                            <TrendChart
+                                                trend={trend}
+                                                compare={compare}
+                                                accent={accent}
+                                                currentTheme={currentTheme}
+                                                peakMo={meta?.peakMo ?? null}
+                                                metric={metric}
+                                            />
+                                        )}
                                     </div>
                                 )}
                             </div>
                         </section>
 
-                        <section className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl shadow-sm overflow-hidden flex flex-col min-h-[18rem]`}>
-                            <div className={`px-3 py-2.5 border-b ${theme.borderColor}`}>
-                                <h2 className={`text-sm font-bold ${theme.textWhite}`}>Top codeware</h2>
-                                <p className={`text-[11px] ${theme.textMuted}`}>
-                                    Top 10 + Other · qtyproc ≥ {REASONS_CODEWARE_MIN_QTYPROC.toLocaleString()}
-                                </p>
+                        <section className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl shadow-sm overflow-hidden flex flex-col min-h-[22rem]`}>
+                            <div className={`px-3 py-2.5 border-b ${theme.borderColor} flex flex-wrap items-center justify-between gap-2`}>
+                                <div>
+                                    <h2 className={`text-sm font-bold ${theme.textWhite}`}>Pareto · codeware</h2>
+                                    <p className={`text-[11px] ${theme.textMuted}`}>
+                                        Top {REASONS_CODEWARE_TOP_N} by rate · qtyproc ≥ {REASONS_CODEWARE_MIN_QTYPROC.toLocaleString()}
+                                    </p>
+                                </div>
+                                {paretoGroupOptions.length > 0 && (
+                                    <label className={`flex items-center gap-1.5 px-2.5 py-1.5 ${theme.inputBg} rounded-xl border ${theme.borderColor} shrink-0`}>
+                                        <span className={`text-[10px] font-bold ${theme.textMuted}`}>Group</span>
+                                        <select
+                                            value={activeParetoGroup}
+                                            onChange={(e) => setParetoGroup(e.target.value)}
+                                            className={`bg-transparent text-xs font-bold ${theme.textWhite} outline-none cursor-pointer max-w-[9.5rem]`}
+                                            title="Filter Pareto by codeware group"
+                                            style={{ colorScheme: currentTheme }}
+                                        >
+                                            <option value="all" className={currentTheme === 'dark' ? 'bg-[#141414] text-white' : 'bg-white text-zinc-900'}>All</option>
+                                            {paretoGroupOptions.map((opt) => (
+                                                <option
+                                                    key={opt.value}
+                                                    value={opt.value}
+                                                    className={currentTheme === 'dark' ? 'bg-[#141414] text-white' : 'bg-white text-zinc-900'}
+                                                >
+                                                    {opt.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </label>
+                                )}
                             </div>
+                            {!loading && !error && paretoItems.length > 0 && (
+                                <CodewarePareto items={paretoItems} currentTheme={currentTheme} accent={accent} />
+                            )}
                             <CodewareList
                                 theme={theme}
                                 accent={accent}
                                 family={_family}
                                 items={codeware}
-                                other={payload?.other}
+                                other={codewareOther}
                                 loading={loading}
                                 error={error}
-                                empty={!loading && !error && codeware.length === 0 && !payload?.other}
+                                empty={!loading && !error && codeware.length === 0 && !codewareOther}
                                 year={year}
                                 onRetry={onRetry}
                             />
