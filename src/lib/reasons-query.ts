@@ -648,16 +648,20 @@ export async function getReasonsDetailResponse(
     }
     const years = yearsForReasonsParam(params.year);
     const packs = await Promise.all(years.map(async (year) => {
-        const [month, detail] = await Promise.all([
+        const useMixProds = params.family === 'ww';
+        const [month, detail, sqlMonth] = await Promise.all([
             getYearKindRows(year, params.kind, params.family, forceRefresh),
             getDetailRows(year, params.kind, params.rsn, forceRefresh),
+            useMixProds ? getMonthRows(year, params.kind, forceRefresh) : Promise.resolve(null),
         ]);
+        const codeProds = sqlMonth?.prods;
         const payload = buildReasonsDetail(month.defects, detail.rows, month.prods, { ...params, year }, {
             generatedAt: month.generatedAt,
             stale: month.stale || detail.stale,
+            codeProds,
         });
         payload.groupOptions = reasonsGroupOptions(month.defects);
-        return { year, month, detail, payload: withFocusQc(payload, detail.rows) };
+        return { year, month, detail, codeProds, payload: withFocusQc(payload, detail.rows) };
     }));
     const stale = packs.some((pack) => pack.month.stale || pack.detail.stale);
     const generatedAt = packs[0]?.month.generatedAt;
@@ -669,7 +673,11 @@ export async function getReasonsDetailResponse(
         packs.flatMap((pack) => pack.detail.rows),
         packs.flatMap((pack) => pack.month.prods),
         { ...params, year: 'all' },
-        { generatedAt, stale },
+        {
+            generatedAt,
+            stale,
+            codeProds: packs.flatMap((pack) => pack.codeProds || []),
+        },
     );
     combined.groupOptions = reasonsGroupOptions(packs.flatMap((pack) => pack.month.defects));
     return withFocusQc(mergeReasonsYearDetails(

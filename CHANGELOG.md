@@ -2,6 +2,13 @@
 
 All notable changes to the **Sorting Dashboard** project will be documented in this file.
 
+## [1.6.114] - 2026-09-21
+
+### Fixed
+- **Defects Focus:** WW Pareto · codeware was empty because Mix totals have no ware names, so every rate was 0%. Focus now joins qtyproc from the year×kind cache. No database objects were changed.
+
+---
+
 ## [1.6.113] - 2026-09-20
 
 ### Changed

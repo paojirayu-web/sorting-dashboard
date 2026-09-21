@@ -962,6 +962,11 @@ function focusToneOf(tone: ReasonsToneKey | undefined): ReasonsFocusTone | undef
     return undefined;
 }
 
+function addProdQty(byCode: Map<string, number>, key: string, qty: number) {
+    if (!key || qty <= 0) return;
+    byCode.set(key, (byCode.get(key) || 0) + qty);
+}
+
 function prodProcByCode(rows: ReasonsProdRow[], splitTone = false): Map<string, number> {
     const byCode = new Map<string, number>();
     for (const row of rows) {
@@ -972,9 +977,12 @@ function prodProcByCode(rows: ReasonsProdRow[], splitTone = false): Map<string, 
             tone: row.tone,
         });
         if (!code) continue;
-        const tone = splitTone ? focusToneOf(row.tone) : undefined;
-        const key = splitTone ? `${tone || '_'}\t${code}` : code;
-        byCode.set(key, (byCode.get(key) || 0) + (Number(row.qtyproc) || 0));
+        const qty = Number(row.qtyproc) || 0;
+        addProdQty(byCode, code, qty);
+        if (splitTone) {
+            const tone = focusToneOf(row.tone);
+            addProdQty(byCode, `${tone || '_'}\t${code}`, qty);
+        }
     }
     return byCode;
 }
@@ -1335,7 +1343,7 @@ function collectCodeware(
     }
     return [...byKey.entries()]
         .map(([key, row]) => {
-            const qtyproc = prodByCode.get(key) || 0;
+            const qtyproc = prodByCode.get(key) || prodByCode.get(row.code) || 0;
             const item: ReasonsCodewareItem = {
                 code: row.code,
                 qty: row.qty,
@@ -1419,12 +1427,20 @@ type SliceBuild = {
     stratify: ReasonsStratify;
 };
 
+type DetailBuildOptions = {
+    generatedAt?: string;
+    stale?: boolean;
+    topN?: number;
+    /** Per-ware qtyproc. Mix WW totals have no desc1 — pass year×kind prods here. */
+    codeProds?: ReasonsProdRow[];
+};
+
 function buildSlice(
     monthRows: ReasonsMonthRow[],
     codeRows: ReasonsDetailRow[],
     prodRows: ReasonsProdRow[],
     params: ReasonsSliceParams,
-    options?: { generatedAt?: string; stale?: boolean; topN?: number },
+    options?: DetailBuildOptions,
 ): SliceBuild {
     const mix = mixFromDetail(params);
     const slicedMonths = monthRows.filter((row) => matchesReasonsMix(row, mix));
@@ -1448,7 +1464,9 @@ function buildSlice(
     const slicedCodes = codeRows.filter((row) => matchesReasonsMix(row, mix));
     const splitTone = params.tone === 'all';
     const minQtyproc = mixIsNarrow(mix) ? 0 : REASONS_CODEWARE_MIN_QTYPROC;
-    const prodByCode = prodProcByCode(slicedProds, splitTone);
+    const joinProds = options?.codeProds?.length ? options.codeProds : prodRows;
+    const slicedJoinProds = joinProds.filter((row) => matchesReasonsMix(row, mix));
+    const prodByCode = prodProcByCode(slicedJoinProds, splitTone);
     let pool = collectCodeware(slicedCodes, prodByCode, minQtyproc, splitTone);
     if (pool.length === 0 && slicedCodes.some((row) => (Number(row.qty) || 0) > 0)) {
         pool = collectCodeware(slicedCodes, prodByCode, 0, splitTone);
@@ -1538,7 +1556,7 @@ export function buildReasonsDetail(
     codeRows: ReasonsDetailRow[],
     prodRows: ReasonsProdRow[],
     params: ReasonsSliceParams,
-    options?: { generatedAt?: string; stale?: boolean; topN?: number },
+    options?: DetailBuildOptions,
 ): ReasonsDetailResponse {
     if (params.family === 'all') {
         const activeTone = isReasonsFocusTone(params.tone) ? params.tone : 'white';

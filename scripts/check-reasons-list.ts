@@ -673,6 +673,33 @@ const overviewFromMix = buildReasonsOverview(fromMix.defects, fromMix.prods, { .
 assert.equal(overviewFromMix.meta.qty, 15);
 assert.equal(overviewFromMix.meta.qtyproc, 100);
 assert.equal(overviewFromMix.top?.length, 2);
+const mixFocusRows = [{
+    mo: 1,
+    code: 'W/W JMSC76/T0040(VG)',
+    qty: 10,
+    tone: 'white' as const,
+    desc1: 'W/W JMSC76/T0040(VG)',
+}];
+const mixFocusEmptyProc = buildReasonsDetail(fromMix.defects, mixFocusRows, fromMix.prods, {
+    rsn: 'Crack',
+    year: 2026,
+    kind: 'scrap',
+    family: 'ww',
+    tone: 'all',
+});
+assert.equal(mixFocusEmptyProc.codeware[0]?.qtyproc, 0);
+const mixFocusWithCodeProds = buildReasonsDetail(fromMix.defects, mixFocusRows, fromMix.prods, {
+    rsn: 'Crack',
+    year: 2026,
+    kind: 'scrap',
+    family: 'ww',
+    tone: 'all',
+}, {
+    codeProds: [{ mo: 1, qtyproc: 400, tone: 'white', desc1: 'W/W JMSC76/T0040(VG)' }],
+});
+assert.equal(mixFocusWithCodeProds.codeware[0]?.qtyproc, 400);
+assert.ok((mixFocusWithCodeProds.codeware[0]?.pct || 0) > 0);
+assert.ok((mixFocusWithCodeProds.pareto?.[0]?.pct || 0) > 0);
 
 const overviewAll = buildReasonsOverview(mixDefects, mixProds, mixAll);
 assert.equal(overviewAll.mode, 'scope');

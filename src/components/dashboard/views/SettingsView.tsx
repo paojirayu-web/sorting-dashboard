@@ -69,6 +69,17 @@ export function SettingsView({ theme, currentTheme, setCurrentTheme }: SettingsV
                     theme={theme}
                 >
                 <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
+                    <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.114 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-21</span></h3>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className={`text-sm font-bold ${theme.textWhite} mb-2`}>Fixed</h4>
+                            <ul className={`list-disc list-inside text-sm ${theme.textSecondary} space-y-1`}>
+                                <li><strong>Defects Focus:</strong> WW Pareto · codeware was empty because Mix totals have no ware names, so every rate was 0%. Focus now joins qtyproc from the year×kind cache. No database objects were changed.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className={`${theme.cardBg} border ${theme.borderColor} rounded-2xl p-4 sm:p-6 shadow-sm mb-6 sm:mb-8`}>
                     <h3 className={`text-xl font-bold ${theme.accentText} mb-4`}>v1.6.113 <span className={`text-sm font-normal ${theme.textMuted} ml-2`}>2026-09-20</span></h3>
                     <div className="space-y-4">
                         <div>
